@@ -1,0 +1,84 @@
+# SenseL OT Edge Sensor — Main Docker Compose
+# Target: Ubuntu Server (MVP / Lab)
+# Pi4 overlay: docker compose -f docker-compose.yml -f docker-compose.pi4.yml up -d
+# EdgeX UI (lab): docker compose --profile lab-ui up -d
+
+name: sensel-ot-edge-sensor
+
+include:
+  - path: edgex/docker-compose.edgex.yml
+
+services:
+  # ---------------------------------------------------------------------------
+  # Local MQTT Broker (feature summary → EdgeX device-mqtt)
+  # ---------------------------------------------------------------------------
+  local-mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sensel-local-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./services/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "127.0.0.1:1884:1883"
+    networks:
+      - sensel-edge
+
+  # ---------------------------------------------------------------------------
+  # SenseL Edge Agent — platform comms, policy sync, health
+  # ---------------------------------------------------------------------------
+  sensel-edge-agent:
+    build:
+      context: ./services/sensel-edge-agent
+      dockerfile: Dockerfile
+    container_name: sensel-edge-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-false}
+      - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
+      - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets:ro
+    depends_on:
+      local-mqtt:
+        condition: service_started
+      core-data:
+        condition: service_started
+    networks:
+      - sensel-edge
+      - edgex-network
+
+  # ---------------------------------------------------------------------------
+  # Packet Sensor Agent — mirror capture, parse, detect, evidence
+  # ---------------------------------------------------------------------------
+  packet-sensor:
+    build:
+      context: ./services/packet-sensor
+      dockerfile: Dockerfile
+    container_name: sensel-packet-sensor
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/pcap:/app/data/pcap
+      - ./data/assets:/app/data/assets
+    # Mirror NIC requires host network or macvlan — configure per deploy guide
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      - local-mqtt
+      - sensel-edge-agent
+
+networks:
+  sensel-edge:
+    driver: bridge
+  edgex-network:
+    driver: bridge
+
+volumes:
+  edgex-db:

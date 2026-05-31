@@ -1,0 +1,65 @@
+# Pi4 deployment overlay
+# Usage: docker compose -f docker-compose.yml -f docker-compose.pi4.yml up -d
+
+services:
+  packet-sensor:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+    environment:
+      - DEPLOY_TARGET=pi4
+      - CAPTURE_MAX_MBPS=100
+
+  sensel-edge-agent:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  database:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  core-data:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  core-metadata:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  modbus-simulator:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.1"
+
+  device-modbus:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  device-mqtt:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # Pi4: reduce EdgeX footprint in lab — enable full stack when hardware verified
+  # See deploy/pi4/setup.sh for memory tuning

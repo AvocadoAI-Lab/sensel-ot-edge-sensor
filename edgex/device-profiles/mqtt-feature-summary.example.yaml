@@ -1,0 +1,4 @@
+# EdgeX Device Profile — Packet Sensor Feature Summary (MQTT)
+# Subscribes to local-mqtt topic: sensel/ot/{sensor_id}/features/+
+#
+# Bridges 1-minute feature summaries into Core Data for SenseL telemetry path.

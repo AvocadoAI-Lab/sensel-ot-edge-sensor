@@ -1,0 +1,221 @@
+# EdgeX Foundry 4.0 — MVP subset (non-secure, MQTT message bus)
+# Included from root docker-compose.yml
+#
+# Services: Postgres, MQTT broker, Core (keeper/metadata/data), device-modbus, device-mqtt
+# Lab UI: enable with profile `lab-ui`  →  docker compose --profile lab-ui up -d
+
+x-edgex-defaults: &edgex-defaults
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  user: "2002:2001"
+  networks:
+    - edgex-network
+  volumes:
+    - /etc/localtime:/etc/localtime:ro
+
+x-edgex-depends-core: &edgex-depends-core
+  core-common-config-bootstrapper:
+    condition: service_started
+  core-keeper:
+    condition: service_started
+  core-metadata:
+    condition: service_started
+
+services:
+  database:
+    <<: *edgex-defaults
+    container_name: edgex-postgres
+    image: postgres:16.3-alpine3.20
+    hostname: edgex-postgres
+    user: postgres
+    read_only: false
+    environment:
+      POSTGRES_DB: edgex_db
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    tmpfs:
+      - /run
+      - /var/run/postgresql
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - edgex-db:/var/lib/postgresql/data
+
+  mqtt-broker:
+    <<: *edgex-defaults
+    container_name: edgex-mqtt-broker
+    image: eclipse-mosquitto:2.0.21
+    hostname: edgex-mqtt-broker
+    command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto-no-auth.conf"]
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./mqtt-broker/mosquitto-no-auth.conf:/mosquitto/config/mosquitto-no-auth.conf:ro
+    networks:
+      - edgex-network
+      - sensel-edge
+
+  core-keeper:
+    <<: *edgex-defaults
+    container_name: edgex-core-keeper
+    image: edgexfoundry/core-keeper:4.0.0
+    hostname: edgex-core-keeper
+    depends_on:
+      database:
+        condition: service_started
+      mqtt-broker:
+        condition: service_started
+    environment:
+      DATABASE_HOST: edgex-postgres
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      MESSAGEBUS_AUTHMODE: none
+      MESSAGEBUS_HOST: edgex-mqtt-broker
+      MESSAGEBUS_PORT: "1883"
+      MESSAGEBUS_PROTOCOL: tcp
+      MESSAGEBUS_SECRETNAME: ""
+      MESSAGEBUS_TYPE: mqtt
+      SERVICE_HOST: edgex-core-keeper
+    ports:
+      - "127.0.0.1:59890:59890"
+
+  core-common-config-bootstrapper:
+    <<: *edgex-defaults
+    container_name: edgex-core-common-config-bootstrapper
+    image: edgexfoundry/core-common-config-bootstrapper:4.0.0
+    hostname: edgex-core-common-config-bootstrapper
+    depends_on:
+      core-keeper:
+        condition: service_started
+    command:
+      - /core-common-config-bootstrapper
+      - --registry
+      - -cp=keeper.http://edgex-core-keeper:59890
+    environment:
+      ALL_SERVICES_DATABASE_HOST: edgex-postgres
+      ALL_SERVICES_MESSAGEBUS_HOST: edgex-mqtt-broker
+      ALL_SERVICES_REGISTRY_HOST: edgex-core-keeper
+      APP_SERVICES_CLIENTS_CORE_METADATA_HOST: edgex-core-metadata
+      DEVICE_SERVICES_CLIENTS_CORE_METADATA_HOST: edgex-core-metadata
+      EDGEX_SECURITY_SECRET_STORE: "false"
+    restart: "no"
+
+  core-metadata:
+    <<: *edgex-defaults
+    container_name: edgex-core-metadata
+    image: edgexfoundry/core-metadata:4.0.0
+    hostname: edgex-core-metadata
+    depends_on:
+      core-keeper:
+        condition: service_started
+      database:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      SERVICE_HOST: edgex-core-metadata
+    ports:
+      - "127.0.0.1:59881:59881"
+
+  core-data:
+    <<: *edgex-defaults
+    container_name: edgex-core-data
+    image: edgexfoundry/core-data:4.0.0
+    hostname: edgex-core-data
+    depends_on:
+      <<: *edgex-depends-core
+      database:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      SERVICE_HOST: edgex-core-data
+    ports:
+      - "127.0.0.1:59880:59880"
+
+  modbus-simulator:
+    container_name: edgex-modbus-simulator
+    image: iotechsys/modbus-sim:1.1.0
+    hostname: modbus-simulator
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:1502:1502"
+    networks:
+      - edgex-network
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+  device-modbus:
+    <<: *edgex-defaults
+    container_name: edgex-device-modbus
+    image: edgexfoundry/device-modbus:4.0.0
+    hostname: edgex-device-modbus
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+      modbus-simulator:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-modbus
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    ports:
+      - "127.0.0.1:59901:59901"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../config/edgex/devices:/custom-config/devices:ro
+      - ../config/edgex/profiles:/custom-config/profiles:ro
+
+  device-mqtt:
+    <<: *edgex-defaults
+    container_name: edgex-device-mqtt
+    image: edgexfoundry/device-mqtt:4.0.0
+    hostname: edgex-device-mqtt
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+      mqtt-broker:
+        condition: service_started
+      local-mqtt:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-mqtt
+      # External MQTT for OT devices / Packet Sensor feature summaries
+      MQTTBROKERINFO_HOST: local-mqtt
+      MQTTBROKERINFO_PORT: "1883"
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    ports:
+      - "127.0.0.1:59982:59982"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../config/edgex/devices:/custom-config/devices:ro
+      - ../config/edgex/profiles:/custom-config/profiles:ro
+    networks:
+      - edgex-network
+      - sensel-edge
+
+  ui:
+    <<: *edgex-defaults
+    profiles: [lab-ui]
+    container_name: edgex-ui-go
+    image: edgexfoundry/edgex-ui:4.0.0
+    hostname: edgex-ui-go
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      SERVICE_HOST: edgex-ui-go
+    ports:
+      - "127.0.0.1:4000:4000"

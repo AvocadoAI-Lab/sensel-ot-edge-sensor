@@ -1,0 +1,70 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a2332;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --high: #f85149;
+  --medium: #d29922;
+  --low: #3fb950;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+header, .controls, .summaries, .table-wrap, footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+.subtitle { color: var(--muted); margin: 0; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  background: var(--panel);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+input, select, button {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: var(--text);
+}
+button { cursor: pointer; background: var(--accent); color: #fff; border: none; }
+button:hover { filter: brightness(1.1); }
+.auto { flex-direction: row; align-items: center; gap: 0.5rem; }
+
+.summaries { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.card {
+  background: var(--panel);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  min-width: 140px;
+}
+.card.muted { color: var(--muted); }
+
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { padding: 0.55rem 0.65rem; border-bottom: 1px solid #30363d; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+tr.sev-high td:nth-child(4) { color: var(--high); }
+tr.sev-medium td:nth-child(4) { color: var(--medium); }
+tr.sev-low td:nth-child(4) { color: var(--low); }
+code { font-size: 0.8rem; word-break: break-all; }
+
+footer { color: var(--muted); font-size: 0.85rem; padding-top: 0; }

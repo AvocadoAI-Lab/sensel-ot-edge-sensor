@@ -1,0 +1,17 @@
+{
+  "sensor_id": "ot-edge-001",
+  "site_id": "factory-lab-001",
+  "window": "60s",
+  "src_mac": "00:11:22:33:44:55",
+  "src_ip": "192.168.10.20",
+  "dst_ip": "192.168.10.30",
+  "protocol": "modbus-tcp",
+  "port": 502,
+  "packet_count": 520,
+  "byte_count": 84212,
+  "modbus_read_count": 120,
+  "modbus_write_count": 3,
+  "new_connection_count": 2,
+  "risk_score": 62,
+  "timestamp": "2026-05-30T12:00:00+08:00"
+}

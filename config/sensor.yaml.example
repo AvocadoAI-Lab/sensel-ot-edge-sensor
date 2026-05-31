@@ -1,0 +1,93 @@
+# SenseL OT Edge Sensor — Main Configuration
+# Copy to sensor.yaml (gitignored) and customize per deployment
+
+sensor:
+  id: ot-edge-001
+  site_id: factory-lab-001
+  type: ot-edge-sensor
+  hardware: ubuntu  # ubuntu | raspberry-pi-4
+  software_version: "0.1.0"
+  capabilities:
+    - edgex
+    - modbus
+    - mqtt
+    - packet-capture
+    - local-detection
+
+sensel:
+  api_url: ${SENSEL_API_URL}
+  api_key: ${SENSEL_API_KEY}
+  events:
+    watch_path: /app/data/assets/security-events.jsonl
+    offset_path: /app/data/security-events.offset
+  upload:
+    events_path: /api/v1/ot/security-events
+    telemetry_path: /api/v1/ot/telemetry
+    health_path: /api/v1/edge-sensors/health
+    register_path: /api/v1/edge-sensors/register
+  retry:
+    max_attempts: 10
+    backoff_sec: 30
+  buffer:
+    max_events: 1000
+    db_path: /app/data/event-buffer.db
+
+northbound_mqtt:
+  enabled: false
+  host: ""
+  port: 1883
+  tenant_id: default
+  qos_events: 1
+
+capture:
+  interface: ${CAPTURE_INTERFACE}
+  promiscuous: true
+  # Lab 61850: (ether proto 0x88b8) or (tcp port 102)
+  bpf_filter: ${CAPTURE_BPF_FILTER}
+  timestamping: true
+  health_check_interval_sec: 30
+
+pcap:
+  retention_minutes: 120
+  max_disk_mb: 2048
+  evidence_before_sec: 60
+  evidence_after_sec: 60
+  ring_buffer_path: /app/data/pcap
+
+features:
+  window_sec: 60
+  mqtt:
+    host: ${LOCAL_MQTT_HOST}
+    port: ${LOCAL_MQTT_PORT}
+    topic_prefix: sensel/ot
+    edgex_device_name: packet-sensor-features
+    # edgex_data_topic:  # default → incoming/data/packet-sensor-features/FeatureSummary
+
+detection:
+  policy_file: /app/config/policy/baseline.json
+  rules_enabled:
+    - OT-001
+    - OT-002
+    - OT-003
+    - OT-004
+    - OT-005
+    - OT-006
+    - OT-007
+    - OT-008
+    - OT-009
+    - OT-010
+    - OT-011
+    - OT-012
+    - OT-013
+    - OT-014
+    - OT-016
+    - OT-018
+  latency_target_sec: 3
+
+edgex:
+  enabled: true
+  mqtt_broker: edgex-mqtt-broker:1883
+
+logging:
+  level: info
+  format: json

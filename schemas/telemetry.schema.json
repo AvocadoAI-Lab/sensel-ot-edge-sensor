@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.io/schemas/ot/telemetry.json",
+  "title": "OT Telemetry",
+  "type": "object",
+  "required": ["site_id", "sensor_id", "resource_name", "value", "timestamp"],
+  "properties": {
+    "site_id": { "type": "string" },
+    "sensor_id": { "type": "string" },
+    "asset_id": { "type": "string" },
+    "resource_name": { "type": "string" },
+    "value": {},
+    "source": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

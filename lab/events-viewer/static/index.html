@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SenseL OT Lab — Events Viewer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>SenseL OT Lab Events</h1>
+    <p class="subtitle">Pi4 被動偵測事件 · 本地 JSONL + Edge Agent 上傳副本</p>
+  </header>
+
+  <section class="controls">
+    <label>
+      來源
+      <select id="source">
+        <option value="local">本地 (security-events.jsonl)</option>
+        <option value="uploaded">已上傳 (uploaded-events.jsonl)</option>
+      </select>
+    </label>
+    <label>
+      Rule ID
+      <input id="ruleFilter" type="text" placeholder="OT-016" />
+    </label>
+    <label>
+      筆數
+      <input id="limit" type="number" value="50" min="1" max="500" />
+    </label>
+    <button id="refresh">重新整理</button>
+    <label class="auto">
+      <input id="autoRefresh" type="checkbox" checked /> 每 10 秒自動更新
+    </label>
+  </section>
+
+  <section class="summaries" id="summaries"></section>
+
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>時間</th>
+          <th>Rule</th>
+          <th>類型</th>
+          <th>嚴重度</th>
+          <th>來源 → 目的</th>
+          <th>描述</th>
+          <th>Evidence</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+  <footer id="status"></footer>
+
+  <script>
+    const rows = document.getElementById("rows");
+    const status = document.getElementById("status");
+    const summariesEl = document.getElementById("summaries");
+
+    async function loadSummaries() {
+      const res = await fetch("/api/summaries");
+      const data = await res.json();
+      const cards = [];
+      if (data.goose) {
+        cards.push(`<div class="card"><strong>GOOSE</strong> msgs=${data.goose.goose_message_count ?? 0}</div>`);
+      }
+      if (data.mms) {
+        cards.push(`<div class="card"><strong>MMS</strong> writes=${data.mms.mms_write_count ?? 0}</div>`);
+      }
+      summariesEl.innerHTML = cards.length ? cards.join("") : "<div class='card muted'>尚無 summary 檔</div>";
+    }
+
+    async function loadEvents() {
+      const source = document.getElementById("source").value;
+      const ruleId = document.getElementById("ruleFilter").value.trim();
+      const limit = document.getElementById("limit").value;
+      const params = new URLSearchParams({ limit });
+      if (ruleId) params.set("rule_id", ruleId);
+      const res = await fetch(`/api/events/${source}?${params}`);
+      const data = await res.json();
+      rows.innerHTML = "";
+      for (const e of data.events) {
+        const tr = document.createElement("tr");
+        tr.className = `sev-${e.severity || "medium"}`;
+        const endpoints = [e.src_ip, e.dst_ip].filter(Boolean).join(" → ");
+        const port = e.dst_port ? `:${e.dst_port}` : "";
+        tr.innerHTML = `
+          <td>${e.timestamp || ""}</td>
+          <td><code>${e.rule_id || ""}</code></td>
+          <td>${e.event_type || ""}</td>
+          <td>${e.severity || ""}</td>
+          <td>${endpoints}${port}</td>
+          <td>${e.description || ""}</td>
+          <td><code>${e.evidence_ref || ""}</code></td>`;
+        rows.appendChild(tr);
+      }
+      status.textContent = `${new Date().toLocaleString()} · ${data.source} · ${data.count} 筆`;
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadSummaries(), loadEvents()]);
+    }
+
+    document.getElementById("refresh").addEventListener("click", refreshAll);
+    document.getElementById("source").addEventListener("change", loadEvents);
+    document.getElementById("ruleFilter").addEventListener("change", loadEvents);
+
+    let timer = null;
+    function setupAuto() {
+      if (timer) clearInterval(timer);
+      if (document.getElementById("autoRefresh").checked) {
+        timer = setInterval(refreshAll, 10000);
+      }
+    }
+    document.getElementById("autoRefresh").addEventListener("change", setupAuto);
+
+    refreshAll();
+    setupAuto();
+  </script>
+</body>
+</html>

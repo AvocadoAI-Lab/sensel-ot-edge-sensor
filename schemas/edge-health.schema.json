@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.io/schemas/edge/health.json",
+  "title": "Edge Sensor Health",
+  "type": "object",
+  "required": ["sensor_id", "site_id", "timestamp"],
+  "properties": {
+    "sensor_id": { "type": "string" },
+    "site_id": { "type": "string" },
+    "cpu_usage": { "type": "number" },
+    "memory_usage": { "type": "number" },
+    "disk_usage": { "type": "number" },
+    "packet_rate": { "type": "integer" },
+    "dropped_packets": { "type": "integer" },
+    "edgex_status": { "type": "string" },
+    "agent_status": { "type": "string" },
+    "policy_version": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

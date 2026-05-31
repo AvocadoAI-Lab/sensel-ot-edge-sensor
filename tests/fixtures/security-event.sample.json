@@ -1,0 +1,21 @@
+{
+  "event_id": "evt-20260530-00001",
+  "site_id": "factory-lab-001",
+  "sensor_id": "ot-edge-001",
+  "asset_id": "relay-01",
+  "event_type": "MODBUS_WRITE_ANOMALY",
+  "severity": "high",
+  "risk_score": 86,
+  "protocol": "modbus-tcp",
+  "src_ip": "192.168.10.88",
+  "dst_ip": "192.168.10.20",
+  "dst_port": 502,
+  "description": "Unexpected Modbus write operation detected from a non-baselined source.",
+  "evidence": {
+    "function_code": 16,
+    "baseline_write_count_per_hour": 0,
+    "observed_write_count": 5,
+    "pcap_ref": "local-ringbuffer://2026-05-30T11:59:30+08:00"
+  },
+  "timestamp": "2026-05-30T12:00:03+08:00"
+}

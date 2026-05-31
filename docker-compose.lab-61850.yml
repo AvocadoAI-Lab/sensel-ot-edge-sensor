@@ -1,0 +1,72 @@
+# IEC 61850 lab overlay — GOOSE publisher + MMS server
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d
+#   CAPTURE_INTERFACE=eth0 make verify-61850
+
+services:
+  goose-publisher:
+    build:
+      context: .
+      dockerfile: lab/61850/goose-publisher/Dockerfile
+    container_name: sensel-goose-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      GOOSE_INTERFACE: ${GOOSE_INTERFACE:-eth0}
+      GOOSE_APPID: "1000"
+      GOOSE_GOCB_REF: simpleIOGenericIO/LLN0.gcbEvents
+      GOOSE_TEST: ${GOOSE_TEST:-false}
+
+  mms-publisher:
+    build:
+      context: .
+      dockerfile: lab/61850/mms-publisher/Dockerfile
+    container_name: sensel-mms-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      MMS_INTERFACE: ${MMS_INTERFACE:-eth0}
+      MMS_SRC_IP: ${MMS_SRC_IP:-192.168.10.88}
+      MMS_DST_IP: ${MMS_DST_IP:-192.168.10.50}
+      MMS_INTERVAL_SEC: ${MMS_INTERVAL_SEC:-2}
+
+  61850-sim-mms:
+    profiles: [lab-mms-amd64]
+    image: stinging/61850-sim:latest
+    container_name: sensel-61850-sim-mms
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:102:102"
+    environment:
+      IED_NAME: IED-LAB
+      MMS_PORT: "102"
+      SIMULATION_FREQUENCY: "2"
+    networks:
+      - sensel-edge
+
+  mms-probe:
+    profiles: [lab-mms-probe]
+    image: python:3.11-slim-bookworm
+    container_name: sensel-mms-probe
+    restart: "no"
+    networks:
+      - sensel-edge
+    depends_on:
+      - 61850-sim-mms
+    command:
+      - python
+      - -c
+      - |
+        import socket, time
+        payload = b"\x03\x00\x00\x2a\x02\xf0\x80confirmedRequest write service"
+        for i in range(5):
+            s = socket.create_connection(("61850-sim-mms", 102), timeout=3)
+            s.sendall(payload)
+            s.close()
+            time.sleep(2)

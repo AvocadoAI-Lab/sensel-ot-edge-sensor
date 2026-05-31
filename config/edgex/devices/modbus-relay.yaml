@@ -1,0 +1,21 @@
+# EdgeX device — lab Modbus relay via iotechsys/modbus-sim (port 1502)
+# Field deploy: set Address to relay IP and Port 502; disable modbus-simulator service.
+
+deviceList:
+  - name: relay-01
+    profileName: ModbusRelay
+    description: Lab Modbus relay (simulator)
+    adminState: UNLOCKED
+    operatingState: UP
+    labels: [ot, modbus, relay, lab]
+    protocols:
+      modbus-tcp:
+        Address: modbus-simulator
+        Port: "1502"
+        UnitID: "1"
+        Timeout: "5"
+        IdleTimeout: "5"
+    autoEvents:
+      - interval: 10s
+        onChange: false
+        sourceName: Status

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.io/schemas/edge/register.json",
+  "title": "Edge Sensor Registration",
+  "type": "object",
+  "required": ["sensor_id", "site_id", "sensor_type"],
+  "properties": {
+    "sensor_id": { "type": "string" },
+    "site_id": { "type": "string" },
+    "sensor_type": { "type": "string" },
+    "hardware": { "type": "string" },
+    "software_version": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } }
+  }
+}

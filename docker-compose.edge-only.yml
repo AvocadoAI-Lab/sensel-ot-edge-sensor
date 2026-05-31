@@ -1,0 +1,97 @@
+# Deploy SenseL edge components alongside an existing EdgeX stack on the host.
+# Usage on Pi/lab with EdgeX already running (e.g. edgex_edgex-network):
+#   docker compose -f docker-compose.edge-only.yml up -d --build
+#
+# Optional 61850 lab:
+#   docker compose -f docker-compose.edge-only.yml -f docker-compose.lab-61850.yml up -d --build
+
+name: sensel-ot-edge-sensor
+
+services:
+  local-mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sensel-local-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./services/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "127.0.0.1:1884:1883"
+    networks:
+      - sensel-edge
+
+  mock-sensel:
+    image: python:3.11-slim-bookworm
+    container_name: sensel-mock-api
+    restart: unless-stopped
+    networks:
+      - sensel-edge
+    command:
+      - python
+      - -c
+      - |
+        import json
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_POST(self):
+                n = int(self.headers.get("Content-Length", 0))
+                self.rfile.read(n)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+        HTTPServer(("0.0.0.0", 8765), H).serve_forever()
+
+  sensel-edge-agent:
+    build:
+      context: ./services/sensel-edge-agent
+      dockerfile: Dockerfile
+    container_name: sensel-edge-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - SENSEL_API_URL=http://mock-sensel:8765
+      - SENSEL_VERIFY_TLS=false
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/agent:/app/data
+    depends_on:
+      - local-mqtt
+      - mock-sensel
+    networks:
+      - sensel-edge
+      - edgex-network
+
+  packet-sensor:
+    build:
+      context: ./services/packet-sensor
+      dockerfile: Dockerfile
+    container_name: sensel-packet-sensor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - LOCAL_MQTT_HOST=127.0.0.1
+      - LOCAL_MQTT_PORT=1884
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-(ether proto 0x88b8) or (tcp port 102)}
+      - DEPLOY_TARGET=pi4
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/pcap:/app/data/pcap
+      - ./data/assets:/app/data/assets
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      - local-mqtt
+      - sensel-edge-agent
+
+networks:
+  sensel-edge:
+    driver: bridge
+  edgex-network:
+    external: true
+    name: edgex_edgex-network

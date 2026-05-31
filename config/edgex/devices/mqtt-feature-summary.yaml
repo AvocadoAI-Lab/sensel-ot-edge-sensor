@@ -1,0 +1,19 @@
+# EdgeX device — Packet Sensor feature summary bridge (S1-03)
+# Packet Sensor publishes to: incoming/data/packet-sensor-features/FeatureSummary
+# Payload: {"PacketRate": 1.0, "UniqueMacCount": 2}
+
+deviceList:
+  - name: packet-sensor-features
+    profileName: FeatureSummary
+    description: Packet Sensor 1-minute feature summary (MQTT bridge)
+    adminState: UNLOCKED
+    operatingState: UP
+    serviceName: device-mqtt
+    labels: [ot, packet-sensor]
+    protocols:
+      mqtt:
+        CommandTopic: command/packet-sensor-features
+        Host: local-mqtt
+        Port: "1883"
+        ClientId: edgex-device-mqtt-features
+        QoS: "0"
