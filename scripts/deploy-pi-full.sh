@@ -60,10 +60,15 @@ echo "==> Stopping old stacks and starting full SenseL stack"
   OT_REGISTRATION_TOKEN="${OT_REGISTRATION_TOKEN:-}" \
   MQTT_TENANT_ID="${MQTT_TENANT_ID:-default}" \
   DEPLOY_PROFILE="${PROFILE}" \
-  COMPOSE_FILES="${COMPOSE_FILES}" \
   bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/sensel-ot-edge-sensor
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml"
+if [[ "${DEPLOY_PROFILE}" == "production" ]]; then
+  COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-production.yml"
+else
+  COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-lab.yml"
+fi
 mkdir -p data/agent data/pcap data/assets config/policy
 chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
 
