@@ -95,6 +95,7 @@ services:
       - ./config:/app/config:ro
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
+    network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
