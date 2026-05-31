@@ -91,9 +91,10 @@ services:
     env_file:
       - .env
       - ./data/agent/capture.env
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
-    # Mirror NIC requires host network or macvlan — configure per deploy guide
-    network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
