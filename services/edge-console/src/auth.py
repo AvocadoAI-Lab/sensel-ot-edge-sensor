@@ -7,6 +7,7 @@ import hmac
 import os
 import secrets
 import time
+from pathlib import Path
 from typing import Optional
 
 from fastapi import Cookie, HTTPException, Request, Response
@@ -16,6 +17,15 @@ _TTL_SEC = 60 * 60 * 12
 
 
 def _secret() -> str:
+    file_path = os.environ.get("EDGE_CONSOLE_PASSWORD_FILE", "/data/agent/console.password")
+    try:
+        stored = Path(file_path)
+        if stored.is_file():
+            text = stored.read_text(encoding="utf-8").strip()
+            if text:
+                return text
+    except OSError:
+        pass
     return (
         os.environ.get("EDGE_CONSOLE_SECRET")
         or os.environ.get("EDGE_CONSOLE_PASSWORD")
@@ -24,14 +34,31 @@ def _secret() -> str:
 
 
 def password_required() -> bool:
+    file_path = os.environ.get("EDGE_CONSOLE_PASSWORD_FILE", "/data/agent/console.password")
+    if Path(file_path).is_file():
+        return True
     return bool((os.environ.get("EDGE_CONSOLE_PASSWORD") or "").strip())
 
 
 def verify_password(password: str) -> bool:
-    expected = (os.environ.get("EDGE_CONSOLE_PASSWORD") or "").strip()
-    if not expected:
+    expected = _secret()
+    env_pw = (os.environ.get("EDGE_CONSOLE_PASSWORD") or "").strip()
+    if not env_pw and not Path(os.environ.get("EDGE_CONSOLE_PASSWORD_FILE", "/data/agent/console.password")).is_file():
         return True
     return hmac.compare_digest(password, expected)
+
+
+def set_password(password: str) -> None:
+    text = (password or "").strip()
+    if len(text) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    file_path = Path(os.environ.get("EDGE_CONSOLE_PASSWORD_FILE", "/data/agent/console.password"))
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(file_path, 0o600)
+    except OSError:
+        pass
 
 
 def _sign(payload: str) -> str:

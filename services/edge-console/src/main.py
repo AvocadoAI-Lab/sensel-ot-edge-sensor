@@ -20,6 +20,7 @@ from src.auth import (
     create_session,
     password_required,
     require_session,
+    set_password,
     verify_password,
 )
 from src.config_store import ConfigStore, PlatformConfig
@@ -47,6 +48,13 @@ class ConfigPatch(BaseModel):
     mqtt_enabled: Optional[bool] = None
     mqtt_host: Optional[str] = None
     mqtt_port: Optional[int] = None
+    capture_interface: Optional[str] = Field(None, max_length=64)
+    capture_bpf_filter: Optional[str] = Field(None, max_length=512)
+
+
+class PasswordChangeBody(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class RegisterTestBody(BaseModel):
@@ -83,6 +91,25 @@ def login(body: LoginBody, response: Response) -> dict[str, bool]:
 def logout(response: Response, _: None = Depends(require_session)) -> dict[str, bool]:
     clear_session(response)
     return {"ok": True}
+
+
+@app.put("/api/auth/password")
+def change_password(body: PasswordChangeBody, _: None = Depends(require_session)) -> dict[str, bool]:
+    if password_required() and not verify_password(body.current_password):
+        raise HTTPException(status_code=401, detail="Current password incorrect")
+    try:
+        set_password(body.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/capture/reload")
+def reload_capture(_: None = Depends(require_session)) -> dict[str, Any]:
+    ok, detail = _restart_container(os.environ.get("PACKET_SENSOR_CONTAINER", "sensel-packet-sensor"))
+    if not ok:
+        raise HTTPException(status_code=503, detail=detail)
+    return {"ok": True, "message": detail}
 
 
 @app.get("/api/config")
@@ -150,9 +177,12 @@ def recent_events(limit: int = 50, _: None = Depends(require_session)) -> dict[s
 
 
 def _restart_agent() -> tuple[bool, str]:
+    return _restart_container(os.environ.get("EDGE_AGENT_CONTAINER", "sensel-edge-agent"))
+
+
+def _restart_container(container: str) -> tuple[bool, str]:
     if os.environ.get("EDGE_CONSOLE_DOCKER_RESTART", "").lower() not in ("1", "true", "yes"):
-        return False, "Docker restart disabled; restart sensel-edge-agent manually"
-    container = os.environ.get("EDGE_AGENT_CONTAINER", "sensel-edge-agent")
+        return False, f"Docker restart disabled; restart {container} manually"
     sock = Path("/var/run/docker.sock")
     if not sock.exists():
         return False, "Docker socket not mounted"

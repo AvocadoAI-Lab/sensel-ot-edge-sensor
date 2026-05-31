@@ -1,0 +1,25 @@
+# Pi production overlay — real SenseL / Control Plane only (no mock-sensel)
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
+#     -f docker-compose.pi-production.yml -f docker-compose.lab-61850.yml up -d
+
+services:
+  sensel-edge-agent:
+    environment:
+      - SENSEL_VERIFY_TLS=false
+      - MQTT_REQUIRE_TENANT=true
+
+  edge-console:
+    mem_limit: 256m
+    environment:
+      - EDGE_CONSOLE_DOCKER_RESTART=true
+      - EDGE_CONSOLE_AUTO_RESTART_AGENT=true
+      - PACKET_SENSOR_CONTAINER=sensel-packet-sensor
+
+  packet-sensor:
+    environment:
+      - LOCAL_MQTT_HOST=127.0.0.1
+      - LOCAL_MQTT_PORT=1884
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-(ether proto 0x88b8) or (tcp port 102)}
+      - DEPLOY_TARGET=pi4

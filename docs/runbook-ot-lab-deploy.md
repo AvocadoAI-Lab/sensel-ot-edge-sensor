@@ -118,8 +118,22 @@ PYTHONPATH=. python3 scripts/e2e-ot-layerc-analyze.py --layerc-url http://192.16
 ```bash
 curl -s http://192.168.1.108:8081/api/health
 curl -s http://192.168.1.203:8001/health
-curl -s http://192.168.1.123:8080   # Pi events viewer
+curl -s http://192.168.1.123:8080   # Pi events viewer (lab profile only)
 ```
+
+## Production Pi 部署（E3）
+
+現場交付請使用 **production profile**（不含 mock-sensel / events-viewer）：
+
+```bash
+./scripts/deploy-pi-full.sh --profile production edgex@192.168.1.123
+```
+
+- Edge Console：`http://<pi-ip>:8090`（建議設定 `EDGE_CONSOLE_PASSWORD`）
+- 註冊後驗證：`EDGE_CONSOLE_URL=... INVITE_CODE=... SENSEL_API_KEY=... ./scripts/verify-pi-onboarding.sh`
+- Production 預設 `MQTT_REQUIRE_TENANT=true`：未完成 Portal 註冊前不會以 `default` tenant 北向 MQTT
+
+進階設定（BPF / 擷取介面）可在 Edge Console「進階」分頁修改，寫入 `data/agent/capture.env` 後重啟 packet-sensor。
 
 ## 常見問題
 

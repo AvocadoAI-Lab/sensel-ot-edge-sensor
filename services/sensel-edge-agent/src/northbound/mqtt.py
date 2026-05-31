@@ -94,6 +94,12 @@ class NorthboundMqttClient:
             return False
 
     def publish_security_event(self, event: dict[str, Any]) -> bool:
+        if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):
+            logger.warning(
+                "Skipping MQTT security event publish — tenant not bound (rule=%s)",
+                event.get("rule_id"),
+            )
+            return False
         topic = events_topic(self._cfg.tenant_id, self._sensor.site_id, self._sensor.id)
         body = self._envelope(
             "security_event",

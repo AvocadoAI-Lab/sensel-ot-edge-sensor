@@ -66,6 +66,11 @@ def apply_platform_overlay(config: AppConfig) -> AppConfig:
 
     if raw.get("last_register_tenant_id"):
         mqtt.tenant_id = str(raw["last_register_tenant_id"])
+    elif raw.get("mqtt_tenant_id") and str(raw.get("mqtt_tenant_id")) != "default":
+        mqtt.tenant_id = str(raw["mqtt_tenant_id"])
+
+    if mqtt.enabled and mqtt.tenant_id == "default":
+        mqtt.require_tenant = True
 
     return config.model_copy(
         update={

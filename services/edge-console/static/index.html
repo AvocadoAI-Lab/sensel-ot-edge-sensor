@@ -126,7 +126,7 @@
 
     <section id="tab-settings" class="panel hidden">
       <h2>進階設定</h2>
-      <p class="hint">修改後請儲存，並重啟 Edge Agent 使設定生效。</p>
+      <p class="hint">修改後請儲存，並重啟 Edge Agent / Packet Sensor 使設定生效。</p>
       <div class="grid-2">
         <label>MQTT Port
           <input id="sMqttPort" type="number" value="1883" />
@@ -137,9 +137,25 @@
             <option value="true">開啟</option>
           </select>
         </label>
+        <label>擷取介面 (CAPTURE_INTERFACE)
+          <input id="sCaptureInterface" placeholder="eth0" />
+        </label>
+        <label>MQTT Tenant（唯讀）
+          <input id="sMqttTenant" readonly placeholder="註冊後自動填入" />
+        </label>
+        <label class="col-span-2">BPF Filter
+          <input id="sCaptureBpf" placeholder="(ether proto 0x88b8) or (tcp port 102)" />
+        </label>
+        <label>Console 新密碼
+          <input id="sNewPassword" type="password" autocomplete="new-password" />
+        </label>
+        <label>確認新密碼
+          <input id="sNewPassword2" type="password" autocomplete="new-password" />
+        </label>
       </div>
       <div class="actions">
         <button class="btn btn-primary" id="saveSettingsBtn">儲存設定</button>
+        <button class="btn btn-secondary" id="reloadCaptureBtn">重啟 Packet Sensor</button>
       </div>
     </section>
   </div>

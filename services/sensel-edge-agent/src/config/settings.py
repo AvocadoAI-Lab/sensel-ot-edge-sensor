@@ -64,6 +64,7 @@ class NorthboundMqttConfig(BaseModel):
     host: str = ""
     port: int = 1883
     tenant_id: str = "default"
+    require_tenant: bool = False
     username: str = ""
     password: str = ""
     qos_events: int = 1
@@ -155,12 +156,14 @@ def load_config(path: Path | None = None) -> AppConfig:
         nb_raw["enabled"] = False
     elif nb_raw.get("host"):
         nb_raw["enabled"] = True
+    require_tenant_env = os.environ.get("MQTT_REQUIRE_TENANT", "").lower()
+    if require_tenant_env in ("1", "true", "yes"):
+        nb_raw["require_tenant"] = True
 
-    return apply_platform_overlay(
-        AppConfig(
+    config = AppConfig(
             sensor=SensorIdentity(**sensor_raw),
             sensel=SenselConfig(**sensel_raw),
             northbound_mqtt=NorthboundMqttConfig(**nb_raw),
             logging=LoggingConfig(**expanded.get("logging", {})),
         )
-    )
+    return apply_platform_overlay(config)

@@ -88,8 +88,21 @@ async function loadConfigIntoForm(cfg) {
   $("#wMqttHost").value = cfg.mqtt_host || "";
   $("#sMqttPort").value = cfg.mqtt_port || 1883;
   $("#sVerifyTls").value = cfg.sensel_verify_tls ? "true" : "false";
+  $("#sCaptureInterface").value = cfg.capture_interface || "";
+  $("#sCaptureBpf").value = cfg.capture_bpf_filter || "";
+  $("#sMqttTenant").value = cfg.last_register_tenant_id || cfg.mqtt_tenant_id || "";
   if (!cfg.sensel_api_key_set) $("#wApiKey").placeholder = "（已儲存，留空不變）";
   if (!cfg.registration_token_set) $("#wInvite").placeholder = "（已儲存，留空不變）";
+}
+
+function collectSettingsConfig(extra = {}) {
+  return {
+    mqtt_port: parseInt($("#sMqttPort").value || "1883", 10),
+    sensel_verify_tls: $("#sVerifyTls").value === "true",
+    capture_interface: $("#sCaptureInterface").value.trim(),
+    capture_bpf_filter: $("#sCaptureBpf").value.trim(),
+    ...extra,
+  };
 }
 
 async function loadStatus() {
@@ -186,9 +199,31 @@ $("#saveSettingsBtn")?.addEventListener("click", async () => {
   try {
     await api("/api/config", {
       method: "PUT",
-      body: JSON.stringify(collectWizardConfig()),
+      body: JSON.stringify(collectSettingsConfig()),
     });
+    const pw1 = $("#sNewPassword").value;
+    const pw2 = $("#sNewPassword2").value;
+    if (pw1 || pw2) {
+      if (pw1 !== pw2) throw new Error("兩次密碼不一致");
+      const current = prompt("請輸入目前 Console 密碼以確認變更");
+      if (!current) throw new Error("已取消");
+      await api("/api/auth/password", {
+        method: "PUT",
+        body: JSON.stringify({ current_password: current, new_password: pw1 }),
+      });
+      $("#sNewPassword").value = "";
+      $("#sNewPassword2").value = "";
+    }
     toast("設定已儲存");
+  } catch (e) {
+    toast(e.message, false);
+  }
+});
+
+$("#reloadCaptureBtn")?.addEventListener("click", async () => {
+  try {
+    const r = await api("/api/capture/reload", { method: "POST" });
+    toast(r.message || "Packet Sensor 已重啟");
   } catch (e) {
     toast(e.message, false);
   }

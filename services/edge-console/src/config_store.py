@@ -29,6 +29,8 @@ class PlatformConfig(BaseModel):
     mqtt_host: str = "192.168.1.203"
     mqtt_port: int = 1883
     mqtt_tenant_id: str = "default"
+    capture_interface: str = "eth0"
+    capture_bpf_filter: str = "(ether proto 0x88b8) or (tcp port 102)"
     last_register_at: Optional[str] = None
     last_register_ok: Optional[bool] = None
     last_register_tenant_id: Optional[str] = None
@@ -81,6 +83,21 @@ class ConfigStore:
         data.pop("sensel_api_key", None)
         return data
 
+    def sync_env_file(self, config: PlatformConfig) -> None:
+        """Write capture overrides for packet-sensor env_file."""
+        capture_env = self.path.parent / "capture.env"
+        capture_env.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"CAPTURE_INTERFACE={config.capture_interface}",
+            f"CAPTURE_BPF_FILTER={config.capture_bpf_filter}",
+            f"MQTT_TENANT_ID={config.mqtt_tenant_id or config.last_register_tenant_id or 'default'}",
+        ]
+        capture_env.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        try:
+            os.chmod(capture_env, 0o600)
+        except OSError:
+            pass
+
     def merge_update(self, patch: dict[str, Any]) -> PlatformConfig:
         current = self.load()
         merged = current.model_dump()
@@ -92,7 +109,9 @@ class ConfigStore:
             if key in merged:
                 merged[key] = value
         merged["configured"] = True
-        return self.save(PlatformConfig.model_validate(merged))
+        saved = self.save(PlatformConfig.model_validate(merged))
+        self.sync_env_file(saved)
+        return saved
 
     def record_register_result(
         self,
