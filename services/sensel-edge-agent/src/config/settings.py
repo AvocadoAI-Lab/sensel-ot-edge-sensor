@@ -10,6 +10,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from src.config.platform_overlay import apply_platform_overlay
+
 
 _ENV_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -154,9 +156,11 @@ def load_config(path: Path | None = None) -> AppConfig:
     elif nb_raw.get("host"):
         nb_raw["enabled"] = True
 
-    return AppConfig(
-        sensor=SensorIdentity(**sensor_raw),
-        sensel=SenselConfig(**sensel_raw),
-        northbound_mqtt=NorthboundMqttConfig(**nb_raw),
-        logging=LoggingConfig(**expanded.get("logging", {})),
+    return apply_platform_overlay(
+        AppConfig(
+            sensor=SensorIdentity(**sensor_raw),
+            sensel=SenselConfig(**sensel_raw),
+            northbound_mqtt=NorthboundMqttConfig(**nb_raw),
+            logging=LoggingConfig(**expanded.get("logging", {})),
+        )
     )

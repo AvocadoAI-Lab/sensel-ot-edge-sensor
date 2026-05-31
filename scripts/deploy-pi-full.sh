@@ -24,7 +24,10 @@ rsync -avz --delete \
   "${ROOT}/" "${TARGET}:${REMOTE_DIR}/"
 
 echo "==> Stopping old stacks and starting full SenseL stack"
-"${SSH_CMD[@]}" "${TARGET}" bash -s <<'REMOTE'
+"${SSH_CMD[@]}" "${TARGET}" env \
+  OT_REGISTRATION_TOKEN="${OT_REGISTRATION_TOKEN:-}" \
+  MQTT_TENANT_ID="${MQTT_TENANT_ID:-default}" \
+  bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/sensel-ot-edge-sensor
 mkdir -p data/agent data/pcap data/assets config/policy
@@ -34,7 +37,7 @@ if [[ ! -f config/policy/baseline.json ]]; then
   cp config/policy/baseline.example.json config/policy/baseline.json
 fi
 
-cat > .env <<'ENV'
+cat > .env <<ENV
 SITE_ID=factory-lab-001
 SENSOR_ID=ot-edge-pi4-001
 SENSOR_TYPE=ot-edge-sensor
@@ -55,6 +58,8 @@ NORTHBOUND_MQTT_ENABLED=true
 CONTROL_PLANE_MQTT_HOST=192.168.1.203
 CONTROL_PLANE_MQTT_PORT=1883
 MQTT_TENANT_ID=${MQTT_TENANT_ID:-default}
+EDGE_CONSOLE_DOCKER_RESTART=true
+EDGE_CONSOLE_AUTO_RESTART_AGENT=true
 DEPLOY_TARGET=pi4
 LOG_LEVEL=info
 ENV
@@ -77,6 +82,7 @@ docker compose -f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose
 echo "==> Lab URLs"
 PI_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
 PI_IP=${PI_IP:-192.168.1.123}
+echo "  Edge Console:  http://${PI_IP}:8090  ← 設定企業邀請碼 / 註冊"
 echo "  Events Viewer: http://${PI_IP}:8080"
 echo "  EdgeX UI (optional): docker compose ... -f docker-compose.pi-ui.yml --profile lab-ui up -d → :4000"
 
@@ -93,6 +99,7 @@ for i in $(seq 1 30); do
 done
 
 echo "==> Service logs (tail)"
+docker logs sensel-edge-console --tail 5 2>&1 || true
 docker logs sensel-edge-agent --tail 8 2>&1 || true
 docker logs sensel-packet-sensor --tail 8 2>&1 || true
 docker logs edgex-device-modbus --tail 5 2>&1 || true

@@ -80,9 +80,11 @@ OT-B3 關鍵 env（`docker-compose.layerc.yml`）：
 ```bash
 cd sensel-ot-edge-sensor
 export SSHPASS='edgex'   # Pi 預設密碼
-export OT_REGISTRATION_TOKEN='<invite-code>'
+export OT_REGISTRATION_TOKEN='<invite-code>'   # 或於 Edge Console UI 設定
 ./scripts/deploy-pi-full.sh edgex@192.168.1.123
 ```
+
+**Edge Console（推薦）：** `http://192.168.1.123:8090` — 設定精靈填寫企業邀請碼並註冊。
 
 ## E2E 驗證
 

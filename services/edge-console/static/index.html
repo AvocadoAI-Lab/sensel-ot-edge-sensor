@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SenseL Edge Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="loginView" class="login-wrap hidden">
+    <div class="panel login-card">
+      <div class="brand" style="margin-bottom:1rem">
+        <div class="logo">SE</div>
+        <div>
+          <h1>SenseL Edge Console</h1>
+          <p>請輸入管理密碼</p>
+        </div>
+      </div>
+      <label>密碼
+        <input id="loginPassword" type="password" autocomplete="current-password" />
+      </label>
+      <div class="actions">
+        <button class="btn btn-primary" id="loginBtn">登入</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appView" class="shell hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">SE</div>
+        <div>
+          <h1>SenseL Edge Console</h1>
+          <p>OT 邊緣感測器 · 本地設定與監控</p>
+        </div>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="dashboard">總覽</button>
+        <button class="tab" data-tab="setup">設定精靈</button>
+        <button class="tab" data-tab="events">事件</button>
+        <button class="tab" data-tab="settings">進階</button>
+        <button class="tab btn-ghost" id="logoutBtn">登出</button>
+      </nav>
+    </header>
+
+    <section id="tab-dashboard" class="panel">
+      <h2>連線狀態</h2>
+      <p class="hint">註冊成功後，事件將經 MQTT 北向送至 Control Plane，並在 SenseL Portal 工控安全防護中顯示。</p>
+      <div id="statusCards" class="grid-4"></div>
+      <div class="actions">
+        <button class="btn btn-secondary" id="refreshStatusBtn">重新整理</button>
+        <button class="btn btn-ghost" id="restartAgentBtn">重啟 Edge Agent</button>
+      </div>
+    </section>
+
+    <section id="tab-setup" class="panel hidden">
+      <h2>首次設定精靈</h2>
+      <p class="hint">三步完成：感測器身分 → 連線 SenseL → 測試註冊</p>
+      <div class="wizard-steps">
+        <span class="step-pill active" data-step="1">1 感測器</span>
+        <span class="step-pill" data-step="2">2 SenseL</span>
+        <span class="step-pill" data-step="3">3 註冊</span>
+      </div>
+
+      <div id="wizardStep1">
+        <div class="grid-2">
+          <label>Sensor ID
+            <input id="wSensorId" placeholder="ot-edge-001" />
+          </label>
+          <label>Site ID
+            <input id="wSiteId" placeholder="factory-lab-001" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" data-next="2">下一步</button>
+        </div>
+      </div>
+
+      <div id="wizardStep2" class="hidden">
+        <div class="grid-2">
+          <label>SenseL API URL
+            <input id="wApiUrl" placeholder="http://192.168.1.108:8081" />
+          </label>
+          <label>API Key
+            <input id="wApiKey" type="password" placeholder="ingest secret" />
+          </label>
+          <label>企業邀請碼 (Registration Token)
+            <input id="wInvite" type="password" placeholder="Avocado AI 邀請碼" autocomplete="off" />
+          </label>
+          <label>MQTT Host (Control Plane)
+            <input id="wMqttHost" placeholder="192.168.1.203" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost" data-next="1">上一步</button>
+          <button class="btn btn-secondary" id="pingSenselBtn">測試 SenseL 連線</button>
+          <button class="btn btn-primary" data-next="3">下一步</button>
+        </div>
+      </div>
+
+      <div id="wizardStep3" class="hidden">
+        <div class="card" id="wizardSummary"></div>
+        <div class="actions">
+          <button class="btn btn-ghost" data-next="2">上一步</button>
+          <button class="btn btn-primary" id="saveAndRegisterBtn">儲存並註冊</button>
+        </div>
+        <pre id="registerResult" class="card" style="margin-top:1rem; white-space:pre-wrap; font-size:0.85rem;"></pre>
+      </div>
+    </section>
+
+    <section id="tab-events" class="panel hidden">
+      <h2>最近安全事件</h2>
+      <p class="hint">來自本地 packet-sensor 偵測（security-events.jsonl）</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>時間</th><th>Rule</th><th>嚴重度</th><th>描述</th></tr>
+          </thead>
+          <tbody id="eventsRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="panel hidden">
+      <h2>進階設定</h2>
+      <p class="hint">修改後請儲存，並重啟 Edge Agent 使設定生效。</p>
+      <div class="grid-2">
+        <label>MQTT Port
+          <input id="sMqttPort" type="number" value="1883" />
+        </label>
+        <label>TLS 驗證 SenseL
+          <select id="sVerifyTls">
+            <option value="false">關閉 (Lab)</option>
+            <option value="true">開啟</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="saveSettingsBtn">儲存設定</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

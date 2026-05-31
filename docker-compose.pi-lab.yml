@@ -1,9 +1,10 @@
-# Pi lab overlay — mock SenseL API + events viewer + host-network MQTT
+# Pi lab overlay — mock SenseL API + events viewer + Edge Console
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
 #     -f docker-compose.pi-lab.yml -f docker-compose.lab-61850.yml up -d
 #
-# Events UI: http://<pi-ip>:8080
+# Edge Console (setup wizard): http://<pi-ip>:8090
+# Events UI (legacy):         http://<pi-ip>:8080
 
 services:
   mock-sensel:
@@ -34,10 +35,10 @@ services:
 
   sensel-edge-agent:
     environment:
-      - SENSEL_API_URL=http://mock-sensel:8765
       - SENSEL_VERIFY_TLS=false
-    depends_on:
-      - mock-sensel
+
+  edge-console:
+    mem_limit: 256m
 
   packet-sensor:
     environment:

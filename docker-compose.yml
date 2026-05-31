@@ -24,6 +24,33 @@ services:
       - sensel-edge
 
   # ---------------------------------------------------------------------------
+  # SenseL Edge Console — local setup wizard + status dashboard (OT-C1)
+  # ---------------------------------------------------------------------------
+  edge-console:
+    build:
+      context: ./services/edge-console
+      dockerfile: Dockerfile
+    container_name: sensel-edge-console
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      - PLATFORM_CONFIG_PATH=/data/agent/platform.json
+      - ASSETS_DIR=/data/assets
+      - DEFAULT_SENSEL_API_KEY=${SENSEL_API_KEY:-sensel-ot-ingest-lab-2026}
+      - EDGE_CONSOLE_PASSWORD=${EDGE_CONSOLE_PASSWORD:-}
+      - EDGE_CONSOLE_DOCKER_RESTART=${EDGE_CONSOLE_DOCKER_RESTART:-true}
+      - EDGE_CONSOLE_AUTO_RESTART_AGENT=${EDGE_CONSOLE_AUTO_RESTART_AGENT:-true}
+      - EDGE_AGENT_CONTAINER=sensel-edge-agent
+    volumes:
+      - ./data/agent:/data/agent
+      - ./data/assets:/data/assets:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+    networks:
+      - sensel-edge
+
+  # ---------------------------------------------------------------------------
   # SenseL Edge Agent — platform comms, policy sync, health
   # ---------------------------------------------------------------------------
   sensel-edge-agent:
@@ -38,6 +65,7 @@ services:
       - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-false}
       - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
       - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+      - PLATFORM_CONFIG_PATH=/app/data/platform.json
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
