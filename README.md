@@ -20,7 +20,15 @@
 
 **優勢**：**沒 baseline 也能立刻安全部署**（commissioning 學習）；重啟不失憶；baseline **對照工程真相**而非猜測；等真實 SCD 到了能 diff 出「觀測 ≠ 工程」的異常。
 
-🎬 **教學模擬影片（1080p MP4，含真實輸出與流程圖）：[docs/video/sensel-walkthrough-1080.mp4](docs/video/sensel-walkthrough-1080.mp4)**　·　文字版見 [docs/walkthrough.md](docs/walkthrough.md)。
+## 🎬 教學模擬影片
+
+把「為什麼有這個分支、跟誰不同、優勢」用**真實終端輸出 + 流程圖**走一遍（1080p · ~49s）：
+
+<video src="https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor/raw/first-principles-redesign/docs/video/sensel-walkthrough-1080.mp4" controls muted width="100%"></video>
+
+[![教學模擬影片 — 點擊播放](docs/video/poster.png)](docs/video/sensel-walkthrough-1080.mp4)
+
+> 上方播放器未顯示時，點上圖或 [▶ 1080p MP4](docs/video/sensel-walkthrough-1080.mp4) 觀看；文字版見 [docs/walkthrough.md](docs/walkthrough.md)，製作方式見 [docs/video/](docs/video/README.md)（用 HeyGen HyperFrames 直出 MP4）。
 
 ## 架構概覽
 
