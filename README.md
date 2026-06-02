@@ -11,7 +11,15 @@ OT 設備 ──► EdgeX Device Services ──► SenseL Exporter ──► Se
      └── SPAN/TAP ──► Packet Sensor Agent ──► 本地偵測 ──► SenseL Platform
 ```
 
-**設計原則**：原始鏡像流量不直接進入 EdgeX；被動流量由 Packet Sensor 處理，僅上傳解析後的特徵摘要、安全事件與證據參考。
+![dual-path architecture](docs/diagrams/architecture.png)
+
+**設計原則**：原始鏡像流量不直接進入 EdgeX；被動流量由 Packet Sensor 處理，僅上傳解析後的特徵摘要、安全事件與證據參考。詳見 [hardening-v1 設計文件](docs/hardening-v1.md)。
+
+## 偵測流程
+
+每個封包先進 PCAP ring buffer（證據保全），再逐層解析、逐條規則評估；速率/離線/靜默類規則掛在每 60s 的 feature window（綠色為 hardening-v1 強化/修正處）：
+
+![detection pipeline](docs/diagrams/detection-pipeline.png)
 
 ## 專案結構
 
