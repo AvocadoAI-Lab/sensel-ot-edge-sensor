@@ -4,6 +4,22 @@
 
 每台資產維護本地 baseline，範例見 `config/policy/baseline.example.json`。
 
+### 從 SCD/SCL 自動推導（建議）
+
+與其手寫，直接從變電所工程檔（`.scd`/`.scl`）推導 baseline——對照**工程真相**：
+
+```bash
+python3 scripts/scd-to-baseline.py substation.scd --stdout            # 預覽
+make scd-baseline SCD=substation.scd                                  # 寫入 config/policy/baseline.json
+```
+
+- `parser/scl/scd.py` 解析 IED 盤點、IP、GOOSE control block（命名空間相容 2003/2007）。
+- `policy/from_scl.py` 產出**既有 policy schema**（detector 不需改動）：
+  - GOOSE 以 **APPID** 為權威 match key（SCL 的 MAC 是目的多播、非來源 MAC，故 `publisher_mac` 留空）。
+  - OT-017 `max_silence_sec` 由 GSE `MaxTime` × 係數推導。
+  - MMS IED = 具 Server 的 IED；`allowed_mms_clients` 預設為非 server 的 IED（HMI/SCADA），操作者可再收緊。
+- 產出會通過 `validate_policy`，並對缺 APPID／超出 GOOSE 範圍（檢查 `--appid-base`）／缺 IP 的項目告警。
+
 ## 規則表 — MVP（Sprint 2）
 
 | Rule ID | 名稱 | 嚴重度 | 模組 |
