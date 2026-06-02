@@ -113,10 +113,59 @@ def detection_pipeline():
     plt.close(fig)
 
 
+def baseline_lifecycle():
+    """first-principles-redesign: engineered (SCD) and observed baselines."""
+    fig, ax = plt.subplots(figsize=(15, 8.5))
+    ax.set_xlim(0, 172)
+    ax.set_ylim(0, 100)
+    ax.axis("off")
+    ax.text(86, 96, "Baseline lifecycle — engineered (SCD) and observed converge on ONE schema",
+            ha="center", fontsize=12.5, fontweight="bold")
+
+    # engineered source (top)
+    _box(ax, 4, 70, 26, 14, "SCD / SCL file\n(engineering truth)", GREY, 8, True)
+    _box(ax, 38, 70, 24, 14, "parse_scd\nparser/scl", BLUE, 8)
+    _box(ax, 70, 70, 30, 14, "derive_baseline\nfrom_scl  (P0)", GREEN, 8, True)
+    # observed source (bottom)
+    _box(ax, 4, 28, 26, 16, "Learning mode\ncommissioning\n(no alerts)", GREEN, 8, True)
+    _box(ax, 38, 29, 24, 14, "StateStore (SQLite)\npersisted inventory", AMBER, 8)
+    _box(ax, 70, 29, 30, 14, "from_observed\n(P1)", GREEN, 8, True)
+    # converge
+    _box(ax, 112, 49, 28, 16, "Detection baseline\nSAME policy schema", BLUE, 9, True)
+    _box(ax, 148, 51, 20, 12, "Detectors\nOT-001~018", BLUE, 8, True)
+
+    _arrow(ax, (30, 77), (38, 77))
+    _arrow(ax, (62, 77), (70, 77))
+    _arrow(ax, (30, 37), (38, 37))
+    _arrow(ax, (62, 36), (70, 36))
+    _arrow(ax, (100, 76), (112, 61))
+    _arrow(ax, (100, 36), (112, 52))
+    _arrow(ax, (140, 57), (148, 57))
+
+    ax.add_patch(FancyArrowPatch((85, 70), (85, 43), arrowstyle="<|-|>", mutation_scale=12,
+                                 lw=1.3, color="#8e24aa", linestyle="--"))
+    ax.text(88, 56, "reconcile diff\n(observed vs engineered)\n— future P1-D",
+            fontsize=7, color="#8e24aa", va="center")
+
+    ax.text(86, 18, "Commissioning workflow", ha="center", fontsize=9.5, fontweight="bold")
+    steps = ["mode: learning", "observe + persist", "export candidate\n(observed-to-baseline)",
+             "review", "mode: monitoring"]
+    sw, sy, gap, sx = 26, 4, 32, 10
+    xs = [sx + i * gap for i in range(len(steps))]
+    for t, x in zip(steps, xs):
+        _box(ax, x, sy, sw, 9, t, BLUE, 7)
+    for i in range(len(steps) - 1):
+        _arrow(ax, (xs[i] + sw, sy + 4.5), (xs[i + 1], sy + 4.5))
+
+    fig.savefig(OUT / "baseline-lifecycle.png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     architecture()
     detection_pipeline()
-    print("wrote architecture.png, detection-pipeline.png")
+    baseline_lifecycle()
+    print("wrote architecture.png, detection-pipeline.png, baseline-lifecycle.png")
 
 
 if __name__ == "__main__":
