@@ -42,6 +42,7 @@ class CaptureSession:
             ring_buffer_dir=config.pcap.ring_buffer_path,
             pcap_retention_sec=config.pcap.retention_minutes * 60,
             pcap_max_disk_bytes=config.pcap.max_disk_mb * 1024 * 1024,
+            state_db=config.detection.state_db,
         )
 
     def _validate_interface(self) -> None:

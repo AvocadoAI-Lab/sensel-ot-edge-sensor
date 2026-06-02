@@ -48,6 +48,7 @@ class PacketPipeline:
         ring_buffer_dir: str | None = None,
         pcap_retention_sec: float = 7200.0,
         pcap_max_disk_bytes: int = 2 * 1024 * 1024 * 1024,
+        state_db: str = "",
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
@@ -81,6 +82,12 @@ class PacketPipeline:
             edgex_device_name=edgex_device_name,
             edgex_data_topic=edgex_data_topic,
         )
+        self._store = None
+        if state_db:
+            from src.assets.store import StateStore
+
+            self._store = StateStore(state_db)
+            self._store.load(self._mvp.inventory, self._detector)
 
     def _emit(self, events) -> None:
         for event in events:
@@ -144,8 +151,13 @@ class PacketPipeline:
             self.state.mms,
         )
         reset_l2_window(self.state.l2)
+        if self._store is not None:
+            self._store.save(self._mvp.inventory, self._detector)
 
     def close(self) -> None:
+        if self._store is not None:
+            self._store.save(self._mvp.inventory, self._detector)
+            self._store.close()
         self._features.close()
 
     @property

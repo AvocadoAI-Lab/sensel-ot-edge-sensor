@@ -58,6 +58,8 @@ class FeaturesConfig(BaseModel):
 class DetectionConfig(BaseModel):
     policy_file: str = "/app/config/policy/baseline.json"
     rules_enabled: list[str] = Field(default_factory=list)
+    # learning state persistence (empty = disabled, in-memory only)
+    state_db: str = ""
 
 
 class PcapConfig(BaseModel):
