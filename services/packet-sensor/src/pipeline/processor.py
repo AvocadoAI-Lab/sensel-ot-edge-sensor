@@ -11,6 +11,7 @@ from src.events.generator import EventStore
 from src.evidence.ring_buffer import PcapRingBuffer
 from src.features.publisher import FeaturePublisher
 from src.parser.l2.ethernet import L2Stats, parse_ethernet, record_l2, reset_l2_window
+from src.parser.l3.arp import parse_arp
 from src.parser.l3.ip import L3Stats, parse_ip, record_l3
 from src.parser.l4.transport import parse_transport
 from src.parser.l7.iec61850.goose import GooseStats, parse_goose_packet, record_goose
@@ -44,6 +45,9 @@ class PacketPipeline:
         edgex_data_topic: str = "",
         feature_window_sec: int = 60,
         ring_buffer_max_packets: int = 5000,
+        ring_buffer_dir: str | None = None,
+        pcap_retention_sec: float = 7200.0,
+        pcap_max_disk_bytes: int = 2 * 1024 * 1024 * 1024,
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
@@ -60,7 +64,12 @@ class PacketPipeline:
             sensor_id=sensor_id,
             policy=policy,
         )
-        self._ring = PcapRingBuffer(max_packets=ring_buffer_max_packets)
+        self._ring = PcapRingBuffer(
+            max_packets=ring_buffer_max_packets,
+            storage_dir=ring_buffer_dir,
+            retention_sec=pcap_retention_sec,
+            max_disk_bytes=pcap_max_disk_bytes,
+        )
         self._events = EventStore(assets_dir)
         self._features = FeaturePublisher(
             sensor_id=sensor_id,
@@ -93,6 +102,11 @@ class PacketPipeline:
 
         src_mac, _ = parse_ethernet(packet)
         record_l2(self.state.l2, src_mac)
+
+        arp = parse_arp(packet)
+        if arp:
+            self._emit(self._mvp.evaluate_arp(arp.sender_mac, arp.sender_ip))
+
         src_ip, dst_ip, version = parse_ip(packet)
         record_l3(self.state.l3, src_ip, version)
 
@@ -122,6 +136,7 @@ class PacketPipeline:
 
     def flush_features(self) -> None:
         self._emit(self._mvp.evaluate_window(self._feature_window_sec))
+        self._emit(self._detector.evaluate_goose_silence())
         self._features.publish_window(
             self.state.l2,
             self._feature_window_sec,

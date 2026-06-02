@@ -1,4 +1,4 @@
-.PHONY: help up down logs build health test lint up-ui verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 deploy-pi deploy-pi-full
+.PHONY: help up down logs build health test lint up-ui verify-modbus verify-61850 verify-mqtt verify-mvp verify-attacks up-lab-61850 up-attack-lab attack-all attack-arp attack-goose attack-mms attack-modbus attack-portscan deploy-pi deploy-pi-full
 
 help:
 	@echo "SenseL OT Edge Sensor"
@@ -13,6 +13,12 @@ help:
 	@echo "  make verify-mqtt    - Verify feature summary → device-mqtt → Core Data (S1-03)"
 	@echo "  make verify-61850   - Verify IEC 61850 passive parser (S1-02b)"
 	@echo "  make verify-mvp     - Verify MVP detection OT-001~010 (S2)"
+	@echo "  make verify-attacks - Verify attack detection coverage OT-001~018 (offline self-test)"
+	@echo "  make up-attack-lab  - Start stack + 61850 lab + broadened capture (attack lab)"
+	@echo "  make attack-all     - Fire REAL OT-001~018 attack sweep (OT-009 absence-based)"
+	@echo "  make attack-arp     - REAL MITM ARP poisoning → OT-003 (isolated lab only!)"
+	@echo "  make attack-goose   - Rogue/test/stNum GOOSE → OT-011/012/013"
+	@echo "  make attack-mms     - Rogue MMS client write → OT-014/016/018"
 	@echo "  Lab Events UI       - http://<host>:8080 (with pi-lab overlay)"
 	@echo "  make down     - Stop stack"
 	@echo "  make build    - Build all service images"
@@ -59,6 +65,33 @@ verify-61850:
 verify-mvp:
 	chmod +x ./scripts/verify-mvp.sh ./scripts/mvp-selftest.py
 	./scripts/verify-mvp.sh
+
+verify-attacks:
+	chmod +x ./scripts/verify-attacks.sh ./scripts/attacks-selftest.py
+	./scripts/verify-attacks.sh
+
+COMPOSE_ATTACK = docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml -f docker-compose.attack-lab.yml
+
+up-attack-lab:
+	$(COMPOSE_ATTACK) up -d --build
+
+attack-all:
+	$(COMPOSE_ATTACK) --profile attack run --rm attacker-all
+
+attack-arp:
+	$(COMPOSE_ATTACK) --profile attack-arp run --rm attacker-arp
+
+attack-goose:
+	$(COMPOSE_ATTACK) --profile attack-goose run --rm attacker-goose
+
+attack-mms:
+	$(COMPOSE_ATTACK) --profile attack-mms run --rm attacker-mms
+
+attack-modbus:
+	$(COMPOSE_ATTACK) --profile attack-modbus run --rm attacker-modbus
+
+attack-portscan:
+	$(COMPOSE_ATTACK) --profile attack-portscan run --rm attacker-portscan
 
 test:
 	python3 -m pip install -q -r tests/requirements.txt

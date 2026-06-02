@@ -80,7 +80,9 @@ detection:
     - OT-012
     - OT-013
     - OT-014
+    - OT-015
     - OT-016
+    - OT-017
     - OT-018
   latency_target_sec: 3
 

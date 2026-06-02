@@ -2,26 +2,21 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
+from service_loader import import_from_service
+
 ROOT = Path(__file__).resolve().parents[2]
-PACKET_SRC = ROOT / "services" / "packet-sensor"
 
 
 def _import_packet_modules():
-    for key in list(sys.modules):
-        if key == "src" or key.startswith("src."):
-            del sys.modules[key]
-    sys.path[:] = [p for p in sys.path if p != str(PACKET_SRC)]
-    sys.path.insert(0, str(PACKET_SRC))
     from scapy.all import IP, Raw, TCP
 
-    from src.parser.l7.modbus.tcp import parse_modbus_tcp
-    from src.pipeline.processor import PacketPipeline
-
-    return IP, Raw, TCP, parse_modbus_tcp, PacketPipeline
+    modbus, processor = import_from_service(
+        "packet-sensor", "src.parser.l7.modbus.tcp", "src.pipeline.processor"
+    )
+    return IP, Raw, TCP, modbus.parse_modbus_tcp, processor.PacketPipeline
 
 
 def _pipeline(tmp_path: Path):

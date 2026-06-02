@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from src.detection.models import SecurityEvent, utc_now_iso
 from src.parser.l7.iec61850.goose import GooseFrame
 from src.parser.l7.iec61850.mms import MmsObservation
+
+# GOOSE stNum is an Unsigned32; a legitimate roll-over wraps modulo 2**32.
+_STNUM_MOD = 1 << 32
 
 
 def _utc_now_iso() -> str:
@@ -23,6 +27,10 @@ class Iec61850Detector:
     known_mms_pairs: set[str] = field(default_factory=set)
     alerted_unauthorized_mms: set[str] = field(default_factory=set)
     last_stnum: dict[str, int] = field(default_factory=dict)
+    last_goose_seen: dict[str, float] = field(default_factory=dict)
+    alerted_goose_silence: set[str] = field(default_factory=set)
+    _mms_session_times: list[float] = field(default_factory=list)
+    _alerted_mms_rate_until: float = 0.0
     _event_seq: int = 0
 
     def _next_event_id(self) -> str:
@@ -57,6 +65,9 @@ class Iec61850Detector:
         events: list[SecurityEvent] = []
         key = f"{frame.publisher_mac}|{frame.appid}|{frame.gocb_ref}"
         baseline = self._match_goose_baseline(frame)
+        if baseline is not None:
+            aid = str(baseline.get("asset_id") or baseline.get("gocb_ref") or key)
+            self.last_goose_seen[aid] = time.time()
 
         if key not in self.known_goose:
             self.known_goose.add(key)
@@ -104,9 +115,14 @@ class Iec61850Detector:
             )
 
         prev = self.last_stnum.get(key)
-        if prev is not None:
-            jump = abs(frame.st_num - prev)
-            if frame.st_num < prev or jump > self._threshold("goose_stnum_jump_max", 100):
+        if prev is not None and frame.st_num != prev:
+            # Forward distance modulo 2**32: a normal +1 step (and a legitimate
+            # Unsigned32 wrap, e.g. 2**32-1 -> 0) stays small, while a replay
+            # (rollback to a lower value) shows up as a large forward distance.
+            forward = (frame.st_num - prev) % _STNUM_MOD
+            threshold = self._threshold("goose_stnum_jump_max", 100)
+            if forward > threshold:
+                anomaly = "rollback" if frame.st_num < prev else "forward_jump"
                 events.append(
                     SecurityEvent(
                         event_id=self._next_event_id(),
@@ -122,10 +138,60 @@ class Iec61850Detector:
                             "goose_gocb_ref": frame.gocb_ref,
                             "goose_stnum": frame.st_num,
                             "previous_stnum": prev,
+                            "forward_delta": forward,
+                            "anomaly": anomaly,
                         },
                     )
                 )
         self.last_stnum[key] = frame.st_num
+        return events
+
+    def evaluate_goose_silence(self, now: float | None = None) -> list[SecurityEvent]:
+        """OT-017 — a baselined production GOOSE publisher that was being seen
+        stops publishing for longer than its max_silence_sec (IED offline).
+
+        Absence-based: call once per feature window. Only publishers seen at
+        least once are tracked, so an entirely absent baseline entry does not
+        raise noise. The alert clears (and can re-fire) when traffic resumes.
+        """
+        events: list[SecurityEvent] = []
+        now = now if now is not None else time.time()
+        for entry in self._goose_publishers():
+            if not entry.get("production", True):
+                continue
+            max_silence = float(entry.get("max_silence_sec", 0) or 0)
+            if max_silence <= 0:
+                continue
+            aid = str(entry.get("asset_id") or entry.get("gocb_ref") or "")
+            last = self.last_goose_seen.get(aid)
+            if last is None:
+                continue
+            if (now - last) <= max_silence:
+                self.alerted_goose_silence.discard(aid)
+                continue
+            if aid in self.alerted_goose_silence:
+                continue
+            self.alerted_goose_silence.add(aid)
+            events.append(
+                SecurityEvent(
+                    event_id=self._next_event_id(),
+                    site_id=self.site_id,
+                    sensor_id=self.sensor_id,
+                    event_type="GOOSE_SILENCE",
+                    severity="high",
+                    rule_id="OT-017",
+                    protocol="iec61850-goose",
+                    asset_id=aid,
+                    description="GOOSE publisher silent beyond max_silence_sec (IED offline)",
+                    risk_score=88,
+                    evidence={
+                        "asset_id": aid,
+                        "goose_gocb_ref": entry.get("gocb_ref", ""),
+                        "silence_sec": round(now - last, 1),
+                        "max_silence_sec": max_silence,
+                    },
+                )
+            )
         return events
 
     def evaluate_mms(self, obs: MmsObservation) -> list[SecurityEvent]:
@@ -136,6 +202,35 @@ class Iec61850Detector:
 
         if pair not in self.known_mms_pairs:
             self.known_mms_pairs.add(pair)
+
+            # OT-015 — burst of new MMS sessions per minute (scan / brute / storm).
+            now = time.time()
+            self._mms_session_times.append(now)
+            cutoff = now - 60.0
+            self._mms_session_times = [t for t in self._mms_session_times if t >= cutoff]
+            rate_threshold = self._threshold("mms_new_sessions_per_min", 20)
+            if len(self._mms_session_times) > rate_threshold and now >= self._alerted_mms_rate_until:
+                self._alerted_mms_rate_until = now + 60.0
+                events.append(
+                    SecurityEvent(
+                        event_id=self._next_event_id(),
+                        site_id=self.site_id,
+                        sensor_id=self.sensor_id,
+                        event_type="MMS_SESSION_RATE_ANOMALY",
+                        severity="medium",
+                        rule_id="OT-015",
+                        protocol="iec61850-mms",
+                        src_ip=client_ip,
+                        dst_ip=ied_ip,
+                        dst_port=102,
+                        description="Abnormal rate of new MMS sessions",
+                        evidence={
+                            "new_sessions_last_min": len(self._mms_session_times),
+                            "threshold_per_min": rate_threshold,
+                        },
+                    )
+                )
+
             if not self._is_known_mms_pair(client_ip, ied_ip):
                 events.append(
                     SecurityEvent(

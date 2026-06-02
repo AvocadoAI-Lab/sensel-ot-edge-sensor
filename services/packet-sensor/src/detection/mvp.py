@@ -35,7 +35,10 @@ class MvpDetector:
     alerted_unauthorized: set[str] = field(default_factory=set)
     alerted_port_scan: set[str] = field(default_factory=set)
     _event_seq: int = 0
-    _started_at: float = field(default_factory=time.monotonic)
+    # Wall-clock (epoch) is used for all "seen / silence" timing so it shares a
+    # timeline with evidence_ref / on-disk pcap timestamps. NTP steps can jump
+    # this clock; acceptable for coarse 60–120s silence windows.
+    _started_at: float = field(default_factory=time.time)
 
     def _enabled(self, rule_id: str) -> bool:
         return not self.rules_enabled or rule_id in self.rules_enabled
@@ -102,6 +105,9 @@ class MvpDetector:
                         risk_score=85,
                     )
                 )
+            # Update only AFTER the comparison and with a case-normalised key so
+            # repeated observations of the same MAC do not mask the change.
+            self.inventory.mac_to_ip[mac_key] = src_ip
 
         if src_ip and dst_ip and self._enabled("OT-004"):
             pair = f"{src_ip}->{dst_ip}"
@@ -167,6 +173,44 @@ class MvpDetector:
                             risk_score=90,
                         )
                     )
+
+        return events
+
+    def evaluate_arp(self, sender_mac: str, sender_ip: str) -> list[SecurityEvent]:
+        """OT-002 / OT-003 via ARP — the (sender_ip -> sender_mac) binding.
+
+        ARP carries the IP that the L2/L3 observation path misses (an ARP frame
+        has no IP layer), so this is where ARP-spoofing flips are caught: when an
+        IP that was previously bound to one MAC is suddenly announced by another.
+        """
+        events: list[SecurityEvent] = []
+        if not sender_mac or not sender_ip:
+            return events
+        mac_key = sender_mac.lower()
+
+        if self._enabled("OT-002") and sender_ip not in self.inventory.known_ips:
+            self.inventory.known_ips.add(sender_ip)
+            if sender_ip.lower() not in self._global_allowlist("ip"):
+                events.append(self._event("OT-002", src_ip=sender_ip))
+
+        if self._enabled("OT-003"):
+            previous = self.inventory.ip_to_mac.get(sender_ip)
+            if previous and previous != mac_key:
+                events.append(
+                    self._event(
+                        "OT-003",
+                        mac=sender_mac,
+                        src_ip=sender_ip,
+                        evidence={
+                            "ip": sender_ip,
+                            "previous_mac": previous,
+                            "observed_mac": mac_key,
+                            "indicator": "arp_spoofing",
+                        },
+                        risk_score=92,
+                    )
+                )
+            self.inventory.ip_to_mac[sender_ip] = mac_key
 
         return events
 
@@ -239,7 +283,7 @@ class MvpDetector:
 
     def _check_relay_offline(self, silence_sec: float = 120.0) -> list[SecurityEvent]:
         events: list[SecurityEvent] = []
-        now = time.monotonic()
+        now = time.time()
         uptime = now - self._started_at
         if uptime < silence_sec:
             return events
@@ -260,7 +304,7 @@ class MvpDetector:
                     evidence={
                         "relay_ip": address,
                         "silence_sec": silence_sec,
-                        "last_seen_monotonic": last_seen,
+                        "last_seen_epoch": last_seen,
                     },
                     risk_score=88,
                 )

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.io/schemas/ot/policy-baseline.json",
+  "title": "OT Detection Baseline Policy",
+  "type": "object",
+  "properties": {
+    "policy_version": { "type": "string" },
+    "site_id": { "type": "string" },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["asset_id"],
+        "properties": {
+          "asset_id": { "type": "string" },
+          "addresses": { "type": "array", "items": { "type": "string" } },
+          "allowed_peers": { "type": "array", "items": { "type": "string" } },
+          "allowed_protocols": { "type": "array", "items": { "type": "string" } },
+          "allowed_ports": { "type": "array", "items": { "type": "integer" } },
+          "allowed_modbus_function_codes": { "type": "array", "items": { "type": "integer" } },
+          "normal_packet_rate_per_min": {
+            "type": "object",
+            "properties": {
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          },
+          "normal_write_count_per_hour": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "global_allowlists": {
+      "type": "object",
+      "properties": {
+        "mac": { "type": "array", "items": { "type": "string" } },
+        "ip": { "type": "array", "items": { "type": "string" } },
+        "communication_pairs": { "type": "array", "items": { "type": "string" } },
+        "ports": { "type": "array" },
+        "protocols": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "port_scan_unique_ports": { "type": "integer", "minimum": 1 },
+        "port_scan_window_sec": { "type": "number", "minimum": 1 },
+        "traffic_rate_multiplier": { "type": "number", "minimum": 1 }
+      }
+    },
+    "iec61850": {
+      "type": "object",
+      "properties": {
+        "goose_publishers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "asset_id": { "type": "string" },
+              "publisher_mac": { "type": "string" },
+              "appid": { "type": "integer" },
+              "gocb_ref": { "type": "string" },
+              "production": { "type": "boolean" },
+              "max_silence_sec": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "mms_ieds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ied_ip"],
+            "properties": {
+              "asset_id": { "type": "string" },
+              "ied_ip": { "type": "string" },
+              "allowed_mms_clients": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "goose_stnum_jump_max": { "type": "integer", "minimum": 1 },
+            "mms_new_sessions_per_min": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "ioc": { "type": "array" }
+  },
+  "additionalProperties": false
+}

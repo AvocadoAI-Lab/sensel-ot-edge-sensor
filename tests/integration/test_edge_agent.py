@@ -2,37 +2,27 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
+from service_loader import import_from_service
+
 ROOT = Path(__file__).resolve().parents[2]
-AGENT_SRC = str(ROOT / "services" / "sensel-edge-agent")
-PACKET_SRC = str(ROOT / "services" / "packet-sensor")
-
-
-def _isolate_service_path(service_src: str) -> None:
-    for key in list(sys.modules):
-        if key == "src" or key.startswith("src."):
-            del sys.modules[key]
-    sys.path[:] = [
-        p for p in sys.path if p not in (AGENT_SRC, PACKET_SRC, str(ROOT))
-    ]
-    sys.path.insert(0, service_src)
 
 
 def _import_agent_modules():
-    _isolate_service_path(AGENT_SRC)
-    from src.api.client import SenseLClient
-    from src.config.settings import load_config
-    from src.health.collector import collect_health
-    from src.upload.buffer import UploadBuffer
+    client, settings, collector, buffer = import_from_service(
+        "sensel-edge-agent",
+        "src.api.client",
+        "src.config.settings",
+        "src.health.collector",
+        "src.upload.buffer",
+    )
+    return client.SenseLClient, settings.load_config, collector.collect_health, buffer.UploadBuffer
 
-    return SenseLClient, load_config, collect_health, UploadBuffer
 
-
-from tests.integration.mock_sensel_server import start_mock_sensel  # noqa: E402
+from integration.mock_sensel_server import start_mock_sensel  # noqa: E402
 
 
 def test_register_and_health_upload(

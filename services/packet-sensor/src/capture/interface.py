@@ -38,6 +38,10 @@ class CaptureSession:
             edgex_device_name=config.features.mqtt.edgex_device_name,
             edgex_data_topic=config.features.mqtt.edgex_data_topic,
             feature_window_sec=config.features.window_sec,
+            ring_buffer_max_packets=config.pcap.ring_buffer_max_packets,
+            ring_buffer_dir=config.pcap.ring_buffer_path,
+            pcap_retention_sec=config.pcap.retention_minutes * 60,
+            pcap_max_disk_bytes=config.pcap.max_disk_mb * 1024 * 1024,
         )
 
     def _validate_interface(self) -> None:

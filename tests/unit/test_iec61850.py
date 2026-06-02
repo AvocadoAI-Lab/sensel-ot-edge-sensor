@@ -2,41 +2,34 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
+from service_loader import import_from_service
+
 ROOT = Path(__file__).resolve().parents[2]
-PACKET_SRC = ROOT / "services" / "packet-sensor"
 
 
 def _import_packet_modules():
-    for key in list(sys.modules):
-        if key == "src" or key.startswith("src."):
-            del sys.modules[key]
-    sys.path[:] = [p for p in sys.path if p != str(PACKET_SRC)]
-    sys.path.insert(0, str(PACKET_SRC))
     from scapy.all import Ether, IP, Raw, TCP
 
-    from src.parser.l7.iec61850.goose import (
-        GOOSE_ETHERTYPE,
-        build_goose_wire,
-        parse_goose_wire,
+    goose, mms, processor = import_from_service(
+        "packet-sensor",
+        "src.parser.l7.iec61850.goose",
+        "src.parser.l7.iec61850.mms",
+        "src.pipeline.processor",
     )
-    from src.parser.l7.iec61850.mms import build_mms_write_probe, classify_mms_payload
-    from src.pipeline.processor import PacketPipeline
-
     return (
         Ether,
         IP,
         Raw,
         TCP,
-        build_goose_wire,
-        parse_goose_wire,
-        build_mms_write_probe,
-        classify_mms_payload,
-        GOOSE_ETHERTYPE,
-        PacketPipeline,
+        goose.build_goose_wire,
+        goose.parse_goose_wire,
+        mms.build_mms_write_probe,
+        mms.classify_mms_payload,
+        goose.GOOSE_ETHERTYPE,
+        processor.PacketPipeline,
     )
 
 

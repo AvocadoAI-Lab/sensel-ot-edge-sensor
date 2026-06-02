@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 import textwrap
 from pathlib import Path
 
 import pytest
+
+# Make the shared service loader importable from any test, regardless of the
+# pytest import mode / rootdir, so tests can do `from service_loader import ...`.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 @pytest.fixture

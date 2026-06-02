@@ -60,6 +60,15 @@ class DetectionConfig(BaseModel):
     rules_enabled: list[str] = Field(default_factory=list)
 
 
+class PcapConfig(BaseModel):
+    ring_buffer_path: str = "/app/data/pcap"
+    retention_minutes: int = 120
+    max_disk_mb: int = 2048
+    ring_buffer_max_packets: int = 5000
+    evidence_before_sec: int = 60
+    evidence_after_sec: int = 60
+
+
 class LoggingConfig(BaseModel):
     level: str = "info"
 
@@ -69,6 +78,7 @@ class AppConfig(BaseModel):
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
+    pcap: PcapConfig = Field(default_factory=PcapConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -126,5 +136,6 @@ def load_config(path: Path | None = None) -> AppConfig:
         capture=CaptureConfig(**capture_raw),
         features=FeaturesConfig(**features_raw),
         detection=DetectionConfig(**detection_raw),
+        pcap=PcapConfig(**expanded.get("pcap", {})),
         logging=LoggingConfig(**expanded.get("logging", {})),
     )

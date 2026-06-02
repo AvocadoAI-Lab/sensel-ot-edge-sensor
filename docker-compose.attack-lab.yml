@@ -1,0 +1,85 @@
+# Attack-lab overlay — REAL adversarial traffic for OT-001 ~ OT-018.
+#
+# Usage:
+#   # 1. broaden sensor capture + start base stack with this overlay
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.lab-61850.yml \
+#                  -f docker-compose.attack-lab.yml up -d
+#   # 2. fire the full sweep (OT-001~018, OT-009 excluded — absence-based)
+#   docker compose -f docker-compose.yml -f docker-compose.attack-lab.yml \
+#                  --profile attack up attacker-all
+#   # 3. real MITM ARP poisoning (isolated lab only!)
+#   docker compose -f docker-compose.yml -f docker-compose.attack-lab.yml \
+#                  --profile attack-arp up attacker-arp
+#
+# SAFETY: attacker-arp performs genuine bidirectional ARP cache poisoning and
+# will disrupt the victim's traffic. Run ONLY on an isolated test segment.
+
+x-attacker: &attacker
+  build:
+    context: .
+    dockerfile: lab/attack/Dockerfile
+  image: sensel-ot-attacker:latest
+  restart: "no"
+  network_mode: host
+  cap_add:
+    - NET_ADMIN
+    - NET_RAW
+  environment:
+    ATTACK_INTERFACE: ${ATTACK_INTERFACE:-eth0}
+    ATTACK_RELAY_IP: ${ATTACK_RELAY_IP:-192.168.10.20}
+    ATTACK_IED_IP: ${ATTACK_IED_IP:-192.168.10.50}
+    ATTACK_ROGUE_IP: ${ATTACK_ROGUE_IP:-192.168.10.231}
+    ATTACK_GATEWAY_IP: ${ATTACK_GATEWAY_IP:-192.168.10.1}
+
+services:
+  # The sensor must SEE the attacks: broaden the BPF beyond the 61850-only
+  # filter so ARP, Modbus/502, MMS/102, GOOSE and generic IP all reach it.
+  packet-sensor:
+    environment:
+      - CAPTURE_INTERFACE=${ATTACK_INTERFACE:-eth0}
+      - CAPTURE_BPF_FILTER=arp or (ether proto 0x88b8) or (tcp port 102) or (tcp port 502) or ip
+
+  # Full OT-001~018 sweep (OT-009 excluded; it is absence-based).
+  attacker-all:
+    <<: *attacker
+    container_name: sensel-attacker-all
+    profiles: [attack]
+    command: ["all"]
+
+  # Real bidirectional MITM ARP poisoning → OT-003.
+  attacker-arp:
+    <<: *attacker
+    container_name: sensel-attacker-arp
+    profiles: [attack-arp]
+    command: ["arp-spoof", "--loop",
+              "--victim", "${ATTACK_RELAY_IP:-192.168.10.20}",
+              "--gateway", "${ATTACK_GATEWAY_IP:-192.168.10.1}"]
+
+  # Rogue GOOSE publisher + test-bit + stNum anomaly → OT-011/012/013.
+  attacker-goose:
+    <<: *attacker
+    container_name: sensel-attacker-goose
+    profiles: [attack-goose]
+    command: ["rogue-goose", "--count", "8"]
+
+  # Non-baselined MMS client write to a baselined IED → OT-014/016/018.
+  attacker-mms:
+    <<: *attacker
+    container_name: sensel-attacker-mms
+    profiles: [attack-mms]
+    command: ["mms-rogue", "--count", "8", "--dst", "${ATTACK_IED_IP:-192.168.10.50}"]
+
+  # Modbus write from a non-baselined host → OT-007 (+OT-010).
+  attacker-modbus:
+    <<: *attacker
+    container_name: sensel-attacker-modbus
+    profiles: [attack-modbus]
+    command: ["modbus-write", "--count", "8", "--relay", "${ATTACK_RELAY_IP:-192.168.10.20}"]
+
+  # Port scan sweep → OT-006.
+  attacker-portscan:
+    <<: *attacker
+    container_name: sensel-attacker-portscan
+    profiles: [attack-portscan]
+    command: ["port-scan", "--ports", "25", "--relay", "${ATTACK_RELAY_IP:-192.168.10.20}"]

@@ -45,5 +45,8 @@ vendor/
 .DS_Store
 Thumbs.db
 
+# Analysis tooling metadata
+.understand-anything/
+
 # Docker volumes (local dev)
 docker-volumes/

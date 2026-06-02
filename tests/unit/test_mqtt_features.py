@@ -3,24 +3,24 @@
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
+from service_loader import import_from_service
+
 ROOT = Path(__file__).resolve().parents[2]
-PACKET_SRC = ROOT / "services" / "packet-sensor"
 
 
 def _import_publisher():
-    for key in list(sys.modules):
-        if key == "src" or key.startswith("src."):
-            del sys.modules[key]
-    sys.path[:] = [p for p in sys.path if p != str(PACKET_SRC)]
-    sys.path.insert(0, str(PACKET_SRC))
-    from src.features.publisher import FeaturePublisher
-    from src.parser.l2.ethernet import L2Stats, record_l2, reset_l2_window
-
-    return FeaturePublisher, L2Stats, record_l2, reset_l2_window
+    publisher, ethernet = import_from_service(
+        "packet-sensor", "src.features.publisher", "src.parser.l2.ethernet"
+    )
+    return (
+        publisher.FeaturePublisher,
+        ethernet.L2Stats,
+        ethernet.record_l2,
+        ethernet.reset_l2_window,
+    )
 
 
 def test_edgex_mqtt_payload_format() -> None:
@@ -74,7 +74,7 @@ def test_edgex_mqtt_payload_format() -> None:
 
 def test_window_resets_after_flush() -> None:
     FeaturePublisher, L2Stats, record_l2, _reset = _import_publisher()
-    from src.pipeline.processor import PacketPipeline
+    PacketPipeline = import_from_service("packet-sensor", "src.pipeline.processor").PacketPipeline
 
     policy = ROOT / "config/policy/baseline.example.json"
     with tempfile.TemporaryDirectory() as tmp:

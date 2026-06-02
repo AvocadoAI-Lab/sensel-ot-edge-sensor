@@ -18,6 +18,7 @@ class InventoryObservation:
 @dataclass
 class AssetInventory:
     mac_to_ip: dict[str, str] = field(default_factory=dict)
+    ip_to_mac: dict[str, str] = field(default_factory=dict)
     known_macs: set[str] = field(default_factory=set)
     known_ips: set[str] = field(default_factory=set)
     known_pairs: set[str] = field(default_factory=set)
@@ -34,7 +35,7 @@ class AssetInventory:
         dst_port: int | None,
         protocol: str | None,
     ) -> InventoryObservation:
-        now = time.monotonic()
+        now = time.time()
         self.window_packet_count += 1
 
         if src_ip:
@@ -42,8 +43,10 @@ class AssetInventory:
         if dst_ip:
             self.last_seen_by_ip[dst_ip] = now
 
-        if src_mac and src_ip:
-            self.mac_to_ip[src_mac] = src_ip
+        # NOTE: mac_to_ip is intentionally NOT updated here. OT-003 must compare
+        # the *previous* binding against the current observation before the map
+        # is overwritten, so the update happens inside MvpDetector after the
+        # comparison (see detection/mvp.py).
 
         return InventoryObservation(
             src_mac=src_mac,
@@ -54,14 +57,14 @@ class AssetInventory:
         )
 
     def record_port_scan_sample(self, src_ip: str, dst_port: int, now: float | None = None) -> None:
-        ts = now if now is not None else time.monotonic()
+        ts = now if now is not None else time.time()
         events = self._port_scan_events.setdefault(src_ip, [])
         events.append((ts, dst_port))
 
     def unique_ports_in_window(
         self, src_ip: str, window_sec: float, now: float | None = None
     ) -> set[int]:
-        ts = now if now is not None else time.monotonic()
+        ts = now if now is not None else time.time()
         cutoff = ts - window_sec
         events = self._port_scan_events.get(src_ip, [])
         self._port_scan_events[src_ip] = [(t, p) for t, p in events if t >= cutoff]

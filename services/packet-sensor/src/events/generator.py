@@ -28,6 +28,9 @@ class EventStore:
             if ref:
                 event.evidence_ref = ref
                 event.evidence.setdefault("pcap_ref", ref)
+                segment = getattr(ring_buffer, "latest_segment", "")
+                if segment:
+                    event.evidence.setdefault("pcap_file", segment)
         with self._path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
 
