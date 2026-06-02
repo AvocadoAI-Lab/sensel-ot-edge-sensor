@@ -3,6 +3,25 @@
 > 產品代號：SenseL RelayGuard  
 > 邊緣部署的 OT 資安與遙測閘道器，整合 EdgeX 主動遙測與被動鏡像流量監控。
 
+## 這個分支：`first-principles-redesign` — 為什麼、差在哪、優勢
+
+> 本分支**包含 `hardening-v1` 的全部修補**（偵測已修到可信，見 [hardening-v1.md](docs/hardening-v1.md)），再從第一性原理解決兩個更深的問題。
+
+**為什麼存在**：就算偵測修好了，baseline 仍是「手寫 JSON 的猜測」、偵測狀態全在記憶體（**重啟即告警風暴**）；而且實務上你在拿到設備/SCD 前**根本還沒有 baseline**。本分支讓感測器**沒有 baseline 也能安全上線**，並把 baseline 來源換成工程真相。
+
+**與 `hardening-v1` 的差異**
+
+| 面向 | `hardening-v1` | `first-principles-redesign` |
+|------|----------------|-----------------------------|
+| baseline 來源 | 手寫 JSON（猜測） | 從工程 **SCD/SCL 自動推導**，或從**觀測學習** |
+| 沒有 baseline 時 | 只能空跑 / 誤報 | **learning 模式**：安靜觀測、不告警 |
+| 重啟 | 盤點失憶 → 告警風暴 | **狀態持久化（SQLite）**，不再風暴 |
+| 兩套 baseline | — | SCD 與觀測**同一 schema**，可 **reconcile** |
+
+**優勢**：**沒 baseline 也能立刻安全部署**（commissioning 學習）；重啟不失憶；baseline **對照工程真相**而非猜測；等真實 SCD 到了能 diff 出「觀測 ≠ 工程」的異常。
+
+📽 **完整模擬流程（真實終端輸出）見 [docs/walkthrough.md](docs/walkthrough.md)**。
+
 ## 架構概覽
 
 ```
