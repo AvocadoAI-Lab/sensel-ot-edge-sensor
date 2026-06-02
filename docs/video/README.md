@@ -1,8 +1,8 @@
 # 教學模擬影片
 
-**[▶ sensel-walkthrough-1080.mp4](sensel-walkthrough-1080.mp4)** — 1920×1080 · H.264 · 30fps · ~49s
+**[▶ sensel-walkthrough-1080.mp4](sensel-walkthrough-1080.mp4)** — 1920×1080 · H.264 · 30fps · ~56s · 動態 motion graphics
 
-一支把「為什麼有 `first-principles-redesign` 分支、跟誰不同、優勢」走一遍的教學影片，內含**真實終端輸出**與流程圖：
+一支把「為什麼有 `first-principles-redesign` 分支、跟誰不同、優勢」走一遍的教學影片。流程圖**會動**（封包沿連線流動、連線自我繪製、規則徽章逐一彈出、18 條攻擊格逐一打勾、兩條 baseline 串流匯流），並穿插**真實終端輸出**：
 
 1. 標題 → 雙路徑架構圖
 2. 問題（為什麼要重做）

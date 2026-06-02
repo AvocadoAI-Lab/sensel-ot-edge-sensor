@@ -3,186 +3,631 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1080" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/MotionPathPlugin.min.js"></script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: #06090d; }
       :root {
-        --bg: #06090d; --panel: #13212f; --panel2: #0c1620; --line: #25394d;
-        --blue: #1e88e5; --green: #43a047; --amber: #ffb300; --red: #e53935;
-        --fg: #ffffff; --mut: #9fb6cc; --body: #c7d4e1;
-        --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+        --bg: #06090d; --panel: #13212f; --panel2: #0c1620; --line: #2c4156;
+        --blue: #2f9ae0; --blueDk: #143247; --green: #4fc26a; --greenDk: #173a22;
+        --amber: #ffb733; --amberDk: #3a2a08; --red: #e5544a; --purple: #c563d6;
+        --fg: #ffffff; --mut: #a9c0d6; --body: #d2dfec;
+        --font: "Microsoft JhengHei", "Noto Sans TC", "PingFang TC", sans-serif;
         --mono: "Cascadia Code", "Consolas", "DejaVu Sans Mono", monospace;
       }
       .scene {
-        position: absolute; inset: 0; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; padding: 70px 110px;
+        position: absolute; inset: 0;
         font-family: var(--font); color: var(--fg); background: var(--bg);
       }
       .wm {
-        position: absolute; top: 26px; right: 34px; font-family: var(--font);
-        font-size: 17px; color: #cdd; text-align: right; line-height: 1.4; opacity: .85;
+        position: absolute; top: 26px; right: 36px; font-family: var(--font);
+        font-size: 18px; color: #bcd0e2; text-align: right; line-height: 1.45; z-index: 30;
       }
       .wm b { color: #fff; }
+      .scene-title {
+        position: absolute; top: 40px; left: 70px; right: 360px;
+        font-size: 36px; font-weight: 900; line-height: 1.2; color: #fff; z-index: 20;
+      }
+      .scene-title .accent { color: var(--green); }
       .badge {
         display: inline-block; background: var(--blue); color: #fff; font-weight: 800;
-        font-size: 22px; padding: 6px 20px; border-radius: 8px; margin-bottom: 22px;
+        font-size: 24px; padding: 8px 22px; border-radius: 9px;
       }
-      .badge.green { background: var(--green); }
+      .badge.green { background: var(--green); color:#06210f; }
       .badge.amber { background: var(--amber); color: #1a1200; }
-      h1 { font-size: 64px; font-weight: 900; line-height: 1.15; }
-      h2 { font-size: 46px; font-weight: 800; line-height: 1.2; margin-bottom: 26px; text-align: center; }
-      .sub { font-size: 27px; color: var(--mut); margin-top: 18px; }
-      ul { list-style: none; font-size: 30px; line-height: 1.55; color: var(--body); }
-      li { margin: 14px 0; }
-      li b { color: #fff; }
-      .tick { color: var(--green); font-weight: 900; }
-      .cross { color: var(--red); font-weight: 900; }
-      img.diagram { max-width: 86%; max-height: 74%; border-radius: 14px;
-        background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+
+      /* ---- flow diagram primitives ---- */
+      .stage { position: absolute; overflow: hidden; }
+      .node {
+        position: absolute; border-radius: 14px; border: 2px solid var(--line);
+        background: var(--panel); display: flex; flex-direction: column;
+        align-items: center; justify-content: center; text-align: center;
+        color: var(--body); font-size: 21px; line-height: 1.3; padding: 8px 14px;
+        box-shadow: 0 6px 22px rgba(0,0,0,.45);
+      }
+      .node .t { color:#fff; font-weight: 800; }
+      .node .s { color: var(--mut); font-size: 17px; margin-top: 3px; }
+      .node.blue  { border-color:#3f7fae; background: linear-gradient(180deg,#163148,#0e2334); }
+      .node.green { border-color:#3f9a55; background: linear-gradient(180deg,#173a22,#0f2817); }
+      .node.amber { border-color:#9a7a2a; background: linear-gradient(180deg,#3a2a08,#241a06); }
+      .node.gray  { border-color:#46586b; background: linear-gradient(180deg,#222d38,#171f28); }
+      .node .rule {
+        position:absolute; top:-13px; right:-13px; background:var(--green); color:#06210f;
+        font-size:14px; font-weight:900; border-radius:8px; padding:3px 8px;
+        font-family:var(--mono); box-shadow:0 3px 10px rgba(0,0,0,.5);
+      }
+      svg.wires { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+      .wire { fill:none; stroke:#62809b; stroke-width:3.5; }
+      .wire.dash { stroke-dasharray: 10 9; }
+      .wire.bridge { stroke:#7d6aa0; stroke-width:3; }
+      .arrow-head { fill:#62809b; }
+      .label {
+        position:absolute; font-size:18px; color:#9fb6cc; background:rgba(6,9,13,.78);
+        padding:2px 8px; border-radius:6px; white-space:nowrap;
+      }
+      .label.green { color:#7fe39a; }
+      .label.purple { color:#d79be4; }
+      .pkt {
+        position:absolute; width:22px; height:22px; border-radius:50%;
+        background: radial-gradient(circle at 35% 30%, #bdeaff, #2f9ae0 60%, #0e5a93);
+        box-shadow:0 0 18px 5px rgba(47,154,224,.85); z-index:15; opacity:0;
+        margin-left:-11px; margin-top:-11px;
+      }
+      .pkt.g { background: radial-gradient(circle at 35% 30%, #d6ffe1, #4fc26a 60%, #1c6e34);
+        box-shadow:0 0 18px 5px rgba(79,194,106,.85); }
+      .pkt.a { background: radial-gradient(circle at 35% 30%, #ffe9bf, #ffb733 60%, #a9740a);
+        box-shadow:0 0 18px 5px rgba(255,183,51,.85); }
+      .caption {
+        position:absolute; bottom:46px; left:70px; right:70px; text-align:center;
+        font-size:26px; color:#dbe7f2; line-height:1.45; z-index:25;
+      }
+      .caption b { color:#7fe39a; }
+      .caption .amberk { color:#ffd27a; }
+
+      /* ---- terminal ---- */
       .term {
-        width: 1480px; background: var(--panel2); border: 1px solid var(--line);
+        position:absolute; background: var(--panel2); border: 1px solid var(--line);
         border-radius: 14px; box-shadow: 0 18px 60px rgba(0,0,0,.5); overflow: hidden;
       }
       .term .bar { background: #0a1119; border-bottom: 1px solid var(--line);
-        padding: 12px 18px; font-family: var(--font); font-size: 17px; color: #6f8498; }
+        padding: 12px 18px; font-family: var(--font); font-size: 17px; color: #7e94a8; }
       .term .bar .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%;
         margin-right: 7px; vertical-align: middle; }
-      .term pre { font-family: var(--mono); font-size: 24px; line-height: 1.5;
-        color: #d7e3ee; padding: 24px 30px; white-space: pre-wrap; }
+      .term pre { font-family: var(--mono); font-size: 25px; line-height: 1.62;
+        color: #d7e3ee; padding: 26px 32px; white-space: pre-wrap; }
+      .term .ln { display:block; }
       .term .p { color: #5bc0ff; }
-      .term .ok { color: #5fd38a; }
+      .term .ok { color: #6fe39a; }
       .term .none { color: #ffd479; }
-      .term .key { color: #ffcf6b; }
-      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 70px;
-        font-family: var(--mono); font-size: 30px; color: #d7e3ee; margin-top: 8px; }
-      .grid div { background: var(--panel); border: 1px solid var(--line);
-        border-radius: 8px; padding: 10px 22px; }
-      .foot { font-size: 19px; color: #6f8498; margin-top: 30px; }
+      .term .key { color: #ffcf6b; border-radius:5px; padding:0 4px; }
+      .term .cm { color:#6f8498; }
+      .foot { position:absolute; left:70px; right:70px; bottom:60px; text-align:center;
+        font-size:25px; color:#cfe0ef; }
+      .foot b { color:#ffcf6b; }
+
+      /* ---- grid scene ---- */
+      .grid-wrap { position:absolute; left:50%; top:300px; transform:translateX(-50%);
+        display:grid; grid-template-columns: repeat(6, 250px); gap:20px; }
+      .cell {
+        background: var(--panel); border:2px solid var(--line); border-radius:12px;
+        padding:18px 0; text-align:center; font-family:var(--mono); font-size:30px;
+        color:#9fb6cc; position:relative;
+      }
+      .cell .ck { color:var(--green); font-weight:900; opacity:0; display:inline-block; }
+      .gridhdr { position:absolute; top:150px; left:0; right:0; text-align:center;
+        font-family:var(--mono); font-size:30px; color:#5bc0ff; }
+      .gridfoot { position:absolute; bottom:140px; left:0; right:0; text-align:center;
+        font-size:38px; font-weight:800; color:#6fe39a; opacity:0; }
+
+      /* chip row */
+      .chips { position:absolute; bottom:60px; left:50%; transform:translateX(-50%);
+        display:flex; gap:18px; }
+      .chip { background:var(--blueDk); border:2px solid #3f7fae; border-radius:30px;
+        padding:10px 24px; font-size:22px; color:#cfe6f7; font-family:var(--mono); }
+      .chip .ar { color:#62809b; margin:0 4px; }
+
+      /* intro / outro */
+      .center { position:absolute; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; padding:0 120px; }
+      h1 { font-size: 92px; font-weight: 900; line-height: 1.1; }
+      .sub { font-size: 34px; color: var(--mut); margin-top: 26px; }
+      .gline { width:0; height:5px; border-radius:3px; margin:34px auto;
+        background:linear-gradient(90deg,var(--blue),var(--green)); }
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-duration="49" data-width="1920" data-height="1080">
+    <div id="root" data-composition-id="main" data-start="0" data-duration="56" data-width="1920" data-height="1080">
 
-      <!-- 1 · Title -->
-      <div id="s1" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
-        <div class="wm"><b>SenseL OT Edge Sensor</b><br>教學模擬 · 全程離線 / 本機 · 真實輸出</div>
-        <div class="anim" style="text-align:center">
-          <div class="badge">first-principles-redesign</div>
-          <h1>SenseL OT Edge Sensor<br>偵測強化 × baseline 重做</h1>
-          <p class="sub">為什麼要多這個分支、跟誰不同、有什麼優勢 — 用真實輸出走一遍</p>
+      <!-- ============ 1 · INTRO ============ -->
+      <div id="s1" class="scene clip" data-start="0" data-duration="4.5" data-track-index="1">
+        <div class="center">
+          <div id="s1-badge" class="badge">first-principles-redesign</div>
+          <h1 id="s1-title" style="margin-top:30px">SenseL OT Edge Sensor</h1>
+          <div id="s1-line" class="gline"></div>
+          <p id="s1-sub" class="sub">被動唯讀偵測 × baseline 重做 · 動態導覽</p>
         </div>
       </div>
 
-      <!-- 2 · Architecture -->
-      <div id="s2" class="scene clip" data-start="6" data-duration="6.5" data-track-index="2">
+      <!-- ============ 2 · ARCHITECTURE ============ -->
+      <div id="s2" class="scene clip" data-start="4.5" data-duration="12" data-track-index="2">
         <div class="wm"><b>架構</b><br>雙路徑 · 被動唯讀</div>
-        <h2 class="anim">雙路徑架構：原始鏡像流量不進 EdgeX，被動側專責偵測</h2>
-        <img class="diagram anim" src="../diagrams/architecture.png" alt="architecture" />
+        <div class="scene-title">雙路徑架構：<span class="accent">原始鏡像流量不進 EdgeX</span>，被動側專責偵測</div>
+        <div id="s2-stage" class="stage" style="inset:0"></div>
+        <div id="s2-cap" class="caption" style="opacity:0">原始鏡像流量不進 EdgeX，被動側專責偵測（<b>唯讀、不干擾 OT</b>）</div>
       </div>
 
-      <!-- 3 · Problem -->
-      <div id="s3" class="scene clip" data-start="12.5" data-duration="6" data-track-index="3">
-        <div class="wm"><b>問題</b><br>為什麼要重做</div>
-        <div class="anim" style="max-width:1400px">
-          <div class="badge amber">為什麼要這個分支</div>
-          <h2 style="text-align:left">main 的偵測「能 demo，對不起電驛場景」</h2>
-          <ul>
-            <li><span class="cross">✗</span> OT-003 因 bug <b>裝了卻不會響</b>；MMS 用字串比對會誤判</li>
-            <li><span class="cross">✗</span> GOOSE 計數合法回繞就誤報；OT-015 / OT-017 <b>列了卻沒實作</b></li>
-            <li><span class="cross">✗</span> baseline 是<b>手寫猜測</b>；狀態全在記憶體 → <b>重啟即告警風暴</b></li>
-            <li><span class="cross">✗</span> 而且拿到設備前 <b>根本還沒有 baseline</b></li>
-          </ul>
-        </div>
+      <!-- ============ 3 · DETECTION PIPELINE ============ -->
+      <div id="s3" class="scene clip" data-start="16.5" data-duration="12.5" data-track-index="3">
+        <div class="wm"><b>偵測管線</b><br>一個封包的旅程</div>
+        <div class="scene-title">偵測管線：一個封包逐站前進，<span class="accent">命中即彈出規則徽章</span></div>
+        <div id="s3-stage" class="stage" style="inset:0"></div>
       </div>
 
-      <!-- 4 · Demo A: SCD -> baseline -->
-      <div id="s4" class="scene clip" data-start="18.5" data-duration="7" data-track-index="4">
+      <!-- ============ 4 · SCD -> baseline ============ -->
+      <div id="s4" class="scene clip" data-start="29" data-duration="6.5" data-track-index="4">
         <div class="wm"><b>① 有工程檔</b><br>SCD → baseline</div>
-        <div class="anim">
-          <div class="badge green">① 對照工程真相：從 SCD 自動推導 baseline</div>
-          <div class="term">
-            <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> scd-to-baseline</div>
-            <pre><span class="p">$</span> python3 scripts/scd-to-baseline.py lab/61850/sample.scd --stdout
-<span class="ok">derived baseline: 2 assets, 1 GOOSE publishers, 1 MMS IEDs</span>
-
-goose_publishers: [{ asset_id: ied-01, <span class="key">appid: 1000</span>, max_silence_sec: 8.0 }]
-mms_ieds:         [{ ied_ip: 192.168.10.50, allowed_mms_clients: [192.168.10.10] }]</pre>
-          </div>
-          <p class="foot">GOOSE 以 <b style="color:#ffcf6b">APPID</b> 為權威 key（SCL 的 MAC 是目的多播、非來源 MAC）</p>
+        <div class="scene-title"><span class="accent">①</span> 對照工程真相：從 SCD 自動推導 baseline</div>
+        <div class="term" id="s4-term" style="left:140px; top:170px; width:1640px;">
+          <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> scd-to-baseline</div>
+          <pre id="s4-pre"><span class="ln"><span class="p">$</span> python3 scripts/scd-to-baseline.py lab/61850/sample.scd --stdout</span><span class="ln"><span class="ok">derived baseline: 2 assets, 1 GOOSE publishers, 1 MMS IEDs</span></span><span class="ln"> </span><span class="ln">goose_publishers: [{ asset_id: ied-01, <span class="key" id="s4-key">appid: 1000</span>, max_silence_sec: 8.0 }]</span><span class="ln">mms_ieds:         [{ ied_ip: 192.168.10.50, allowed_mms_clients: [192.168.10.10] }]</span></pre>
         </div>
+        <p class="foot" id="s4-foot">GOOSE 以 <b>APPID</b> 為權威 key（SCL 的 MAC 是目的多播、非來源 MAC）</p>
       </div>
 
-      <!-- 5 · Demo B: learning -> candidate -->
-      <div id="s5" class="scene clip" data-start="25.5" data-duration="7" data-track-index="5">
+      <!-- ============ 5 · learning -> candidate ============ -->
+      <div id="s5" class="scene clip" data-start="35.5" data-duration="6.5" data-track-index="5">
         <div class="wm"><b>② 還沒 baseline</b><br>learning 學習</div>
-        <div class="anim">
-          <div class="badge green">② 沒有 baseline：learning 模式安靜學習</div>
-          <div class="term">
-            <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> commissioning</div>
-            <pre>sensor: detection.mode = <span class="key">learning</span>   # commissioning
-<span class="none">alerts raised during learning : (none)</span>
-
-<span class="p">$</span> python3 scripts/observed-to-baseline.py learned-state.db --stdout
-candidate goose_publishers : [{ publisher_mac: <span class="key">00:11:22:33:44:55</span>, appid: 1000 }]
-candidate mms_ieds         : [{ ied_ip: 192.168.10.50, clients: [192.168.10.10] }]</pre>
-          </div>
-          <p class="foot">學習期間 <b style="color:#ffd479">零告警</b>，產出候選 baseline（與 SCD <b>同一 schema</b>）</p>
+        <div class="scene-title"><span class="accent">②</span> 沒有 baseline：learning 模式安靜學習，零告警</div>
+        <div class="term" id="s5-term" style="left:140px; top:170px; width:1640px;">
+          <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> commissioning</div>
+          <pre id="s5-pre"><span class="ln">sensor: detection.mode = <span class="key">learning</span>   <span class="cm"># commissioning</span></span><span class="ln"><span class="none" id="s5-none">alerts raised during learning : (none)</span></span><span class="ln"> </span><span class="ln"><span class="p">$</span> python3 scripts/observed-to-baseline.py learned-state.db --stdout</span><span class="ln">candidate goose_publishers : [{ publisher_mac: <span class="key">00:11:22:33:44:55</span>, appid: 1000 }]</span><span class="ln">candidate mms_ieds         : [{ ied_ip: 192.168.10.50, clients: [192.168.10.10] }]</span></pre>
         </div>
+        <p class="foot" id="s5-foot">學習期間 <b>零告警</b> → 候選 baseline（與 SCD <b>同一 schema</b>）</p>
       </div>
 
-      <!-- 6 · Demo C: attacks 18 rules -->
-      <div id="s6" class="scene clip" data-start="32.5" data-duration="7" data-track-index="6">
+      <!-- ============ 6 · 18-rule grid ============ -->
+      <div id="s6" class="scene clip" data-start="42" data-duration="6.5" data-track-index="6">
         <div class="wm"><b>③ 偵測有效</b><br>OT-001 ~ OT-018</div>
-        <div class="anim" style="text-align:center">
-          <div class="badge green">③ 偵測真的有效：真實攻擊 OT-001 ~ OT-018</div>
-          <pre style="font-family:var(--mono);font-size:24px;color:#5bc0ff;margin-bottom:18px">$ python3 scripts/attacks-selftest.py</pre>
-          <div class="grid">
-            <div>OT-001 <span class="tick">✓</span></div><div>OT-007 <span class="tick">✓</span></div><div>OT-013 <span class="tick">✓</span></div>
-            <div>OT-002 <span class="tick">✓</span></div><div>OT-008 <span class="tick">✓</span></div><div>OT-014 <span class="tick">✓</span></div>
-            <div>OT-003 <span class="tick">✓</span></div><div>OT-009 <span class="tick">✓</span></div><div>OT-015 <span class="tick">✓</span></div>
-            <div>OT-004 <span class="tick">✓</span></div><div>OT-010 <span class="tick">✓</span></div><div>OT-016 <span class="tick">✓</span></div>
-            <div>OT-005 <span class="tick">✓</span></div><div>OT-011 <span class="tick">✓</span></div><div>OT-017 <span class="tick">✓</span></div>
-            <div>OT-006 <span class="tick">✓</span></div><div>OT-012 <span class="tick">✓</span></div><div>OT-018 <span class="tick">✓</span></div>
-          </div>
-          <p class="sub" style="color:#5fd38a;margin-top:24px;font-weight:700">OK — all 18 implemented rules fired</p>
-        </div>
+        <div class="scene-title"><span class="accent">③</span> 偵測真的有效：真實攻擊自我測試，18 條規則逐一觸發</div>
+        <div class="gridhdr" id="s6-hdr">$ python3 scripts/attacks-selftest.py</div>
+        <div class="grid-wrap" id="s6-grid"></div>
+        <div class="gridfoot" id="s6-foot">OK — all 18 implemented rules fired</div>
       </div>
 
-      <!-- 7 · Lifecycle -->
-      <div id="s7" class="scene clip" data-start="39.5" data-duration="6" data-track-index="7">
+      <!-- ============ 7 · BASELINE LIFECYCLE (merge) ============ -->
+      <div id="s7" class="scene clip" data-start="48.5" data-duration="5" data-track-index="7">
         <div class="wm"><b>會合</b><br>同一 schema</div>
-        <h2 class="anim">兩條源頭（SCD 工程 / 觀測學習）匯流到同一 policy schema</h2>
-        <img class="diagram anim" src="../diagrams/baseline-lifecycle.png" alt="baseline lifecycle" />
+        <div class="scene-title">兩條源頭匯流到<span class="accent">同一 policy schema</span></div>
+        <div id="s7-stage" class="stage" style="inset:0"></div>
       </div>
 
-      <!-- 8 · Outro -->
-      <div id="s8" class="scene clip" data-start="45.5" data-duration="3.5" data-track-index="8">
-        <div class="anim" style="text-align:center">
-          <div class="badge">總結</div>
-          <h1 style="font-size:52px">沒 baseline 也能安全上線<br>重啟不失憶 · 對照工程真相</h1>
-          <p class="sub">細節見 docs/first-principles-redesign.md · docs/walkthrough.md</p>
+      <!-- ============ 8 · OUTRO ============ -->
+      <div id="s8" class="scene clip" data-start="53.5" data-duration="2.5" data-track-index="8">
+        <div class="center">
+          <h1 id="s8-title" style="font-size:62px; line-height:1.25">沒 baseline 也能安全上線<br>重啟不失憶 · 對照工程真相</h1>
+          <p id="s8-sub" class="sub">細節見 docs/first-principles-redesign.md</p>
         </div>
       </div>
 
     </div>
 
     <script>
+      if (window.MotionPathPlugin) gsap.registerPlugin(MotionPathPlugin);
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      // per-scene entrance: fade + rise of the .anim content at each scene start
-      const scenes = [
-        ["#s1 .anim", 0], ["#s2 .anim", 6], ["#s3 .anim", 12.5], ["#s4 .anim", 18.5],
-        ["#s5 .anim", 25.5], ["#s6 .anim", 32.5], ["#s7 .anim", 39.5], ["#s8 .anim", 45.5],
-      ];
-      for (const [sel, t] of scenes) {
-        tl.fromTo(sel, { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" }, t);
+
+      /* ---------- helpers ---------- */
+      // Build a node div inside a stage. spec: {id,cls,x,y,w,h,title,sub,rule}
+      function mkNode(stage, n) {
+        const d = document.createElement("div");
+        d.className = "node " + (n.cls || "blue");
+        d.id = n.id;
+        d.style.left = n.x + "px"; d.style.top = n.y + "px";
+        d.style.width = n.w + "px"; d.style.height = n.h + "px";
+        let html = "";
+        if (n.title) html += '<div class="t">' + n.title + "</div>";
+        if (n.sub) html += '<div class="s">' + n.sub + "</div>";
+        if (n.rule) html += '<div class="rule" id="' + n.id + '-rule" style="opacity:0">' + n.rule + "</div>";
+        d.innerHTML = html;
+        stage.appendChild(d);
+        n.cx = n.x + n.w / 2; n.cy = n.y + n.h / 2;
+        return n;
       }
-      // gentle Ken-Burns on the two diagram images
-      tl.fromTo("#s2 img", { scale: 1.0 }, { scale: 1.06, duration: 6.5, ease: "none" }, 6);
-      tl.fromTo("#s7 img", { scale: 1.0 }, { scale: 1.06, duration: 6.0, ease: "none" }, 39.5);
+      function ctr(n){ return {x:n.cx, y:n.cy}; }
+      function NS(){ return document.createElementNS("http://www.w3.org/2000/svg","svg"); }
+      function svgEl(t){ return document.createElementNS("http://www.w3.org/2000/svg", t); }
+
+      // draw an arrow path (polyline of points) into an svg; returns the <path> element
+      function mkWire(svg, pts, opts={}) {
+        opts = opts || {};
+        const p = svgEl("path");
+        let dstr = "M " + pts[0].x + " " + pts[0].y;
+        for (let i=1;i<pts.length;i++) dstr += " L " + pts[i].x + " " + pts[i].y;
+        p.setAttribute("d", dstr);
+        p.setAttribute("class", "wire" + (opts.cls ? " " + opts.cls : ""));
+        svg.appendChild(p);
+        // arrowhead at last point
+        if (opts.head !== false) {
+          const a = pts[pts.length-1], b = pts[pts.length-2];
+          const ang = Math.atan2(a.y-b.y, a.x-b.x);
+          const s = 13;
+          const h = svgEl("polygon");
+          const p1 = (a.x) + "," + (a.y);
+          const p2 = (a.x - s*Math.cos(ang) + s*0.6*Math.sin(ang)) + "," + (a.y - s*Math.sin(ang) - s*0.6*Math.cos(ang));
+          const p3 = (a.x - s*Math.cos(ang) - s*0.6*Math.sin(ang)) + "," + (a.y - s*Math.sin(ang) + s*0.6*Math.cos(ang));
+          h.setAttribute("points", p1+" "+p2+" "+p3);
+          h.setAttribute("class","arrow-head" + (opts.headCls?" "+opts.headCls:""));
+          if (opts.headColor) h.setAttribute("fill", opts.headColor);
+          svg.appendChild(h);
+          p._head = h;
+        }
+        return p;
+      }
+      // animate draw-on of a path between [t, t+dur]; head fades in at end
+      function drawOn(path, t, dur) {
+        const len = path.getTotalLength();
+        gsap.set(path, { strokeDasharray: len, strokeDashoffset: len });
+        tl.to(path, { strokeDashoffset: 0, duration: dur, ease: "power1.inOut" }, t);
+        if (path._head) tl.fromTo(path._head, {opacity:0}, {opacity:1, duration:0.25}, t+dur-0.2);
+      }
+      // travel a packet token along straight segments through pts at [t, t+dur]
+      function travel(pkt, pts, t, dur) {
+        tl.set(pkt, { left: pts[0].x, top: pts[0].y, opacity: 0 }, t);
+        tl.to(pkt, { opacity: 1, duration: 0.18 }, t);
+        // distribute duration by segment length
+        const segs = [];
+        let total = 0;
+        for (let i=1;i<pts.length;i++){
+          const dl = Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
+          segs.push(dl); total += dl;
+        }
+        let acc = t;
+        for (let i=1;i<pts.length;i++){
+          const sd = dur * (segs[i-1]/total);
+          tl.to(pkt, { left: pts[i].x, top: pts[i].y, duration: sd, ease: "none" }, acc);
+          acc += sd;
+        }
+        tl.to(pkt, { opacity: 0, duration: 0.2 }, t+dur);
+        return t+dur;
+      }
+      // pulse/light a node when packet arrives
+      function lightNode(id, t) {
+        const el = "#"+id;
+        tl.fromTo(el, { boxShadow:"0 6px 22px rgba(0,0,0,.45)", scale:1 },
+          { boxShadow:"0 0 26px 6px rgba(47,154,224,.7)", scale:1.06, duration:0.22, ease:"power2.out" }, t);
+        tl.to(el, { scale:1, boxShadow:"0 0 16px 3px rgba(47,154,224,.45)", duration:0.4, ease:"power2.inOut" }, t+0.22);
+      }
+      function lightNodeG(id, t) {
+        const el = "#"+id;
+        tl.fromTo(el, { scale:1 },
+          { boxShadow:"0 0 26px 7px rgba(79,194,106,.8)", scale:1.06, duration:0.22, ease:"power2.out" }, t);
+        tl.to(el, { scale:1, boxShadow:"0 0 16px 3px rgba(79,194,106,.5)", duration:0.4 }, t+0.22);
+      }
+      function popRule(id, t) {
+        tl.fromTo("#"+id+"-rule", { opacity:0, scale:0.3, y:6 },
+          { opacity:1, scale:1, y:0, duration:0.35, ease:"back.out(2.4)" }, t);
+      }
+      function mkPkt(stage, cls){
+        const d=document.createElement("div"); d.className="pkt"+(cls?" "+cls:""); stage.appendChild(d); return d;
+      }
+      function mkLabel(stage, x, y, text, cls){
+        const d=document.createElement("div"); d.className="label"+(cls?" "+cls:"");
+        d.style.left=x+"px"; d.style.top=y+"px"; d.textContent=text;
+        d.style.transform="translate(-50%,-50%)"; stage.appendChild(d); return d;
+      }
+      // entrance for nodes (appear before flow reaches them)
+      function nodeIn(id, t){
+        tl.fromTo("#"+id, {opacity:0, scale:0.86}, {opacity:1, scale:1, duration:0.4, ease:"back.out(1.6)"}, t);
+      }
+
+      /* ======================================================
+         SCENE 1 — INTRO
+      ====================================================== */
+      tl.from("#s1-badge", { y:30, opacity:0, duration:0.5, ease:"power3.out" }, 0.2);
+      tl.from("#s1-title", { y:60, opacity:0, duration:0.8, ease:"power4.out" }, 0.4);
+      tl.fromTo("#s1-line", { width:0 }, { width:560, duration:0.8, ease:"power2.inOut" }, 0.9);
+      tl.from("#s1-sub", { y:30, opacity:0, duration:0.6, ease:"power2.out" }, 1.2);
+      tl.fromTo("#s1-title", { textShadow:"0 0 0px rgba(47,154,224,0)" },
+        { textShadow:"0 0 26px rgba(47,154,224,.55)", duration:1.2, ease:"sine.inOut", yoyo:true, repeat:1 }, 1.6);
+
+      /* ======================================================
+         SCENE 2 — ARCHITECTURE (dual path)  t0 = 4.5
+      ====================================================== */
+      (function(){
+        const T = 4.5;
+        const stage = document.getElementById("s2-stage");
+        const svg = NS(); svg.setAttribute("class","wires"); svg.setAttribute("viewBox","0 0 1920 1080");
+        stage.appendChild(svg);
+        // nodes
+        const ot   = mkNode(stage, {id:"a-ot",   cls:"gray",  x:80,  y:430, w:230, h:130, title:"OT devices", sub:"Relay / IED / PLC"});
+        const edgex= mkNode(stage, {id:"a-edgex",cls:"blue",  x:470, y:200, w:300, h:120, title:"EdgeX", sub:"device-mqtt / modbus"});
+        const core = mkNode(stage, {id:"a-core", cls:"blue",  x:880, y:210, w:240, h:100, title:"Core Data"});
+        const sens = mkNode(stage, {id:"a-sens", cls:"green", x:470, y:640, w:300, h:130, title:"Packet Sensor", sub:"capture → parse → detect"});
+        const jsonl= mkNode(stage, {id:"a-json", cls:"amber", x:880, y:650, w:240, h:110, title:"security-events", sub:".jsonl"});
+        const agent= mkNode(stage, {id:"a-agent",cls:"blue",  x:1290,y:420, w:280, h:150, title:"SenseL Edge Agent", sub:"buffer + retry"});
+        const plat = mkNode(stage, {id:"a-plat", cls:"gray",  x:1660,y:445, w:200, h:120, title:"SenseL", sub:"Platform"});
+
+        // wires (top telemetry lane)
+        const w1 = mkWire(svg, [ {x:ot.x+ot.w, y:ot.cy-20}, {x:edgex.x, y:edgex.cy} ]);
+        const w2 = mkWire(svg, [ {x:edgex.x+edgex.w, y:edgex.cy}, {x:core.x, y:core.cy} ]);
+        const w3 = mkWire(svg, [ {x:core.x+core.w, y:core.cy}, {x:agent.cx, y:agent.y} ]);
+        // wires (bottom passive lane) - the focus
+        const w4 = mkWire(svg, [ {x:ot.x+ot.w, y:ot.cy+20}, {x:sens.x, y:sens.cy} ]);
+        const w5 = mkWire(svg, [ {x:sens.x+sens.w, y:sens.cy}, {x:jsonl.x, y:jsonl.cy} ]);
+        const w6 = mkWire(svg, [ {x:jsonl.x+jsonl.w, y:jsonl.cy}, {x:agent.cx-40, y:agent.y+agent.h} ]);
+        const w7 = mkWire(svg, [ {x:agent.x+agent.w, y:agent.cy}, {x:plat.x, y:plat.cy} ]);
+        // dashed bridge: sensor -> edgex (feature summary)
+        const wb = mkWire(svg, [ {x:sens.cx, y:sens.y}, {x:edgex.cx, y:edgex.y+edgex.h} ], {cls:"bridge dash", head:true, headColor:"#7d6aa0"});
+
+        // labels
+        const l1 = mkLabel(stage, 400, 360, "telemetry");
+        const l2 = mkLabel(stage, 400, 600, "SPAN/TAP 唯讀", "green");
+        const lb = mkLabel(stage, sens.cx+150, 470, "Local MQTT 特徵摘要", "purple");
+        gsap.set([l1,l2,lb], {opacity:0});
+
+        // nodes enter
+        nodeIn("a-ot", T+0.2);
+        nodeIn("a-edgex", T+0.5); nodeIn("a-core", T+0.7);
+        nodeIn("a-sens", T+0.5); nodeIn("a-json", T+0.7);
+        nodeIn("a-agent", T+0.9); nodeIn("a-plat", T+1.0);
+
+        // draw wires on
+        drawOn(w1, T+1.1, 0.6); tl.to(l1,{opacity:1,duration:0.3},T+1.4);
+        drawOn(w4, T+1.1, 0.6); tl.to(l2,{opacity:1,duration:0.3},T+1.4);
+        drawOn(w2, T+1.8, 0.5); drawOn(w5, T+1.8, 0.5);
+        drawOn(w3, T+2.4, 0.6); drawOn(w6, T+2.4, 0.6);
+        drawOn(w7, T+3.1, 0.5);
+        drawOn(wb, T+3.6, 0.6); tl.to(lb,{opacity:1,duration:0.3},T+4.0);
+
+        // PACKET FLOW — passive path is the focus: OT -> sensor -> jsonl -> agent -> platform
+        const pkt = mkPkt(stage, "g");
+        const path1 = [ {x:ot.x+ot.w, y:ot.cy+20}, ctr(sens) ];
+        const path2 = [ ctr(sens), ctr(jsonl) ];
+        const path3 = [ ctr(jsonl), {x:agent.cx-40, y:agent.y+agent.h}, ctr(agent) ];
+        const path4 = [ ctr(agent), ctr(plat) ];
+        let tt = T+4.6;
+        travel(pkt, path1, tt, 0.9); lightNodeG("a-sens", tt+0.9); tt+=1.1;
+        travel(pkt, path2, tt, 0.7); lightNode("a-json", tt+0.7); tt+=0.9;
+        travel(pkt, path3, tt, 0.9); lightNode("a-agent", tt+0.9); tt+=1.1;
+        travel(pkt, path4, tt, 0.6); lightNode("a-plat", tt+0.6); tt+=0.8;
+
+        // second packet right behind for "flow" feel
+        const pkt2 = mkPkt(stage, "g");
+        travel(pkt2, path1.concat([ctr(jsonl)]), T+5.6, 1.4);
+
+        // bridge token (feature summary) up to edgex
+        const pktb = mkPkt(stage, "a");
+        travel(pktb, [ {x:sens.cx, y:sens.y}, {x:edgex.cx, y:edgex.y+edgex.h} ], T+8.4, 0.8);
+        lightNode("a-edgex", T+9.3);
+
+        // caption
+        tl.fromTo("#s2-cap", {opacity:0, y:16}, {opacity:1, y:0, duration:0.6, ease:"power2.out"}, T+9.0);
+      })();
+
+      /* ======================================================
+         SCENE 3 — DETECTION PIPELINE  t0 = 16.5
+         horizontal main chain + side branch
+      ====================================================== */
+      (function(){
+        const T = 16.5;
+        const stage = document.getElementById("s3-stage");
+        const svg = NS(); svg.setAttribute("class","wires"); svg.setAttribute("viewBox","0 0 1920 1080");
+        stage.appendChild(svg);
+
+        // two rows of the main chain (snake layout)
+        const w=232, h=92, gap=18;
+        const row1y=210, row2y=470;
+        const xs=[60,60+ (w+gap), 60+2*(w+gap), 60+3*(w+gap), 60+4*(w+gap), 60+5*(w+gap), 60+6*(w+gap)];
+        // 12 stages
+        const stages = [
+          {id:"d1",cls:"blue", t:"Packet in", s:"scapy sniff"},
+          {id:"d2",cls:"amber",t:"PCAP ring", s:"+ on-disk pcap", g:true},
+          {id:"d3",cls:"blue", t:"L2 Ethernet", s:"parse_ethernet"},
+          {id:"d4",cls:"green",t:"ARP → OT-003", s:"ip↔mac flip", g:true, rule:"OT-003"},
+          {id:"d5",cls:"blue", t:"L3 / L4", s:"transport"},
+          {id:"d6",cls:"blue", t:"inventory", s:".observe"},
+          {id:"d7",cls:"blue", t:"MVP rules", s:"001/002/004/005/006/010", rule:"×6"},
+          {id:"d8",cls:"blue", t:"Modbus → OT-007", s:"TCP", rule:"OT-007"},
+          {id:"d9",cls:"green",t:"GOOSE", s:"011/012/013 wrap-safe", g:true, rule:"OT-013"},
+          {id:"d10",cls:"green",t:"MMS · real BER", s:"014/016/018", g:true, rule:"OT-018"},
+          {id:"d11",cls:"amber",t:"SecurityEvent", s:"→ .jsonl +evidence_ref"},
+        ];
+        // place: row1 left->right (first 6), row2 right->left (rest) snake
+        const pos=[];
+        const r1 = stages.slice(0,6), r2 = stages.slice(6);
+        r1.forEach((s,i)=>{ pos.push({s, x:xs[i], y:row1y}); });
+        r2.forEach((s,i)=>{ pos.push({s, x:xs[5-i], y:row2y}); });
+        const nodes={};
+        pos.forEach(p=>{ nodes[p.s.id]=mkNode(stage, {id:p.s.id, cls:p.s.cls, x:p.x, y:p.y, w, h, title:p.s.t, sub:p.s.s, rule:p.s.rule}); });
+
+        // side branch: feature window timer
+        const timer = mkNode(stage, {id:"d-timer", cls:"gray", x:1480, y:700, w:300, h:90, title:"feature window timer", sub:"60s"});
+        const branch= mkNode(stage, {id:"d-branch",cls:"green",x:1480, y:840, w:300, h:120, title:"OT-008 rate · OT-009 offline", sub:"OT-017 silence", g:true});
+
+        // wires along the chain
+        const order = stages.map(s=>nodes[s.id]);
+        const wires=[];
+        for(let i=0;i<order.length-1;i++){
+          const a=order[i], b=order[i+1];
+          let pts;
+          if (Math.abs(a.cy-b.cy)<5){
+            // same row horizontal
+            const dir = b.cx>a.cx ? 1 : -1;
+            pts=[ {x: dir>0?a.x+a.w:a.x, y:a.cy}, {x: dir>0?b.x:b.x+b.w, y:b.cy} ];
+          } else {
+            // drop from row1 last to row2 (the d6->d7 wrap)
+            pts=[ {x:a.cx, y:a.y+a.h}, {x:a.cx, y:(a.y+a.h+b.cy)/2}, {x:b.cx, y:(a.y+a.h+b.cy)/2}, {x:b.cx, y:b.y} ];
+          }
+          wires.push(mkWire(svg, pts));
+        }
+        // branch wires
+        const wt = mkWire(svg, [ {x:nodes.d6.cx, y:nodes.d6.y+nodes.d6.h}, {x:nodes.d6.cx, y:745}, {x:timer.x, y:timer.cy} ]);
+        const wbr= mkWire(svg, [ {x:timer.cx, y:timer.y+timer.h}, {x:branch.cx, y:branch.y} ]);
+
+        // entrances
+        stages.forEach((s,i)=> nodeIn(s.id, T+0.2+i*0.06));
+        nodeIn("d-timer", T+1.0); nodeIn("d-branch", T+1.1);
+        wires.forEach((wp,i)=> drawOn(wp, T+0.9+i*0.05, 0.4));
+        drawOn(wt, T+1.4, 0.5); drawOn(wbr, T+1.7, 0.4);
+
+        // PACKET JOURNEY through every stage; light + pop rules
+        const pkt = mkPkt(stage);
+        const journey = order.map(n=>ctr(n));
+        let tt=T+2.2;
+        const perStage = 0.62;
+        // build travel + light per stage transition
+        tl.set(pkt,{left:journey[0].x, top:journey[0].y, opacity:0}, tt);
+        tl.to(pkt,{opacity:1,duration:0.18}, tt);
+        lightNode(order[0].id, tt);
+        for(let i=0;i<order.length;i++){
+          const s=stages[i];
+          // light + rule pop at arrival
+          if(i>0){ (s.g?lightNodeG:lightNode)(s.id, tt); }
+          if(s.rule) popRule(s.id, tt+0.12);
+          // travel to next
+          if(i<order.length-1){
+            const a=ctr(order[i]), b=ctr(order[i+1]);
+            // route via the same elbow used by the wire for the wrap
+            let pts;
+            if(Math.abs(order[i].cy-order[i+1].cy)<5){ pts=[a,b]; }
+            else { pts=[a, {x:a.x, y:(order[i].y+order[i].h+order[i+1].cy)/2}, {x:b.x, y:(order[i].y+order[i].h+order[i+1].cy)/2}, b]; }
+            tl.to(pkt,{left:b.x, top:b.y, duration:perStage, ease:"none"}, tt+0.18);
+            tt+=perStage+0.06;
+          }
+        }
+        tl.to(pkt,{opacity:0,duration:0.25}, tt+0.2);
+        // a side-branch token spawns at inventory and goes down to branch
+        const pktB=mkPkt(stage,"g");
+        travel(pktB, [ctr(nodes.d6), {x:nodes.d6.cx, y:745}, ctr(timer), ctr(branch)], T+3.4, 1.6);
+        lightNodeG("d-branch", T+5.0);
+      })();
+
+      /* ======================================================
+         SCENE 4 — SCD -> baseline (terminal typing)  t0=29
+      ====================================================== */
+      (function(){
+        const T=29;
+        tl.from("#s4-term", {y:30, opacity:0, scale:0.98, duration:0.6, ease:"power3.out"}, T+0.2);
+        const lines = document.querySelectorAll("#s4-pre .ln");
+        tl.set(lines, {opacity:0}, T+0.3);
+        lines.forEach((ln,i)=> tl.fromTo(ln, {opacity:0, x:-14}, {opacity:1, x:0, duration:0.4, ease:"power2.out"}, T+0.7+i*0.45));
+        // pulse the appid key
+        tl.fromTo("#s4-key", {backgroundColor:"rgba(255,207,107,0)"},
+          {backgroundColor:"rgba(255,207,107,.32)", duration:0.5, ease:"sine.inOut", yoyo:true, repeat:3}, T+3.2);
+        tl.from("#s4-foot", {y:20, opacity:0, duration:0.6, ease:"power2.out"}, T+3.0);
+      })();
+
+      /* ======================================================
+         SCENE 5 — learning -> candidate  t0=35.5
+      ====================================================== */
+      (function(){
+        const T=35.5;
+        tl.from("#s5-term", {y:30, opacity:0, scale:0.98, duration:0.6, ease:"power3.out"}, T+0.2);
+        const lines = document.querySelectorAll("#s5-pre .ln");
+        tl.set(lines, {opacity:0}, T+0.3);
+        lines.forEach((ln,i)=> tl.fromTo(ln, {opacity:0, x:-14}, {opacity:1, x:0, duration:0.4, ease:"power2.out"}, T+0.7+i*0.45));
+        tl.fromTo("#s5-none", {scale:1, color:"#ffd479"},
+          {scale:1.12, color:"#9fffc0", duration:0.45, ease:"back.out(2)", yoyo:true, repeat:3, transformOrigin:"left center"}, T+2.2);
+        tl.from("#s5-foot", {y:20, opacity:0, duration:0.6, ease:"power2.out"}, T+3.4);
+      })();
+
+      /* ======================================================
+         SCENE 6 — 18-rule grid ticks on  t0=42
+      ====================================================== */
+      (function(){
+        const T=42;
+        const grid = document.getElementById("s6-grid");
+        // build 18 cells OT-001..OT-018 in 3 rows x 6 cols
+        const cells=[];
+        for(let i=1;i<=18;i++){
+          const id = "OT-" + String(i).padStart(3,"0");
+          const c=document.createElement("div"); c.className="cell";
+          c.innerHTML = id + ' <span class="ck" id="ck-'+i+'">✓</span>';
+          grid.appendChild(c); cells.push(c);
+        }
+        tl.from("#s6-hdr", {y:-20, opacity:0, duration:0.5, ease:"power2.out"}, T+0.2);
+        tl.from(cells, {opacity:0, y:24, scale:0.9, duration:0.4, ease:"power2.out", stagger:0.04}, T+0.6);
+        // ticks pop one-by-one
+        for(let i=1;i<=18;i++){
+          tl.fromTo("#ck-"+i, {opacity:0, scale:0.2},
+            {opacity:1, scale:1, duration:0.28, ease:"back.out(3)"}, T+1.4 + (i-1)*0.16);
+          tl.fromTo(cells[i-1], {borderColor:"#2c4156"},
+            {borderColor:"#4fc26a", duration:0.3}, T+1.4 + (i-1)*0.16);
+        }
+        // footer last
+        tl.fromTo("#s6-foot", {opacity:0, y:18, scale:0.94},
+          {opacity:1, y:0, scale:1, duration:0.6, ease:"back.out(1.8)"}, T+4.6);
+        tl.fromTo("#s6-foot", {textShadow:"0 0 0 rgba(79,194,106,0)"},
+          {textShadow:"0 0 24px rgba(79,194,106,.7)", duration:0.7, yoyo:true, repeat:1, ease:"sine.inOut"}, T+5.0);
+      })();
+
+      /* ======================================================
+         SCENE 7 — BASELINE LIFECYCLE (two streams merge) t0=48.5
+      ====================================================== */
+      (function(){
+        const T=48.5;
+        const stage=document.getElementById("s7-stage");
+        const svg=NS(); svg.setAttribute("class","wires"); svg.setAttribute("viewBox","0 0 1920 1080"); stage.appendChild(svg);
+        // top source row
+        const scd  = mkNode(stage,{id:"l-scd", cls:"gray", x:70,  y:200, w:240, h:120, title:"SCD / SCL", sub:"engineering truth"});
+        const pscd = mkNode(stage,{id:"l-pscd",cls:"blue", x:380, y:205, w:230, h:110, title:"parse_scd", sub:"parser/scl"});
+        const dscd = mkNode(stage,{id:"l-dscd",cls:"green",x:680, y:200, w:250, h:120, title:"derive_baseline", sub:"from_scl (P0)"});
+        // bottom source row
+        const lrn  = mkNode(stage,{id:"l-lrn", cls:"green",x:70,  y:480, w:240, h:120, title:"Learning mode", sub:"no alerts"});
+        const ss   = mkNode(stage,{id:"l-ss",  cls:"amber",x:380, y:485, w:230, h:110, title:"StateStore", sub:"SQLite persist"});
+        const dobs = mkNode(stage,{id:"l-dobs",cls:"green",x:680, y:480, w:250, h:120, title:"from_observed", sub:"(P1)"});
+        // merge target
+        const schema = mkNode(stage,{id:"l-sch", cls:"blue", x:1080, y:340, w:300, h:160, title:"Detection baseline", sub:"SAME policy schema"});
+        const det    = mkNode(stage,{id:"l-det", cls:"blue", x:1480, y:360, w:240, h:120, title:"Detectors", sub:"OT-001~018"});
+
+        // wires
+        const wa=mkWire(svg,[{x:scd.x+scd.w,y:scd.cy},{x:pscd.x,y:pscd.cy}]);
+        const wb=mkWire(svg,[{x:pscd.x+pscd.w,y:pscd.cy},{x:dscd.x,y:dscd.cy}]);
+        const wc=mkWire(svg,[{x:lrn.x+lrn.w,y:lrn.cy},{x:ss.x,y:ss.cy}]);
+        const wd=mkWire(svg,[{x:ss.x+ss.w,y:ss.cy},{x:dobs.x,y:dobs.cy}]);
+        const we=mkWire(svg,[{x:dscd.x+dscd.w,y:dscd.cy},{x:schema.cx-30,y:schema.y}]);
+        const wf=mkWire(svg,[{x:dobs.x+dobs.w,y:dobs.cy},{x:schema.cx-30,y:schema.y+schema.h}]);
+        const wg=mkWire(svg,[{x:schema.x+schema.w,y:schema.cy},{x:det.x,y:det.cy}]);
+        // reconcile dashed double arrow between dscd and dobs
+        const wr=mkWire(svg,[{x:dscd.cx,y:dscd.y+dscd.h},{x:dobs.cx,y:dobs.y}],{cls:"bridge dash",head:true,headColor:"#c563d6"});
+        const wr2=mkWire(svg,[{x:dobs.cx,y:dobs.y},{x:dscd.cx,y:dscd.y+dscd.h}],{cls:"bridge dash",head:true,headColor:"#c563d6"});
+        const lr=mkLabel(stage, dscd.cx+150, (dscd.y+dscd.h+dobs.y)/2, "reconcile diff (未來 P1-D)", "purple");
+        gsap.set(lr,{opacity:0});
+
+        // entrances
+        ["l-scd","l-pscd","l-dscd"].forEach((id,i)=>nodeIn(id,T+0.2+i*0.12));
+        ["l-lrn","l-ss","l-dobs"].forEach((id,i)=>nodeIn(id,T+0.3+i*0.12));
+        nodeIn("l-sch", T+0.9); nodeIn("l-det", T+1.1);
+        drawOn(wa,T+0.8,0.35); drawOn(wb,T+1.0,0.35);
+        drawOn(wc,T+0.9,0.35); drawOn(wd,T+1.1,0.35);
+        drawOn(we,T+1.5,0.5); drawOn(wf,T+1.5,0.5); drawOn(wg,T+2.0,0.4);
+        drawOn(wr,T+2.3,0.4); drawOn(wr2,T+2.5,0.4);
+        tl.to(lr,{opacity:1,duration:0.3},T+2.7);
+        // pulse reconcile arrows
+        tl.fromTo([wr,wr2], {strokeOpacity:1}, {strokeOpacity:0.35, duration:0.6, yoyo:true, repeat:2, ease:"sine.inOut"}, T+2.9);
+
+        // TWO TOKEN STREAMS converge into schema
+        const pk1=mkPkt(stage,"g"), pk2=mkPkt(stage,"g");
+        travel(pk1, [ctr(scd),ctr(pscd),ctr(dscd),{x:schema.cx-30,y:schema.y},ctr(schema)], T+1.6, 1.6);
+        travel(pk2, [ctr(lrn),ctr(ss),ctr(dobs),{x:schema.cx-30,y:schema.y+schema.h},ctr(schema)], T+1.6, 1.6);
+        lightNode("l-sch", T+3.2);
+        const pk3=mkPkt(stage);
+        travel(pk3, [ctr(schema),ctr(det)], T+3.4, 0.6);
+        lightNode("l-det", T+4.0);
+      })();
+
+      /* ======================================================
+         SCENE 8 — OUTRO  t0=53.5
+      ====================================================== */
+      (function(){
+        const T=53.5;
+        tl.from("#s8-title", {y:40, opacity:0, duration:0.7, ease:"power3.out"}, T+0.2);
+        tl.from("#s8-sub", {y:24, opacity:0, duration:0.5, ease:"power2.out"}, T+0.6);
+        tl.fromTo("#s8-title", {textShadow:"0 0 0 rgba(79,194,106,0)"},
+          {textShadow:"0 0 26px rgba(79,194,106,.5)", duration:1.0, ease:"sine.inOut"}, T+1.0);
+      })();
+
       window.__timelines["main"] = tl;
     </script>
   </body>

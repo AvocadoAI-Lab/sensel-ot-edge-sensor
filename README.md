@@ -22,7 +22,7 @@
 
 ## 🎬 教學模擬影片
 
-把「為什麼有這個分支、跟誰不同、優勢」用**真實終端輸出 + 流程圖**走一遍（1080p · ~49s）：
+把「為什麼有這個分支、跟誰不同、優勢」用**會動的流程圖 + 真實終端輸出**走一遍——封包沿路流動、連線自我繪製、規則逐一點亮、兩條 baseline 匯流（1080p · ~56s · 動態 motion graphics）：
 
 <video src="https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor/raw/first-principles-redesign/docs/video/sensel-walkthrough-1080.mp4" controls muted width="100%"></video>
 
