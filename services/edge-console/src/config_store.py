@@ -23,6 +23,8 @@ class PlatformConfig(BaseModel):
     hardware: str = "pi4"
     sensel_api_url: str = "http://192.168.1.108:8081"
     sensel_api_key: str = ""
+    smb_intel_api_key: str = ""
+    policy_sync_tenant_id: str = ""
     registration_token: str = ""
     sensel_verify_tls: bool = False
     mqtt_enabled: bool = True
@@ -71,6 +73,7 @@ class ConfigStore:
         data = config.model_dump()
         token = data.get("registration_token") or ""
         key = data.get("sensel_api_key") or ""
+        intel_key = data.get("smb_intel_api_key") or ""
         data["registration_token_set"] = bool(token.strip())
         data["registration_token_preview"] = (
             f"{token[:4]}…{token[-2:]}" if len(token) > 6 else ("••••" if token else "")
@@ -79,8 +82,13 @@ class ConfigStore:
         data["sensel_api_key_preview"] = (
             f"{key[:6]}…" if len(key) > 8 else ("••••" if key else "")
         )
+        data["smb_intel_api_key_set"] = bool(intel_key.strip())
+        data["smb_intel_api_key_preview"] = (
+            f"{intel_key[:6]}…" if len(intel_key) > 8 else ("••••" if intel_key else "")
+        )
         data.pop("registration_token", None)
         data.pop("sensel_api_key", None)
+        data.pop("smb_intel_api_key", None)
         return data
 
     def sync_env_file(self, config: PlatformConfig) -> None:
@@ -104,7 +112,7 @@ class ConfigStore:
         for key, value in patch.items():
             if value is None:
                 continue
-            if key in ("registration_token", "sensel_api_key") and value == "":
+            if key in ("registration_token", "sensel_api_key", "smb_intel_api_key") and value == "":
                 continue
             if key in merged:
                 merged[key] = value

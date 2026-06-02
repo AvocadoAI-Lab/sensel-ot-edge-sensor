@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from src.detection.iec61850 import Iec61850Detector
+from src.detection.ioc import IocMatcher
 from src.detection.mvp import MvpDetector
 from src.events.generator import EventStore
 from src.evidence.ring_buffer import PcapRingBuffer
@@ -44,6 +46,11 @@ class PacketPipeline:
         edgex_data_topic: str = "",
         feature_window_sec: int = 60,
         ring_buffer_max_packets: int = 5000,
+        ioc_enabled: bool = True,
+        ioc_cache_path: str = "/app/data/agent/ioc-cache.json",
+        ioc_stamp_path: str = "/app/data/agent/ioc-cache.stamp",
+        ioc_cooldown_sec: int = 300,
+        ioc_reload_check_sec: int = 5,
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
@@ -60,6 +67,22 @@ class PacketPipeline:
             sensor_id=sensor_id,
             policy=policy,
         )
+        self._ioc: IocMatcher | None = None
+        if ioc_enabled:
+            from src.policy.ioc_cache import IocCacheStore
+
+            self._ioc = IocMatcher(
+                site_id=site_id,
+                sensor_id=sensor_id,
+                cache=IocCacheStore(
+                    cache_path=Path(ioc_cache_path),
+                    stamp_path=Path(ioc_stamp_path),
+                    reload_check_sec=float(ioc_reload_check_sec),
+                ),
+                policy=policy,
+                rules_enabled=enabled,
+                cooldown_sec=ioc_cooldown_sec,
+            )
         self._ring = PcapRingBuffer(max_packets=ring_buffer_max_packets)
         self._events = EventStore(assets_dir)
         self._features = FeaturePublisher(
@@ -97,6 +120,15 @@ class PacketPipeline:
         record_l3(self.state.l3, src_ip, version)
 
         flow = parse_transport(packet)
+        if self._ioc:
+            self._emit(
+                self._ioc.evaluate(
+                    src_ip=src_ip,
+                    dst_ip=dst_ip,
+                    dst_port=flow.dst_port if flow else None,
+                    protocol=flow.protocol if flow else None,
+                )
+            )
         obs = self._mvp.inventory.observe(
             src_mac=src_mac,
             src_ip=src_ip,

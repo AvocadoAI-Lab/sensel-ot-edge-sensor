@@ -34,6 +34,14 @@ Mirror 上 GOOSE（L2）與 MMS（TCP/102）專用。詳細觸發條件、schema
 | OT-017 | GOOSE silence (IED offline) | high | `detection/iec61850` |
 | OT-018 | Unauthorized MMS to relay IED | high | `detection/` |
 
+## 規則表 — CTI IoC（Track B-S2）
+
+| Rule ID | 名稱 | 嚴重度 | 模組 |
+|---------|------|--------|------|
+| OT-019 | CTI IOC observed | high | `detection/ioc` |
+
+被動 mirror 上比對 `data/agent/ioc-cache.json`（由 edge-agent policy sync 寫入）。命中寫入 `security-events.jsonl`，事件類型 `CTI_IOC_OBSERVED`。
+
 ## Phase 2
 
 EWMA、Z-score、Isolation Forest 等見 PRD §15.3。  

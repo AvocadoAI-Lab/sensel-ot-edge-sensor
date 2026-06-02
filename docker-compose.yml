@@ -42,6 +42,7 @@ services:
       - EDGE_CONSOLE_DOCKER_RESTART=${EDGE_CONSOLE_DOCKER_RESTART:-true}
       - EDGE_CONSOLE_AUTO_RESTART_AGENT=${EDGE_CONSOLE_AUTO_RESTART_AGENT:-true}
       - EDGE_AGENT_CONTAINER=sensel-edge-agent
+      - PACKET_SENSOR_CONTAINER=sensel-packet-sensor
     volumes:
       - ./data/agent:/data/agent
       - ./data/assets:/data/assets:ro
@@ -66,6 +67,18 @@ services:
       - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
       - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
       - PLATFORM_CONFIG_PATH=/app/data/platform.json
+      - POLICY_SYNC_ENABLED=${POLICY_SYNC_ENABLED:-true}
+      - POLICY_SYNC_INTERVAL_SEC=${POLICY_SYNC_INTERVAL_SEC:-60}
+      - SMB_INTEL_API_KEY=${SMB_INTEL_API_KEY:-}
+      - POLICY_SYNC_TENANT_ID=${POLICY_SYNC_TENANT_ID:-}
+      - IOC_CACHE_PATH=/app/data/ioc-cache.json
+      - SIGHTING_REPORT_ENABLED=${SIGHTING_REPORT_ENABLED:-true}
+      - SIGHTING_REPORT_INTERVAL_SEC=${SIGHTING_REPORT_INTERVAL_SEC:-10}
+      - SIGHTING_QUEUE_PATH=/app/data/sighting-queue.jsonl
+      - POLICY_SYNC_MQTT_ENABLED=${POLICY_SYNC_MQTT_ENABLED:-false}
+      - POLICY_SYNC_MQTT_HOST=${POLICY_SYNC_MQTT_HOST:-${CONTROL_PLANE_MQTT_HOST:-}}
+      - POLICY_SYNC_MQTT_PORT=${POLICY_SYNC_MQTT_PORT:-${CONTROL_PLANE_MQTT_PORT:-1883}}
+      - POLICY_SYNC_MQTT_TOPIC=${POLICY_SYNC_MQTT_TOPIC:-sensel/{tenant_id}/policy/blacklist}
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
@@ -95,10 +108,27 @@ services:
       - ./config:/app/config:ro
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
+      - ./data/agent:/app/data/agent:ro
+      - /sys/fs/bpf:/sys/fs/bpf
+    environment:
+      - IOC_MATCH_ENABLED=${IOC_MATCH_ENABLED:-true}
+      - IOC_CACHE_PATH=/app/data/agent/ioc-cache.json
+      - IOC_CACHE_STAMP_PATH=/app/data/agent/ioc-cache.stamp
+      - IOC_MATCH_COOLDOWN_SEC=${IOC_MATCH_COOLDOWN_SEC:-300}
+      - CAPTURE_BACKEND=${CAPTURE_BACKEND:-scapy}
+      - XDP_MODE=${XDP_MODE:-native}
+      - XDP_QUEUE_ID=${XDP_QUEUE_ID:-0}
+      - AF_XDP_FRAME_SIZE=${AF_XDP_FRAME_SIZE:-2048}
+      - AF_XDP_NUM_FRAMES=${AF_XDP_NUM_FRAMES:-4096}
     network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - BPF
+      - IPC_LOCK
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       - local-mqtt
       - sensel-edge-agent

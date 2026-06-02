@@ -16,6 +16,9 @@ from src.api.client import SenseLClient
 from src.config.settings import load_config
 from src.health.collector import collect_health
 from src.northbound.mqtt import NorthboundMqttClient
+from src.policy.sync import PolicySync
+from src.policy.mqtt_subscriber import PolicyMqttSubscriber
+from src.sighting.reporter import SightingReporter
 from src.upload.buffer import UploadBuffer
 from src.upload.events import SecurityEventTailer
 
@@ -124,6 +127,21 @@ def main() -> int:
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
     )
+    policy_sync = PolicySync(config) if config.policy_sync.enabled else None
+    policy_mqtt = (
+        PolicyMqttSubscriber(config, policy_sync)
+        if policy_sync and config.policy_sync.mqtt_enabled
+        else None
+    )
+    sighting_reporter = SightingReporter(config)
+    last_policy_sync = 0.0
+
+    if policy_mqtt and policy_mqtt.enabled:
+        logger.info(
+            "Policy MQTT subscriber enabled host=%s topic_tpl=%s",
+            config.policy_sync.mqtt_host,
+            config.policy_sync.mqtt_topic_template,
+        )
 
     try:
         try:
@@ -131,8 +149,31 @@ def main() -> int:
             tenant_id = str(reg.get("tenant_id") or reg.get("mqtt_tenant_id") or "").strip()
             if tenant_id and mqtt.enabled:
                 mqtt.update_tenant_id(tenant_id)
+            if policy_mqtt:
+                policy_mqtt.refresh_subscription()
         except Exception:
             logger.exception("Initial registration failed; will retry on health cycle")
+
+        if policy_mqtt:
+            policy_mqtt.start()
+
+        if policy_sync:
+            initial = policy_sync.pull_http_feed(force=True)
+            if initial.ok:
+                logger.info(
+                    "Policy sync initial tenant=%s version=%s items=%s",
+                    initial.tenant_id,
+                    initial.artifact_version,
+                    initial.item_count,
+                )
+            else:
+                logger.warning("Policy sync initial failed: %s", initial.error)
+            last_policy_sync = time.monotonic()
+
+        if sighting_reporter.enabled:
+            sighting_reporter.run_cycle(force_flush=True)
+        elif config.sighting_report.enabled and not config.sighting_report.smb_intel_api_key:
+            logger.warning("Sighting report enabled but SMB_INTEL_API_KEY is not set")
 
         if mqtt.enabled:
             mqtt.publish_state(
@@ -148,6 +189,24 @@ def main() -> int:
         while not _shutdown:
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None)
+
+            if sighting_reporter.enabled:
+                sighting_reporter.run_cycle()
+
+            if policy_sync:
+                elapsed = time.monotonic() - last_policy_sync
+                if elapsed >= config.policy_sync.interval_sec:
+                    result = policy_sync.pull_http_feed()
+                    if result.changed:
+                        logger.info(
+                            "Policy sync updated tenant=%s version=%s items=%s",
+                            result.tenant_id,
+                            result.artifact_version,
+                            result.item_count,
+                        )
+                    elif not result.ok and result.error:
+                        logger.warning("Policy sync failed: %s", result.error)
+                    last_policy_sync = time.monotonic()
 
             health = collect_health(config)
             try:
@@ -167,6 +226,8 @@ def main() -> int:
                     break
                 time.sleep(1)
     finally:
+        if policy_mqtt:
+            policy_mqtt.stop()
         buffer.close()
         mqtt.close()
         client.close()

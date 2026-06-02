@@ -14,6 +14,8 @@
 | **1 Foundation** | 1–2 週 | 可部署、可連線、可擷取 | `docker compose up` 後 agent 註冊 + health 上傳成功；packet-sensor 可從 mirror 介面抓到封包 |
 | **2 Passive MVP** | 1–2 週 | 被動解析 + 偵測 + 證據 | OT-001~010 觸發事件並上傳 SenseL；PCAP ring buffer 可本地留存 |
 | **3 Dashboard** | 1–2 週 | 端到端整合 + 政策 | 72h lab soak pass；Dashboard 可見資產、事件、遙測 |
+| **4 Intelligence + UX** | 2 週 | Edge Console 工控 UI + Layer B AE + Layer C LLM/RAG | Portal 可讀 Layer C 摘要；203 gemma2:2b POC；behavior_score 上線 |
+| **5 Productization** | 2 週 | Demo Ready + soak + deploy 硬化 | 見 [`sprint-5-productization.md`](sprint-5-productization.md) |
 
 ## PRD MVP 對照
 
@@ -194,6 +196,28 @@
 | 平台 API 未就緒 | Sprint 1 起維護 mock server |
 | Pi4 資源不足 | compose 資源限制 + 可調取樣率 |
 
+## Sprint 4 — Edge Console UX + OT Layer B/C 智慧加值
+
+**詳細規格：** [`sprint-4-ot-intelligence-ui.md`](sprint-4-ot-intelligence-ui.md)
+
+| Epic | 主題 | Repo |
+|------|------|------|
+| **A** | Edge Console 工控 UI（tokens、總覽四卡） | sensel-ot-edge-sensor |
+| **B** | Layer B OT 行為 AE v0（feature + behavior_score） | Aristaconnector-Control-Plane |
+| **C** | Layer C gemma2:2b + Agentic RAG（episode enrich） | Aristaconnector-Control-Plane |
+| **D** | Portal Layer C 卡片化 | guacamole-ai |
+
+**退出條件：** Edge Console 工控視覺上線；203 OT LLM enrich POC 合格；AE 寫入 entity_state；Portal 可讀摘要卡。
+
+| 退出項 | 狀態 |
+|--------|------|
+| ① Edge Console tokens + 四卡 | ✅ 已上線（S4-A3 事件篩選 ✅） |
+| ② LLM enrich POC | ✅ E2E `--expect-llm` PASS；10 episode 人工評分待辦 |
+| ③ AE v0 → entity_state | ✅ model.joblib + warm-up；203 `OT_BEHAVIOR_AE_ENABLED=1` |
+| ④ Portal Layer C 卡片 | ✅ 已 deploy；warm-up 提示已加 |
+
+---
+
 ## 建議時程（2 週 / sprint）
 
 | 週次 | 邊緣 repo | 平台 repo |
@@ -201,3 +225,4 @@
 | W1–2 | Sprint 1 | Mock ingestion API |
 | W3–4 | Sprint 2 | Events / Asset API |
 | W5–6 | Sprint 3 + soak | Dashboard UI |
+| W7–8 | Sprint 4 — Edge Console + spec | Layer B/C + Portal 卡片 |

@@ -87,10 +87,42 @@ class LoggingConfig(BaseModel):
     level: str = "info"
 
 
+class PolicySyncConfig(BaseModel):
+    enabled: bool = True
+    interval_sec: int = 60
+    cache_path: str = "/app/data/ioc-cache.json"
+    stamp_path: str = "/app/data/ioc-cache.stamp"
+    feed_path_template: str = "/api/v1/feed/{tenant_id}/blacklist.json"
+    feed_tenant_id: str = ""
+    smb_intel_api_key: str = ""
+    mqtt_enabled: bool = False
+    mqtt_host: str = ""
+    mqtt_port: int = 1883
+    mqtt_topic_template: str = "sensel/{tenant_id}/policy/blacklist"
+    mqtt_qos: int = 1
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+
+
+class SightingReportConfig(BaseModel):
+    enabled: bool = True
+    interval_sec: int = 10
+    queue_path: str = "/app/data/sighting-queue.jsonl"
+    events_offset_path: str = "/app/data/sighting-events.offset"
+    ingest_path: str = "/api/v1/smb/sightings/ingest"
+    source_system: str = "ndr"
+    smb_intel_api_key: str = ""
+    max_attempts: int = 10
+    backoff_base_sec: int = 5
+    backoff_max_sec: int = 300
+
+
 class AppConfig(BaseModel):
     sensor: SensorIdentity
     sensel: SenselConfig
     northbound_mqtt: NorthboundMqttConfig = Field(default_factory=NorthboundMqttConfig)
+    policy_sync: PolicySyncConfig = Field(default_factory=PolicySyncConfig)
+    sighting_report: SightingReportConfig = Field(default_factory=SightingReportConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -160,10 +192,130 @@ def load_config(path: Path | None = None) -> AppConfig:
     if require_tenant_env in ("1", "true", "yes"):
         nb_raw["require_tenant"] = True
 
+    policy_raw = expanded.get("policy_sync", {})
+    enabled_env = os.environ.get("POLICY_SYNC_ENABLED", "").lower()
+    if enabled_env in ("0", "false", "no"):
+        policy_raw["enabled"] = False
+    elif enabled_env in ("1", "true", "yes"):
+        policy_raw["enabled"] = True
+    policy_raw.setdefault(
+        "interval_sec",
+        int(os.environ.get("POLICY_SYNC_INTERVAL_SEC", policy_raw.get("interval_sec", 60))),
+    )
+    policy_raw.setdefault(
+        "cache_path",
+        os.environ.get("IOC_CACHE_PATH", "/app/data/ioc-cache.json"),
+    )
+    policy_raw.setdefault(
+        "stamp_path",
+        os.environ.get("IOC_CACHE_STAMP_PATH", "/app/data/ioc-cache.stamp"),
+    )
+    policy_raw.setdefault(
+        "feed_path_template",
+        os.environ.get(
+            "POLICY_FEED_PATH_TEMPLATE",
+            "/api/v1/feed/{tenant_id}/blacklist.json",
+        ),
+    )
+    policy_raw.setdefault(
+        "smb_intel_api_key",
+        os.environ.get("SMB_INTEL_API_KEY", ""),
+    )
+    policy_raw.setdefault(
+        "feed_tenant_id",
+        os.environ.get("POLICY_SYNC_TENANT_ID", ""),
+    )
+    mqtt_enabled_env = os.environ.get("POLICY_SYNC_MQTT_ENABLED", "").lower()
+    if mqtt_enabled_env in ("0", "false", "no"):
+        policy_raw["mqtt_enabled"] = False
+    elif mqtt_enabled_env in ("1", "true", "yes"):
+        policy_raw["mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "mqtt_host",
+        os.environ.get(
+            "POLICY_SYNC_MQTT_HOST",
+            os.environ.get("CONTROL_PLANE_MQTT_HOST", policy_raw.get("mqtt_host", "")),
+        ),
+    )
+    policy_raw.setdefault(
+        "mqtt_port",
+        int(
+            os.environ.get(
+                "POLICY_SYNC_MQTT_PORT",
+                os.environ.get(
+                    "CONTROL_PLANE_MQTT_PORT",
+                    str(policy_raw.get("mqtt_port", 1883)),
+                ),
+            )
+        ),
+    )
+    policy_raw.setdefault(
+        "mqtt_topic_template",
+        os.environ.get(
+            "POLICY_SYNC_MQTT_TOPIC",
+            policy_raw.get("mqtt_topic_template", "sensel/{tenant_id}/policy/blacklist"),
+        ),
+    )
+    policy_raw.setdefault(
+        "mqtt_qos",
+        int(os.environ.get("POLICY_SYNC_MQTT_QOS", policy_raw.get("mqtt_qos", 1))),
+    )
+    policy_raw.setdefault(
+        "mqtt_username",
+        os.environ.get(
+            "POLICY_SYNC_MQTT_USERNAME",
+            os.environ.get("CONTROL_PLANE_MQTT_USERNAME", ""),
+        ),
+    )
+    policy_raw.setdefault(
+        "mqtt_password",
+        os.environ.get(
+            "POLICY_SYNC_MQTT_PASSWORD",
+            os.environ.get("CONTROL_PLANE_MQTT_PASSWORD", ""),
+        ),
+    )
+
+    sighting_raw = expanded.get("sighting_report", {})
+    enabled_env = os.environ.get("SIGHTING_REPORT_ENABLED", "").lower()
+    if enabled_env in ("0", "false", "no"):
+        sighting_raw["enabled"] = False
+    elif enabled_env in ("1", "true", "yes"):
+        sighting_raw["enabled"] = True
+    sighting_raw.setdefault(
+        "interval_sec",
+        int(os.environ.get("SIGHTING_REPORT_INTERVAL_SEC", sighting_raw.get("interval_sec", 10))),
+    )
+    sighting_raw.setdefault(
+        "queue_path",
+        os.environ.get("SIGHTING_QUEUE_PATH", "/app/data/sighting-queue.jsonl"),
+    )
+    sighting_raw.setdefault(
+        "events_offset_path",
+        os.environ.get("SIGHTING_EVENTS_OFFSET", "/app/data/sighting-events.offset"),
+    )
+    sighting_raw.setdefault(
+        "ingest_path",
+        os.environ.get("SIGHTING_INGEST_PATH", "/api/v1/smb/sightings/ingest"),
+    )
+    sighting_raw.setdefault(
+        "source_system",
+        os.environ.get("SIGHTING_SOURCE_SYSTEM", sighting_raw.get("source_system", "ndr")),
+    )
+    sighting_raw.setdefault(
+        "smb_intel_api_key",
+        os.environ.get("SMB_INTEL_API_KEY", ""),
+    )
+    sighting_raw.setdefault(
+        "max_attempts",
+        int(os.environ.get("SIGHTING_MAX_ATTEMPTS", sighting_raw.get("max_attempts", 10))),
+    )
+
     config = AppConfig(
             sensor=SensorIdentity(**sensor_raw),
             sensel=SenselConfig(**sensel_raw),
             northbound_mqtt=NorthboundMqttConfig(**nb_raw),
+            policy_sync=PolicySyncConfig(**policy_raw),
+            sighting_report=SightingReportConfig(**sighting_raw),
             logging=LoggingConfig(**expanded.get("logging", {})),
         )
     return apply_platform_overlay(config)

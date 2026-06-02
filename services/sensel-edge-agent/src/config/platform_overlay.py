@@ -72,10 +72,20 @@ def apply_platform_overlay(config: AppConfig) -> AppConfig:
     if mqtt.enabled and mqtt.tenant_id == "default":
         mqtt.require_tenant = True
 
+    policy_sync = config.policy_sync.model_copy(deep=True)
+    sighting_report = config.sighting_report.model_copy(deep=True)
+    if raw.get("smb_intel_api_key"):
+        policy_sync.smb_intel_api_key = str(raw["smb_intel_api_key"])
+        sighting_report.smb_intel_api_key = str(raw["smb_intel_api_key"])
+    if raw.get("policy_sync_tenant_id"):
+        policy_sync.feed_tenant_id = str(raw["policy_sync_tenant_id"])
+
     return config.model_copy(
         update={
             "sensor": sensor,
             "sensel": sensel,
             "northbound_mqtt": mqtt,
+            "policy_sync": policy_sync,
+            "sighting_report": sighting_report,
         }
     )

@@ -37,6 +37,53 @@ def _tcp_reachable(host: str, port: int, timeout: float = 2.0) -> bool:
         return False
 
 
+def _rule_counts_24h(events_path: Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if not events_path.is_file():
+        return counts
+    cutoff = datetime.now(timezone.utc).timestamp() - 86400
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        ts = ev.get("timestamp") or ev.get("detected_at") or ""
+        try:
+            if ts.endswith("Z"):
+                ts = ts.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts)
+            if dt.timestamp() < cutoff:
+                continue
+        except ValueError:
+            continue
+        rid = str(ev.get("rule_id") or ev.get("event_class") or "unknown").upper()
+        counts[rid] = counts.get(rid, 0) + 1
+    return counts
+
+
+def _baseline_stats() -> dict[str, Any]:
+    policy_dir = Path(os.environ.get("POLICY_DIR", "/data/config/policy"))
+    baseline_path = policy_dir / "baseline.json"
+    if not baseline_path.is_file():
+        alt = Path("/app/config/policy/baseline.json")
+        baseline_path = alt if alt.is_file() else baseline_path
+    if not baseline_path.is_file():
+        return {"loaded": False, "assets": 0, "comm_pairs": 0}
+    try:
+        data = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"loaded": False, "assets": 0, "comm_pairs": 0}
+    assets = data.get("assets") or data.get("devices") or []
+    pairs = data.get("comm_pairs") or data.get("communication_pairs") or []
+    return {
+        "loaded": True,
+        "assets": len(assets) if isinstance(assets, list) else 0,
+        "comm_pairs": len(pairs) if isinstance(pairs, list) else 0,
+    }
+
+
 def build_status(store: ConfigStore) -> dict[str, Any]:
     config = store.load()
     assets_dir = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
@@ -74,6 +121,10 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
         except Exception:
             sensel_ok = False
 
+    rule_counts = _rule_counts_24h(events_path)
+    top_rules = sorted(rule_counts.items(), key=lambda x: -x[1])[:5]
+    baseline = _baseline_stats()
+
     return {
         "configured": config.configured,
         "sensor_id": config.sensor_id,
@@ -100,10 +151,24 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
                 "ok": events_path.is_file(),
                 "detail": f"24h {events_24h} 筆" if events_path.is_file() else "等待首筆事件",
             },
+            "baseline": {
+                "label": "Baseline",
+                "ok": baseline.get("loaded") is True,
+                "detail": (
+                    f"{baseline.get('assets', 0)} 資產 · {baseline.get('comm_pairs', 0)} comm pairs"
+                    if baseline.get("loaded")
+                    else "未載入"
+                ),
+            },
         },
         "metrics": {
             "events_24h": events_24h,
             "recent_events": recent,
+            "rule_counts_24h": rule_counts,
+            "top_rules_24h": top_rules,
+            "baseline": baseline,
+            "capture_interface": config.capture_interface or os.environ.get("CAPTURE_INTERFACE", ""),
+            "capture_bpf": config.capture_bpf_filter or "",
         },
         "last_register_at": config.last_register_at,
     }

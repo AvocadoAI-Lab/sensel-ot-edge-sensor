@@ -1,0 +1,91 @@
+:root {
+  /* Purdue layer palette */
+  --purdue-l0: #64748b;
+  --purdue-l1: #94a3b8;
+  --purdue-l2: #14b8a6;
+  --purdue-l3: #38bdf8;
+  --purdue-l4: #a78bfa;
+  --purdue-l5: #f87171;
+
+  --mono-id: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  --status-ok: #14b8a6;
+  --status-warn: #f59e0b;
+  --status-alarm: #ef4444;
+
+  --surface-panel: #0f1419;
+  --border-ot: #2a3544;
+  --accent-ot: #14b8a6;
+  --accent-ot-dim: rgba(20, 184, 166, 0.15);
+}
+
+.card-ot {
+  background: var(--surface-panel);
+  border: 1px solid var(--border-ot);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  min-height: 5.5rem;
+}
+
+.card-ot .title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.card-ot .value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.card-ot .sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.mono {
+  font-family: var(--mono-id);
+  font-size: 0.85em;
+}
+
+.purdue-badge {
+  display: inline-block;
+  font-family: var(--mono-id);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--accent-ot-dim);
+  color: var(--accent-ot);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+}
+
+.sev-high td:first-child { border-left: 3px solid var(--status-alarm); }
+.sev-critical td:first-child { border-left: 3px solid #dc2626; }
+.sev-medium td:first-child { border-left: 3px solid var(--status-warn); }
+.sev-low td:first-child { border-left: 3px solid var(--purdue-l1); }
+
+.rule-chip {
+  font-family: var(--mono-id);
+  font-size: 0.8rem;
+  background: rgba(20, 184, 166, 0.12);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.topbar .logo {
+  background: linear-gradient(135deg, var(--accent-ot), #0d9488);
+}
+
+.tab.active {
+  border-color: var(--accent-ot);
+  color: var(--accent-ot);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-ot), #0d9488);
+}
+
+.status-dot.ok { background: var(--status-ok); }
+.status-dot.bad { background: var(--status-alarm); }

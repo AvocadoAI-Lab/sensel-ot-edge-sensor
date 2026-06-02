@@ -28,3 +28,7 @@ IEC61850_RULES = [
     {"id": "OT-017", "name": "GOOSE silence (IED offline)", "severity": "high"},
     {"id": "OT-018", "name": "Unauthorized MMS to relay IED", "severity": "high"},
 ]
+
+CTI_RULES = [
+    {"id": "OT-019", "name": "CTI IOC observed", "severity": "high"},
+]

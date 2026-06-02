@@ -36,6 +36,11 @@ class CaptureConfig(BaseModel):
     interface: str = "eth1"
     promiscuous: bool = True
     bpf_filter: str = ""
+    backend: str = "scapy"
+    xdp_mode: str = "native"
+    xdp_queue_id: int = 0
+    af_xdp_frame_size: int = 2048
+    af_xdp_num_frames: int = 4096
     timestamping: bool = True
     health_check_interval_sec: int = 30
     stats_log_interval_sec: int = 10
@@ -60,6 +65,14 @@ class DetectionConfig(BaseModel):
     rules_enabled: list[str] = Field(default_factory=list)
 
 
+class IocConfig(BaseModel):
+    enabled: bool = True
+    cache_path: str = "/app/data/agent/ioc-cache.json"
+    stamp_path: str = "/app/data/agent/ioc-cache.stamp"
+    cooldown_sec: int = 300
+    reload_check_sec: int = 5
+
+
 class LoggingConfig(BaseModel):
     level: str = "info"
 
@@ -69,6 +82,7 @@ class AppConfig(BaseModel):
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
+    ioc: IocConfig = Field(default_factory=IocConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -101,6 +115,26 @@ def load_config(path: Path | None = None) -> AppConfig:
     sensor_raw.setdefault("site_id", os.environ.get("SITE_ID", "factory-lab-001"))
     capture_raw.setdefault("interface", os.environ.get("CAPTURE_INTERFACE", "eth1"))
     capture_raw.setdefault("bpf_filter", os.environ.get("CAPTURE_BPF_FILTER", ""))
+    capture_raw.setdefault(
+        "backend",
+        os.environ.get("CAPTURE_BACKEND", capture_raw.get("backend", "scapy")).lower(),
+    )
+    capture_raw.setdefault(
+        "xdp_mode",
+        os.environ.get("XDP_MODE", capture_raw.get("xdp_mode", "native")).lower(),
+    )
+    capture_raw.setdefault(
+        "xdp_queue_id",
+        int(os.environ.get("XDP_QUEUE_ID", capture_raw.get("xdp_queue_id", 0))),
+    )
+    capture_raw.setdefault(
+        "af_xdp_frame_size",
+        int(os.environ.get("AF_XDP_FRAME_SIZE", capture_raw.get("af_xdp_frame_size", 2048))),
+    )
+    capture_raw.setdefault(
+        "af_xdp_num_frames",
+        int(os.environ.get("AF_XDP_NUM_FRAMES", capture_raw.get("af_xdp_num_frames", 4096))),
+    )
 
     mqtt_raw = features_raw.get("mqtt", {})
     mqtt_raw.setdefault("host", os.environ.get("LOCAL_MQTT_HOST", "local-mqtt"))
@@ -121,10 +155,34 @@ def load_config(path: Path | None = None) -> AppConfig:
         os.environ.get("POLICY_FILE", "/app/config/policy/baseline.json"),
     )
 
+    ioc_raw = expanded.get("ioc", {})
+    enabled_env = os.environ.get("IOC_MATCH_ENABLED", "").lower()
+    if enabled_env in ("0", "false", "no"):
+        ioc_raw["enabled"] = False
+    elif enabled_env in ("1", "true", "yes"):
+        ioc_raw["enabled"] = True
+    ioc_raw.setdefault(
+        "cache_path",
+        os.environ.get("IOC_CACHE_PATH", "/app/data/agent/ioc-cache.json"),
+    )
+    ioc_raw.setdefault(
+        "stamp_path",
+        os.environ.get("IOC_CACHE_STAMP_PATH", "/app/data/agent/ioc-cache.stamp"),
+    )
+    ioc_raw.setdefault(
+        "cooldown_sec",
+        int(os.environ.get("IOC_MATCH_COOLDOWN_SEC", ioc_raw.get("cooldown_sec", 300))),
+    )
+    ioc_raw.setdefault(
+        "reload_check_sec",
+        int(os.environ.get("IOC_CACHE_RELOAD_SEC", ioc_raw.get("reload_check_sec", 5))),
+    )
+
     return AppConfig(
         sensor=SensorIdentity(**sensor_raw),
         capture=CaptureConfig(**capture_raw),
         features=FeaturesConfig(**features_raw),
         detection=DetectionConfig(**detection_raw),
+        ioc=IocConfig(**ioc_raw),
         logging=LoggingConfig(**expanded.get("logging", {})),
     )

@@ -6,8 +6,9 @@
   <title>SenseL Edge Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css?v=2" />
+  <link rel="stylesheet" href="/tokens.css?v=2" />
 </head>
 <body>
   <div id="loginView" class="login-wrap hidden">
@@ -41,15 +42,17 @@
         <button class="tab active" data-tab="dashboard">總覽</button>
         <button class="tab" data-tab="setup">設定精靈</button>
         <button class="tab" data-tab="events">事件</button>
+        <button class="tab" data-tab="traffic">即時流量</button>
         <button class="tab" data-tab="settings">進階</button>
         <button class="tab btn-ghost" id="logoutBtn">登出</button>
       </nav>
     </header>
 
     <section id="tab-dashboard" class="panel">
-      <h2>連線狀態</h2>
+      <h2>OT 邊緣總覽</h2>
       <p class="hint">註冊成功後，事件將經 MQTT 北向送至 Control Plane，並在 SenseL Portal 工控安全防護中顯示。</p>
       <div id="statusCards" class="grid-4"></div>
+      <div id="ruleSummary" class="card-ot hidden" style="margin-top:1rem"></div>
       <div class="actions">
         <button class="btn btn-secondary" id="refreshStatusBtn">重新整理</button>
         <button class="btn btn-ghost" id="restartAgentBtn">重啟 Edge Agent</button>
@@ -114,12 +117,76 @@
     <section id="tab-events" class="panel hidden">
       <h2>最近安全事件</h2>
       <p class="hint">來自本地 packet-sensor 偵測（security-events.jsonl）</p>
+      <div class="event-filters">
+        <label>嚴重度
+          <select id="eventFilterSeverity">
+            <option value="">全部</option>
+            <option value="critical">critical</option>
+            <option value="high">high</option>
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+          </select>
+        </label>
+        <label>Rule 前綴
+          <input id="eventFilterRule" placeholder="OT-01" class="mono" />
+        </label>
+        <button class="btn btn-ghost btn-sm" id="eventFilterClear" type="button">清除篩選</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>時間</th><th>Rule</th><th>嚴重度</th><th>描述</th></tr>
+            <tr><th>時間</th><th>Rule</th><th>嚴重度</th><th>Purdue</th><th>描述</th></tr>
           </thead>
           <tbody id="eventsRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-traffic" class="panel hidden">
+      <div class="traffic-header">
+        <div>
+          <h2>Mirror 即時流量</h2>
+          <p class="hint">來自 packet-sensor 鏡像埠擷取，每秒更新</p>
+        </div>
+        <div class="traffic-status">
+          <span id="trafficLiveDot" class="status-dot unk"></span>
+          <span id="trafficLiveLabel" class="mono">連線中…</span>
+        </div>
+      </div>
+
+      <div class="traffic-meta card-ot">
+        <div class="sub">
+          介面 <span id="trafficIface" class="mono">—</span>
+          · 後端 <span id="trafficBackend" class="mono">—</span>
+          · BPF <span id="trafficBpf" class="mono">—</span>
+        </div>
+      </div>
+
+      <div id="trafficMetrics" class="grid-4" style="margin-top:1rem"></div>
+
+      <div class="traffic-chart-wrap card-ot" style="margin-top:1rem">
+        <div class="title">封包速率 (pkt/s)</div>
+        <canvas id="trafficRateChart" width="900" height="120" aria-label="封包速率圖表"></canvas>
+      </div>
+
+      <div class="grid-2" style="margin-top:1rem">
+        <div class="card-ot">
+          <div class="title">視窗 Top MAC</div>
+          <div id="trafficTopMacs" class="traffic-list muted">尚無資料</div>
+        </div>
+        <div class="card-ot">
+          <div class="title">Top 來源 IP</div>
+          <div id="trafficTopIps" class="traffic-list muted">尚無資料</div>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:1rem">
+        <div class="title" style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">最近封包</div>
+        <table>
+          <thead>
+            <tr><th>時間</th><th>協定</th><th>來源 MAC</th><th>來源 IP</th><th>目的 IP</th><th>大小</th></tr>
+          </thead>
+          <tbody id="trafficRecentRows"></tbody>
         </table>
       </div>
     </section>
@@ -161,6 +228,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=2"></script>
 </body>
 </html>

@@ -41,6 +41,7 @@ services:
     mem_limit: 256m
 
   packet-sensor:
+    privileged: true
     environment:
       - LOCAL_MQTT_HOST=127.0.0.1
       - LOCAL_MQTT_PORT=1884

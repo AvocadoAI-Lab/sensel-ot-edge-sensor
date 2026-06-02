@@ -82,7 +82,16 @@ detection:
     - OT-014
     - OT-016
     - OT-018
+    - OT-019
   latency_target_sec: 3
+
+# CTI IoC match (Track B-S2) — reads edge-agent ioc-cache via shared volume
+ioc:
+  enabled: true
+  cache_path: /app/data/agent/ioc-cache.json
+  stamp_path: /app/data/agent/ioc-cache.stamp
+  cooldown_sec: 300
+  reload_check_sec: 5
 
 edgex:
   enabled: true

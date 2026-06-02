@@ -6,6 +6,7 @@ Sprint 1: capture loop. S1-02b: IEC 61850 GOOSE/MMS passive pipeline.
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
 import threading
@@ -13,6 +14,7 @@ import time
 
 from src.capture.interface import CaptureSession
 from src.config.settings import load_config
+from src.live_stats import LiveStatsTracker, write_live_stats
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,9 +47,10 @@ def main() -> int:
     logging.getLogger().setLevel(log_level)
 
     logger.info(
-        "SenseL Packet Sensor v%s starting (interface=%s bpf=%r)",
+        "SenseL Packet Sensor v%s starting (interface=%s backend=%s bpf=%r)",
         config.sensor.software_version,
         config.capture.interface,
+        config.capture.backend,
         config.capture.bpf_filter or "",
     )
 
@@ -65,28 +68,45 @@ def main() -> int:
     thread.start()
 
     stats_interval = config.capture.stats_log_interval_sec
+    live_interval = max(
+        1,
+        int(os.environ.get("LIVE_STATS_INTERVAL_SEC", "1")),
+    )
     feature_interval = config.features.window_sec
     ticks_since_feature = 0
+    ticks_since_log = 0
+    live_tracker = LiveStatsTracker()
 
     try:
         while not _shutdown:
             if capture_error:
                 return 1
             snap = session.snapshot()
-            logger.info(
-                "Capture stats — total=%d rate=%.1f/s goose=%d mms_writes=%d sessions=%d elapsed=%.0fs",
-                snap["total_packets"],
-                snap["packet_rate"],
-                snap["goose_messages"],
-                snap["mms_writes"],
-                snap["mms_sessions"],
-                snap["elapsed_sec"],
-            )
-            ticks_since_feature += stats_interval
+            live_payload = live_tracker.enrich(snap)
+            live_payload["sensor_id"] = config.sensor.id
+            live_payload["site_id"] = config.sensor.site_id
+            write_live_stats(live_payload, config.features.assets_dir)
+
+            ticks_since_log += live_interval
+            if ticks_since_log >= stats_interval:
+                ticks_since_log = 0
+                logger.info(
+                    "Capture stats — backend=%s total=%d rate=%.1f/s instant=%.1f/s goose=%d mms_writes=%d sessions=%d elapsed=%.0fs",
+                    snap.get("capture_backend", "?"),
+                    snap["total_packets"],
+                    snap["packet_rate"],
+                    live_payload.get("instant_rate", 0),
+                    snap["goose_messages"],
+                    snap["mms_writes"],
+                    snap["mms_sessions"],
+                    snap["elapsed_sec"],
+                )
+
+            ticks_since_feature += live_interval
             if ticks_since_feature >= feature_interval:
                 session.pipeline.flush_features()
                 ticks_since_feature = 0
-            for _ in range(stats_interval):
+            for _ in range(live_interval):
                 if _shutdown or capture_error:
                     break
                 time.sleep(1)

@@ -26,6 +26,7 @@ from src.auth import (
 from src.config_store import ConfigStore, PlatformConfig
 from src.sensel_api import ping_sensel, register_sensor
 from src.status_service import build_status, _read_jsonl_tail
+from src.traffic_service import read_live_traffic
 
 APP_VERSION = "0.1.0"
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -129,6 +130,11 @@ def get_status(_: None = Depends(require_session)) -> dict[str, Any]:
     return build_status(store)
 
 
+@app.get("/api/traffic/live")
+def traffic_live(_: None = Depends(require_session)) -> dict[str, Any]:
+    return read_live_traffic(store)
+
+
 @app.post("/api/sensel/ping")
 def sensel_ping(_: None = Depends(require_session)) -> dict[str, Any]:
     config = store.load()
@@ -221,6 +227,11 @@ def index() -> FileResponse:
 @app.get("/style.css")
 def style_css() -> FileResponse:
     return FileResponse(STATIC_DIR / "style.css")
+
+
+@app.get("/tokens.css")
+def tokens_css() -> FileResponse:
+    return FileResponse(STATIC_DIR / "tokens.css")
 
 
 @app.get("/app.js")
