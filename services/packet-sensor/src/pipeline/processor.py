@@ -49,9 +49,13 @@ class PacketPipeline:
         pcap_retention_sec: float = 7200.0,
         pcap_max_disk_bytes: int = 2 * 1024 * 1024 * 1024,
         state_db: str = "",
+        mode: str = "monitoring",
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
+        self._learning = mode.lower() == "learning"
+        if self._learning:
+            logger.info("Packet pipeline in LEARNING (commissioning) mode — observing, no alerts")
         policy = load_policy(policy_path)
         enabled = set(rules_enabled or [])
         self._mvp = MvpDetector(
@@ -90,6 +94,10 @@ class PacketPipeline:
             self._store.load(self._mvp.inventory, self._detector)
 
     def _emit(self, events) -> None:
+        if self._learning:
+            # Commissioning: the evaluators have already updated the learned
+            # state (known_*, mappings); we just suppress the alerts.
+            return
         for event in events:
             self._events.append(event, ring_buffer=self._ring)
             logger.warning(

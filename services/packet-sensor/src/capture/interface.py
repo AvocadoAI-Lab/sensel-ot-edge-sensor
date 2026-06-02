@@ -43,6 +43,7 @@ class CaptureSession:
             pcap_retention_sec=config.pcap.retention_minutes * 60,
             pcap_max_disk_bytes=config.pcap.max_disk_mb * 1024 * 1024,
             state_db=config.detection.state_db,
+            mode=config.detection.mode,
         )
 
     def _validate_interface(self) -> None:

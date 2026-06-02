@@ -60,6 +60,8 @@ class DetectionConfig(BaseModel):
     rules_enabled: list[str] = Field(default_factory=list)
     # learning state persistence (empty = disabled, in-memory only)
     state_db: str = ""
+    # "monitoring" (alert) or "learning" (commissioning: observe + persist, no alerts)
+    mode: str = "monitoring"
 
 
 class PcapConfig(BaseModel):

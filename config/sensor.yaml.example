@@ -65,6 +65,9 @@ features:
 
 detection:
   policy_file: /app/config/policy/baseline.json
+  # "monitoring" raises alerts; "learning" (commissioning) only observes and
+  # persists the baseline, raising no alerts — use until you have a baseline/SCD.
+  mode: monitoring
   # Persist learned inventory across restarts (prevents novelty alert storms on
   # reboot). Empty = in-memory only.
   state_db: /app/data/assets/learned-state.db
