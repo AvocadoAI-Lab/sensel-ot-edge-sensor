@@ -24,6 +24,16 @@
 
 **優勢**：偵測**真的會觸發、誤報更少**、有**可重現的端到端驗證**（`make verify-attacks` → OT-001~018 全綠），可放心當作後續重做的穩固基礎。細節見 [hardening-v1 設計文件](docs/hardening-v1.md)。
 
+## 🎬 教學模擬影片
+
+專案動態導覽——**會動的流程圖**（封包沿路流動、連線自我繪製、規則逐一點亮、攻擊格逐一打勾）＋真實終端輸出（1080p · ~56s）：
+
+<video src="https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor/raw/hardening-v1/docs/video/sensel-walkthrough-1080.mp4" controls muted width="100%"></video>
+
+[![教學模擬影片 — 點擊播放](docs/video/poster.png)](docs/video/sensel-walkthrough-1080.mp4)
+
+> 上方播放器未顯示時，點上圖或 [▶ 1080p MP4](docs/video/sensel-walkthrough-1080.mp4) 觀看；製作方式見 [docs/video/](docs/video/README.md)（HeyGen HyperFrames 直出 MP4）。
+
 ## 架構概覽
 
 ```

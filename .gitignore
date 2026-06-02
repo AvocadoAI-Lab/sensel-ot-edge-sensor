@@ -48,5 +48,9 @@ Thumbs.db
 # Analysis tooling metadata
 .understand-anything/
 
+# Local agent skills (npx skills add ...) — tooling, not product code
+.agents/
+skills-lock.json
+
 # Docker volumes (local dev)
 docker-volumes/
