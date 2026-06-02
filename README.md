@@ -26,7 +26,7 @@
 
 ## 🎬 教學模擬影片
 
-專案動態導覽——**會動的流程圖**（封包沿路流動、連線自我繪製、規則逐一點亮、攻擊格逐一打勾）＋真實終端輸出（1080p · ~56s）：
+`hardening-v1` 動態導覽——**會動的流程圖**：被動側封包流動、連線自我繪製、main 的偵測 bug ✗→✓ 逐項修正、偵測管線逐階點亮、攻擊格 OT-001~018 逐一打勾（1080p · ~52s · 動態 motion graphics）：
 
 <video src="https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor/raw/hardening-v1/docs/video/sensel-walkthrough-1080.mp4" controls muted width="100%"></video>
 

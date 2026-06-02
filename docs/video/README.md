@@ -1,8 +1,8 @@
 # 教學模擬影片
 
-**[▶ sensel-walkthrough-1080.mp4](sensel-walkthrough-1080.mp4)** — 1920×1080 · H.264 · 30fps · ~56s · 動態 motion graphics
+**[▶ sensel-walkthrough-1080.mp4](sensel-walkthrough-1080.mp4)** — 1920×1080 · H.264 · 30fps · ~52s · 動態 motion graphics
 
-專案動態導覽。流程圖**會動**（封包沿連線流動、連線自我繪製、規則徽章逐一彈出、18 條攻擊格逐一打勾、兩條 baseline 串流匯流），並穿插**真實終端輸出**。涵蓋 `hardening-v1` 的偵測強化與 `first-principles-redesign` 的 baseline 重做。
+`hardening-v1` 偵測強化動態導覽。流程圖**會動**（封包沿被動側連線流動、連線自我繪製、規則徽章逐一彈出、修好的階段發綠光、18 條攻擊格逐一打勾）。聚焦**修好 main 的偵測並用真實攻擊驗證**：OT-003 ARP、MMS 真 BER 解析、OT-013 wrap-safe、OT-015/017 補實作、tailer 輪替、可落盤 pcap 證據。
 
 ## 怎麼做的 / 如何重新產生
 
