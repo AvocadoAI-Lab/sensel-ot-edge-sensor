@@ -1,5 +1,7 @@
 # 模擬流程 walkthrough（真實終端輸出）
 
+> 🎬 影片版：**[docs/video/sensel-walkthrough-1080.mp4](video/sensel-walkthrough-1080.mp4)**（1080p，同樣的真實輸出 + 流程圖；製作方式見 [docs/video/README.md](video/README.md)）。
+
 下面三段是 `first-principles-redesign` 分支**實際跑出來**的輸出（非示意）。全部離線、不需 Docker/網路，你可在任何裝了 Python+scapy 的機器照著重跑。這就是「錄下模擬流程」的可重現版本——比影片更能被你親自驗證。
 
 > 真實感測器要在 Linux/Pi + 鏡像埠上跑（`make up-attack-lab` 等），那一段需要 Docker，無法在純 Windows 開發機重現；要產出 MP4 影片，建議在 Linux lab 機上對 `make up-attack-lab → make attack-all → make verify-attacks` 錄製。

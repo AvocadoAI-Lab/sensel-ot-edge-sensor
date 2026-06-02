@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #06090d; }
+      :root {
+        --bg: #06090d; --panel: #13212f; --panel2: #0c1620; --line: #25394d;
+        --blue: #1e88e5; --green: #43a047; --amber: #ffb300; --red: #e53935;
+        --fg: #ffffff; --mut: #9fb6cc; --body: #c7d4e1;
+        --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+        --mono: "Cascadia Code", "Consolas", "DejaVu Sans Mono", monospace;
+      }
+      .scene {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; padding: 70px 110px;
+        font-family: var(--font); color: var(--fg); background: var(--bg);
+      }
+      .wm {
+        position: absolute; top: 26px; right: 34px; font-family: var(--font);
+        font-size: 17px; color: #cdd; text-align: right; line-height: 1.4; opacity: .85;
+      }
+      .wm b { color: #fff; }
+      .badge {
+        display: inline-block; background: var(--blue); color: #fff; font-weight: 800;
+        font-size: 22px; padding: 6px 20px; border-radius: 8px; margin-bottom: 22px;
+      }
+      .badge.green { background: var(--green); }
+      .badge.amber { background: var(--amber); color: #1a1200; }
+      h1 { font-size: 64px; font-weight: 900; line-height: 1.15; }
+      h2 { font-size: 46px; font-weight: 800; line-height: 1.2; margin-bottom: 26px; text-align: center; }
+      .sub { font-size: 27px; color: var(--mut); margin-top: 18px; }
+      ul { list-style: none; font-size: 30px; line-height: 1.55; color: var(--body); }
+      li { margin: 14px 0; }
+      li b { color: #fff; }
+      .tick { color: var(--green); font-weight: 900; }
+      .cross { color: var(--red); font-weight: 900; }
+      img.diagram { max-width: 86%; max-height: 74%; border-radius: 14px;
+        background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+      .term {
+        width: 1480px; background: var(--panel2); border: 1px solid var(--line);
+        border-radius: 14px; box-shadow: 0 18px 60px rgba(0,0,0,.5); overflow: hidden;
+      }
+      .term .bar { background: #0a1119; border-bottom: 1px solid var(--line);
+        padding: 12px 18px; font-family: var(--font); font-size: 17px; color: #6f8498; }
+      .term .bar .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+        margin-right: 7px; vertical-align: middle; }
+      .term pre { font-family: var(--mono); font-size: 24px; line-height: 1.5;
+        color: #d7e3ee; padding: 24px 30px; white-space: pre-wrap; }
+      .term .p { color: #5bc0ff; }
+      .term .ok { color: #5fd38a; }
+      .term .none { color: #ffd479; }
+      .term .key { color: #ffcf6b; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 70px;
+        font-family: var(--mono); font-size: 30px; color: #d7e3ee; margin-top: 8px; }
+      .grid div { background: var(--panel); border: 1px solid var(--line);
+        border-radius: 8px; padding: 10px 22px; }
+      .foot { font-size: 19px; color: #6f8498; margin-top: 30px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="49" data-width="1920" data-height="1080">
+
+      <!-- 1 · Title -->
+      <div id="s1" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="wm"><b>SenseL OT Edge Sensor</b><br>教學模擬 · 全程離線 / 本機 · 真實輸出</div>
+        <div class="anim" style="text-align:center">
+          <div class="badge">first-principles-redesign</div>
+          <h1>SenseL OT Edge Sensor<br>偵測強化 × baseline 重做</h1>
+          <p class="sub">為什麼要多這個分支、跟誰不同、有什麼優勢 — 用真實輸出走一遍</p>
+        </div>
+      </div>
+
+      <!-- 2 · Architecture -->
+      <div id="s2" class="scene clip" data-start="6" data-duration="6.5" data-track-index="2">
+        <div class="wm"><b>架構</b><br>雙路徑 · 被動唯讀</div>
+        <h2 class="anim">雙路徑架構：原始鏡像流量不進 EdgeX，被動側專責偵測</h2>
+        <img class="diagram anim" src="../diagrams/architecture.png" alt="architecture" />
+      </div>
+
+      <!-- 3 · Problem -->
+      <div id="s3" class="scene clip" data-start="12.5" data-duration="6" data-track-index="3">
+        <div class="wm"><b>問題</b><br>為什麼要重做</div>
+        <div class="anim" style="max-width:1400px">
+          <div class="badge amber">為什麼要這個分支</div>
+          <h2 style="text-align:left">main 的偵測「能 demo，對不起電驛場景」</h2>
+          <ul>
+            <li><span class="cross">✗</span> OT-003 因 bug <b>裝了卻不會響</b>；MMS 用字串比對會誤判</li>
+            <li><span class="cross">✗</span> GOOSE 計數合法回繞就誤報；OT-015 / OT-017 <b>列了卻沒實作</b></li>
+            <li><span class="cross">✗</span> baseline 是<b>手寫猜測</b>；狀態全在記憶體 → <b>重啟即告警風暴</b></li>
+            <li><span class="cross">✗</span> 而且拿到設備前 <b>根本還沒有 baseline</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 4 · Demo A: SCD -> baseline -->
+      <div id="s4" class="scene clip" data-start="18.5" data-duration="7" data-track-index="4">
+        <div class="wm"><b>① 有工程檔</b><br>SCD → baseline</div>
+        <div class="anim">
+          <div class="badge green">① 對照工程真相：從 SCD 自動推導 baseline</div>
+          <div class="term">
+            <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> scd-to-baseline</div>
+            <pre><span class="p">$</span> python3 scripts/scd-to-baseline.py lab/61850/sample.scd --stdout
+<span class="ok">derived baseline: 2 assets, 1 GOOSE publishers, 1 MMS IEDs</span>
+
+goose_publishers: [{ asset_id: ied-01, <span class="key">appid: 1000</span>, max_silence_sec: 8.0 }]
+mms_ieds:         [{ ied_ip: 192.168.10.50, allowed_mms_clients: [192.168.10.10] }]</pre>
+          </div>
+          <p class="foot">GOOSE 以 <b style="color:#ffcf6b">APPID</b> 為權威 key（SCL 的 MAC 是目的多播、非來源 MAC）</p>
+        </div>
+      </div>
+
+      <!-- 5 · Demo B: learning -> candidate -->
+      <div id="s5" class="scene clip" data-start="25.5" data-duration="7" data-track-index="5">
+        <div class="wm"><b>② 還沒 baseline</b><br>learning 學習</div>
+        <div class="anim">
+          <div class="badge green">② 沒有 baseline：learning 模式安靜學習</div>
+          <div class="term">
+            <div class="bar"><span class="dot" style="background:#e35"></span><span class="dot" style="background:#fb5"></span><span class="dot" style="background:#5d6"></span> commissioning</div>
+            <pre>sensor: detection.mode = <span class="key">learning</span>   # commissioning
+<span class="none">alerts raised during learning : (none)</span>
+
+<span class="p">$</span> python3 scripts/observed-to-baseline.py learned-state.db --stdout
+candidate goose_publishers : [{ publisher_mac: <span class="key">00:11:22:33:44:55</span>, appid: 1000 }]
+candidate mms_ieds         : [{ ied_ip: 192.168.10.50, clients: [192.168.10.10] }]</pre>
+          </div>
+          <p class="foot">學習期間 <b style="color:#ffd479">零告警</b>，產出候選 baseline（與 SCD <b>同一 schema</b>）</p>
+        </div>
+      </div>
+
+      <!-- 6 · Demo C: attacks 18 rules -->
+      <div id="s6" class="scene clip" data-start="32.5" data-duration="7" data-track-index="6">
+        <div class="wm"><b>③ 偵測有效</b><br>OT-001 ~ OT-018</div>
+        <div class="anim" style="text-align:center">
+          <div class="badge green">③ 偵測真的有效：真實攻擊 OT-001 ~ OT-018</div>
+          <pre style="font-family:var(--mono);font-size:24px;color:#5bc0ff;margin-bottom:18px">$ python3 scripts/attacks-selftest.py</pre>
+          <div class="grid">
+            <div>OT-001 <span class="tick">✓</span></div><div>OT-007 <span class="tick">✓</span></div><div>OT-013 <span class="tick">✓</span></div>
+            <div>OT-002 <span class="tick">✓</span></div><div>OT-008 <span class="tick">✓</span></div><div>OT-014 <span class="tick">✓</span></div>
+            <div>OT-003 <span class="tick">✓</span></div><div>OT-009 <span class="tick">✓</span></div><div>OT-015 <span class="tick">✓</span></div>
+            <div>OT-004 <span class="tick">✓</span></div><div>OT-010 <span class="tick">✓</span></div><div>OT-016 <span class="tick">✓</span></div>
+            <div>OT-005 <span class="tick">✓</span></div><div>OT-011 <span class="tick">✓</span></div><div>OT-017 <span class="tick">✓</span></div>
+            <div>OT-006 <span class="tick">✓</span></div><div>OT-012 <span class="tick">✓</span></div><div>OT-018 <span class="tick">✓</span></div>
+          </div>
+          <p class="sub" style="color:#5fd38a;margin-top:24px;font-weight:700">OK — all 18 implemented rules fired</p>
+        </div>
+      </div>
+
+      <!-- 7 · Lifecycle -->
+      <div id="s7" class="scene clip" data-start="39.5" data-duration="6" data-track-index="7">
+        <div class="wm"><b>會合</b><br>同一 schema</div>
+        <h2 class="anim">兩條源頭（SCD 工程 / 觀測學習）匯流到同一 policy schema</h2>
+        <img class="diagram anim" src="../diagrams/baseline-lifecycle.png" alt="baseline lifecycle" />
+      </div>
+
+      <!-- 8 · Outro -->
+      <div id="s8" class="scene clip" data-start="45.5" data-duration="3.5" data-track-index="8">
+        <div class="anim" style="text-align:center">
+          <div class="badge">總結</div>
+          <h1 style="font-size:52px">沒 baseline 也能安全上線<br>重啟不失憶 · 對照工程真相</h1>
+          <p class="sub">細節見 docs/first-principles-redesign.md · docs/walkthrough.md</p>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      // per-scene entrance: fade + rise of the .anim content at each scene start
+      const scenes = [
+        ["#s1 .anim", 0], ["#s2 .anim", 6], ["#s3 .anim", 12.5], ["#s4 .anim", 18.5],
+        ["#s5 .anim", 25.5], ["#s6 .anim", 32.5], ["#s7 .anim", 39.5], ["#s8 .anim", 45.5],
+      ];
+      for (const [sel, t] of scenes) {
+        tl.fromTo(sel, { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" }, t);
+      }
+      // gentle Ken-Burns on the two diagram images
+      tl.fromTo("#s2 img", { scale: 1.0 }, { scale: 1.06, duration: 6.5, ease: "none" }, 6);
+      tl.fromTo("#s7 img", { scale: 1.0 }, { scale: 1.06, duration: 6.0, ease: "none" }, 39.5);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
