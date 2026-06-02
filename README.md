@@ -73,6 +73,7 @@ Pi4 部署見 [docs/deployment-pi4.md](docs/deployment-pi4.md)。
 - [PRD 摘要](docs/PRD.md)
 - [Sprint 規劃](docs/sprint-plan.md)
 - [S1-02b IEC 61850 被動 backlog](docs/sprint-s1-02b-iec61850.md)
+- [**hardening-v1 設計文件**（偵測強化、攻擊 lab、含流程圖）](docs/hardening-v1.md)
 
 ## 授權
 
