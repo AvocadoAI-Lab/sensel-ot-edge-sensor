@@ -21,6 +21,12 @@ OT 設備 ──► EdgeX Device Services ──► SenseL Exporter ──► Se
 
 ![detection pipeline](docs/diagrams/detection-pipeline.png)
 
+## Baseline 生命週期
+
+工程的 SCD 與「觀測（學習模式）」兩條源頭，產出**同一個 policy schema**；還沒有 baseline 時可先用 commissioning 學習，等真實 SCD 到了再 reconcile。詳見 [first-principles-redesign 設計文件](docs/first-principles-redesign.md)。
+
+![baseline lifecycle](docs/diagrams/baseline-lifecycle.png)
+
 ## 專案結構
 
 | 目錄 | 說明 |
