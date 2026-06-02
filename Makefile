@@ -14,7 +14,8 @@ help:
 	@echo "  make verify-61850   - Verify IEC 61850 passive parser (S1-02b)"
 	@echo "  make verify-mvp     - Verify MVP detection OT-001~010 (S2)"
 	@echo "  make verify-attacks - Verify attack detection coverage OT-001~018 (offline self-test)"
-	@echo "  make scd-baseline   - Derive detection baseline from an SCD/SCL file (SCD=path)"
+	@echo "  make scd-baseline      - Derive detection baseline from an SCD/SCL file (SCD=path)"
+	@echo "  make observed-baseline - Derive candidate baseline from learning state (DB=path)"
 	@echo "  make up-attack-lab  - Start stack + 61850 lab + broadened capture (attack lab)"
 	@echo "  make attack-all     - Fire REAL OT-001~018 attack sweep (OT-009 absence-based)"
 	@echo "  make attack-arp     - REAL MITM ARP poisoning → OT-003 (isolated lab only!)"
@@ -74,6 +75,10 @@ verify-attacks:
 # Derive baseline from an SCD/SCL file:  make scd-baseline SCD=substation.scd
 scd-baseline:
 	python3 scripts/scd-to-baseline.py $(SCD) --out config/policy/baseline.json --force
+
+# Derive candidate baseline from learning state:  make observed-baseline DB=data/assets/learned-state.db
+observed-baseline:
+	python3 scripts/observed-to-baseline.py $(DB) --out config/policy/baseline.json --force
 
 COMPOSE_ATTACK = docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml -f docker-compose.attack-lab.yml
 

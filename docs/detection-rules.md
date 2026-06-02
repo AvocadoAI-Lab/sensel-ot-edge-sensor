@@ -20,6 +20,27 @@ make scd-baseline SCD=substation.scd                                  # 寫入 c
   - MMS IED = 具 Server 的 IED；`allowed_mms_clients` 預設為非 server 的 IED（HMI/SCADA），操作者可再收緊。
 - 產出會通過 `validate_policy`，並對缺 APPID／超出 GOOSE 範圍（檢查 `--appid-base`）／缺 IP 的項目告警。
 
+### 還沒有 SCD？先用 Commissioning（學習模式）
+
+拿到 SCD 之前，讓感測器先安靜地觀測學習：
+
+```yaml
+# sensor.yaml
+detection:
+  mode: learning                              # 只觀測、不告警
+  state_db: /app/data/assets/learned-state.db # 學到的盤點落地，重啟不失憶
+```
+
+跑一段代表性時間後，匯出候選 baseline 供審核，再切回 `mode: monitoring`：
+
+```bash
+python3 scripts/observed-to-baseline.py data/assets/learned-state.db --stdout   # 預覽
+make observed-baseline DB=data/assets/learned-state.db                          # 寫入
+```
+
+- 觀測能拿到 GOOSE **來源 MAC**，故候選 baseline 以 (publisher_mac, APPID) 為 key。
+- 與 SCD 推導**同一個 schema**，等 SCD 到了可做 observed↔engineered 比對（reconcile）。
+
 ## 規則表 — MVP（Sprint 2）
 
 | Rule ID | 名稱 | 嚴重度 | 模組 |
