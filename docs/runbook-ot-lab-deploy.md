@@ -114,7 +114,55 @@ export OT_REGISTRATION_TOKEN='<invite-code>'   # 或於 Edge Console UI 設定
 ./scripts/deploy-pi-full.sh edgex@192.168.1.123
 ```
 
-**Edge Console（推薦）：** `http://192.168.1.123:8090` — 設定精靈填寫企業邀請碼並註冊。
+**Edge Console（推薦）：** `http://192.168.1.123:8090` — 設定精靈填寫企業邀請碼並註冊。強制重新整理：`Ctrl+Shift+R`。
+
+### Edge Console 功能地圖（SenseL EdgeX）
+
+| 分頁 | 用途 |
+|------|------|
+| 總覽 | Telemetry 趨勢圖、Policy 合規 gauge、註冊/MQTT/Baseline 狀態 |
+| EdgeX 平台 | core-data/metadata、device 服務、重啟 |
+| 設備與協定 | 被動發現（Mirror IP）、**＋ 新增設備**、OPC UA/S7 Phase2 |
+| 安全事件 | Rule、**來源 IP / 關聯設備** |
+| 即時流量 | Mirror pkt/s、GOOSE/MMS |
+| 進階 | 擷取 BPF、Console 密碼、**審計 log** |
+
+```bash
+# Console smoke
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-edgex.sh
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-traffic.sh
+```
+
+正式部署請設 `EDGE_CONSOLE_PASSWORD` 並使用 `docker-compose.pi-production.yml`。
+
+### S5-F1 Pi：開機順序、healthcheck、`.env` 保留（階段 4）
+
+| 機制 | 說明 |
+|------|------|
+| `scripts/wait-for-upstream.sh` | 啟動前等待 203:1883 + 108 `/api/health`（`WAIT_UPSTREAM=0` 可略過） |
+| `docker-compose.pi-reliability.yml` | `edge-agent` / `edge-console` / `packet-sensor` healthcheck |
+| `scripts/seed-pi-env.sh` | 僅補缺 key，**不覆寫**既有 `.env` / `platform.json` |
+| `scripts/pi-stack-up.sh` | Pi 本機一鍵：seed → wait → compose up → EdgeX 61850 apply → health gate |
+| `scripts/verify-pi-stack-health.sh` | 驗證三服務 `healthy` + `agent-runtime.json` |
+
+```bash
+# Pi 上（已同步 repo 後）
+cd ~/sensel-ot-edge-sensor
+./scripts/pi-stack-up.sh
+
+# 或僅驗證 health
+make verify-pi-health
+
+# systemd 開機自啟（可選）
+sudo cp deploy/systemd/sensel-edge-stack.service /etc/systemd/system/
+sudo systemctl enable --now sensel-edge-stack.service
+```
+
+`deploy-pi-full.sh` 已改為 **merge `.env`**，不再整檔覆寫。
+
+### Lab 流量 UI 控制（草案，未實作）
+
+若要在 `:8090` 以 UI 開始／暫停本機 GOOSE/MMS 模擬與擷取，見 [edge-console-lab-traffic-control.md](edge-console-lab-traffic-control.md)。目前請用 `docker stop/start sensel-goose-publisher sensel-mms-publisher`。
 
 ## E2E 驗證
 
