@@ -1,6 +1,6 @@
 # Edge Console — Lab 流量控制 API / UI 草案
 
-> 狀態：**草案（未實作）**  
+> 狀態：**P0 已實作**（`lab_traffic_service.py`、`GET/POST /api/lab/traffic/*`、即時流量分頁 UI）  
 > 目標：在 `http://<pi>:8090` 以 UI 控制 **61850 lab 本機流量**（GOOSE/MMS publisher）與 **被動擷取**（packet-sensor），支援開始／暫停／停止；正式現場僅顯示鏡像狀態、不暴露 publisher 控制。
 
 ---
@@ -368,4 +368,10 @@ EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-lab-tra
 
 ---
 
-*草案版本：2026-06-05 · 對應 Edge Console v0.1.0 + lab-61850 overlay*
+*版本：2026-06-05 · P0 實作 · Edge Console v0.1.0 + lab-61850 overlay*
+
+驗收：
+
+```bash
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-lab-traffic.sh
+```

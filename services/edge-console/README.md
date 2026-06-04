@@ -94,5 +94,9 @@ EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-traffic
 
 ## Lab 流量控制（草案）
 
-UI 控制本機 GOOSE/MMS publisher 與擷取 start/stop：見 [docs/edge-console-lab-traffic-control.md](../../docs/edge-console-lab-traffic-control.md)（尚未實作）。
+UI 控制本機 GOOSE/MMS publisher 與擷取 start/stop：見 [docs/edge-console-lab-traffic-control.md](../../docs/edge-console-lab-traffic-control.md)。
+
+```bash
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-lab-traffic.sh
+```
 

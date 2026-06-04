@@ -160,9 +160,13 @@ sudo systemctl enable --now sensel-edge-stack.service
 
 `deploy-pi-full.sh` 已改為 **merge `.env`**，不再整檔覆寫。
 
-### Lab 流量 UI 控制（草案，未實作）
+### Lab 流量 UI 控制（P0）
 
-若要在 `:8090` 以 UI 開始／暫停本機 GOOSE/MMS 模擬與擷取，見 [edge-console-lab-traffic-control.md](edge-console-lab-traffic-control.md)。目前請用 `docker stop/start sensel-goose-publisher sensel-mms-publisher`。
+在 `:8090` → **即時流量** 分頁可開始／暫停 GOOSE/MMS 模擬與 packet-sensor；API 見 [edge-console-lab-traffic-control.md](edge-console-lab-traffic-control.md)。
+
+```bash
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-lab-traffic.sh
+```
 
 ## E2E 驗證
 
