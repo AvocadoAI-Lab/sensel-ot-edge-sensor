@@ -1,4 +1,4 @@
-.PHONY: help up down logs build health test lint up-ui verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 deploy-pi deploy-pi-full
+.PHONY: help up down logs build health test lint up-ui verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 apply-lab-61850-edgex wait-upstream verify-pi-health deploy-pi deploy-pi-full
 
 help:
 	@echo "SenseL OT Edge Sensor"
@@ -31,6 +31,15 @@ up-pi4:
 
 up-lab-61850:
 	docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d
+
+apply-lab-61850-edgex:
+	./scripts/apply-lab-61850-edgex.sh
+
+wait-upstream:
+	./scripts/wait-for-upstream.sh
+
+verify-pi-health:
+	./scripts/verify-pi-stack-health.sh
 
 down:
 	docker compose down

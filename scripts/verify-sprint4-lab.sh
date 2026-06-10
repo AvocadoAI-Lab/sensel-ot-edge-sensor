@@ -88,6 +88,22 @@ if [[ "$SKIP_PI" == "0" ]]; then
   else
     fail "G1-pi-security-events-jsonl missing or empty"
   fi
+  if "${PI_SSH[@]}" "$PI_TARGET" 'cd ~/sensel-ot-edge-sensor && ./scripts/verify-pi-stack-health.sh'; then
+    pass "G1-pi-stack-health"
+  else
+    fail "G1-pi-stack-health (edge-agent/console/packet-sensor docker health)"
+  fi
+  PI_IP="${PI_IP:-192.168.1.123}"
+  if EDGE_CONSOLE_URL="http://${PI_IP}:8090" "$ROOT/scripts/verify-edge-console-edgex.sh" >/dev/null 2>&1; then
+    pass "G1-pi-edge-console-edgex"
+  else
+    fail "G1-pi-edge-console-edgex smoke"
+  fi
+  if EDGE_CONSOLE_URL="http://${PI_IP}:8090" "$ROOT/scripts/verify-edge-console-traffic.sh" >/dev/null 2>&1; then
+    pass "G1-pi-edge-console-traffic"
+  else
+    fail "G1-pi-edge-console-traffic smoke"
+  fi
 else
   echo "==> Skipping Pi SSH checks (--skip-pi)"
 fi

@@ -1,4 +1,6 @@
 # Pi lab overlay — mock SenseL API + events viewer + Edge Console
+# With lab-61850 overlay: EdgeX = mqtt-feature only (see docker-compose.lab-61850.yml)
+# Optional: COMPOSE_PROFILES=modbus-lab or phase2 for Modbus / OPC UA / S7
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
 #     -f docker-compose.pi-lab.yml -f docker-compose.lab-61850.yml up -d
@@ -38,7 +40,7 @@ services:
       - SENSEL_VERIFY_TLS=false
 
   edge-console:
-    mem_limit: 256m
+    mem_limit: 384m
 
   packet-sensor:
     privileged: true

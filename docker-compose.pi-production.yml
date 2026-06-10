@@ -10,11 +10,15 @@ services:
       - MQTT_REQUIRE_TENANT=true
 
   edge-console:
-    mem_limit: 256m
+    mem_limit: 384m
     environment:
       - EDGE_CONSOLE_DOCKER_RESTART=true
       - EDGE_CONSOLE_AUTO_RESTART_AGENT=true
       - PACKET_SENSOR_CONTAINER=sensel-packet-sensor
+      # 正式部署請在 .env 設定 EDGE_CONSOLE_PASSWORD（至少 8 字元）
+      - EDGE_CONSOLE_PASSWORD=${EDGE_CONSOLE_PASSWORD:?Set EDGE_CONSOLE_PASSWORD for production}
+      - EDGE_CONSOLE_PASSWORD_FILE=/data/agent/console.password
+      - EDGE_CONSOLE_AUDIT_LOG=/data/agent/console-audit.jsonl
 
   packet-sensor:
     environment:

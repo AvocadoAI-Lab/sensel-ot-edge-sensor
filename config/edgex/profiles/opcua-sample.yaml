@@ -1,0 +1,22 @@
+name: OPCUASample
+manufacturer: SenseL
+model: OPC-UA-Generic
+labels:
+  - ot
+  - opcua
+description: Generic OPC UA sample profile (single numeric node)
+
+deviceResources:
+  - name: Temperature
+    description: Sample temperature reading
+    attributes:
+      nodeId: "ns=2;i=2"
+    properties:
+      valueType: Float64
+      readWrite: R
+
+deviceCommands:
+  - name: AllResources
+    readWrite: R
+    resourceOperations:
+      - deviceResource: Temperature

@@ -1,0 +1,22 @@
+name: S7Sample
+manufacturer: SenseL
+model: S7-Generic
+labels:
+  - ot
+  - s7
+description: Generic Siemens S7 sample profile (DB1 offset 0)
+
+deviceResources:
+  - name: Counter
+    description: DB1.DBW0 Int16 counter
+    attributes:
+      NodeName: DB1.DBW0
+    properties:
+      valueType: Int16
+      readWrite: R
+
+deviceCommands:
+  - name: AllResource
+    readWrite: R
+    resourceOperations:
+      - deviceResource: Counter

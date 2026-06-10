@@ -1,0 +1,19 @@
+[Unit]
+Description=SenseL OT Edge Sensor Docker stack
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/edgex/sensel-ot-edge-sensor
+User=edgex
+Group=edgex
+Environment=DEPLOY_PROFILE=lab
+ExecStart=/home/edgex/sensel-ot-edge-sensor/scripts/pi-stack-up.sh
+ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml -f docker-compose.pi-lab.yml -f docker-compose.pi-reliability.yml down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

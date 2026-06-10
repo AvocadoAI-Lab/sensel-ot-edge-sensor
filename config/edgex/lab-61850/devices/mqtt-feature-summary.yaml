@@ -1,0 +1,18 @@
+# IEC 61850 lab — Packet Sensor feature summary only (device-mqtt)
+# Packet Sensor → incoming/data/packet-sensor-features/FeatureSummary on local-mqtt
+
+deviceList:
+  - name: packet-sensor-features
+    profileName: FeatureSummary
+    description: Packet Sensor 1-minute feature summary (MQTT bridge)
+    adminState: UNLOCKED
+    operatingState: UP
+    serviceName: device-mqtt
+    labels: [ot, packet-sensor, lab-61850]
+    protocols:
+      mqtt:
+        CommandTopic: command/packet-sensor-features
+        Host: local-mqtt
+        Port: "1883"
+        ClientId: edgex-device-mqtt-features
+        QoS: "0"

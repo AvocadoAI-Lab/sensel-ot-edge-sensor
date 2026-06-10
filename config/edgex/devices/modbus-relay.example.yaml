@@ -1,4 +1,4 @@
-# EdgeX device — lab Modbus relay via iotechsys/modbus-sim (port 1502)
+# Lab Modbus relay — enable with: docker compose --profile modbus-lab up -d
 # Field deploy: set Address to relay IP and Port 502; disable modbus-simulator service.
 
 deviceList:
@@ -7,6 +7,7 @@ deviceList:
     description: Lab Modbus relay (simulator)
     adminState: UNLOCKED
     operatingState: UP
+    serviceName: device-modbus
     labels: [ot, modbus, relay, lab]
     protocols:
       modbus-tcp:

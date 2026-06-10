@@ -208,6 +208,54 @@ services:
       - edgex-network
       - sensel-edge
 
+  device-opc-ua:
+    <<: *edgex-defaults
+    profiles: [phase2]
+    container_name: edgex-device-opc-ua
+    image: edgexfoundry/device-opc-ua:4.0.0
+    hostname: edgex-device-opc-ua
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-opc-ua
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    ports:
+      - "127.0.0.1:59997:59997"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../config/edgex/devices:/custom-config/devices:ro
+      - ../config/edgex/profiles:/custom-config/profiles:ro
+
+  device-s7:
+    <<: *edgex-defaults
+    profiles: [phase2]
+    container_name: edgex-device-s7
+    image: edgexfoundry/device-s7:4.0.0
+    hostname: edgex-device-s7
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-s7
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    ports:
+      - "127.0.0.1:59994:59994"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../config/edgex/devices:/custom-config/devices:ro
+      - ../config/edgex/profiles:/custom-config/profiles:ro
+
   ui:
     <<: *edgex-defaults
     profiles: [lab-ui]

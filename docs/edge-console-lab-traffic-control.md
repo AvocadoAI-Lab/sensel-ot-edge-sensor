@@ -368,7 +368,21 @@ EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-lab-tra
 
 ---
 
-*版本：2026-06-05 · P0 實作 · Edge Console v0.1.0 + lab-61850 overlay*
+## OT 偵測政策 MQTT（path B）
+
+Portal **工控安全防護 → 偵測政策** 可編輯 `rules_enabled` + MMS baseline，發布至：
+
+`sensel/{tenant_id}/policy/ot-detection`
+
+Pi `edge-agent` 訂閱後寫入 `data/agent/detection-policy.json`，`packet-sensor` 熱重載。
+
+```bash
+# 需 alembic upgrade + MQTT_ENABLED on 108 API
+POLICY_SYNC_MQTT_ENABLED=true  # Pi .env
+MQTT_ENABLED=true MQTT_BROKER=192.168.1.203  # 108
+```
+
+*版本：2026-06-06 · P0 + MQTT detection policy path B*
 
 驗收：
 

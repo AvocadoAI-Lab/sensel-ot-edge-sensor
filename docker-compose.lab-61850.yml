@@ -1,9 +1,30 @@
-# IEC 61850 lab overlay — GOOSE publisher + MMS server
+# IEC 61850 lab overlay — GOOSE/MMS publishers + EdgeX mqtt-feature only
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d
 #   CAPTURE_INTERFACE=eth0 make verify-61850
+#
+# EdgeX: device-modbus / modbus-simulator / phase2 (opc-ua, s7) are OFF unless
+#   docker compose --profile modbus-lab up -d
+#   docker compose --profile phase2 up -d device-opc-ua device-s7
 
 services:
+  device-modbus:
+    profiles: [modbus-lab]
+
+  modbus-simulator:
+    profiles: [modbus-lab]
+
+  device-mqtt:
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/lab-61850/devices:/custom-config/devices:ro
+      - ./config/edgex/lab-61850/profiles:/custom-config/profiles:ro
+
+  edge-console:
+    environment:
+      - EDGEX_DEVICES_DIR=/config/edgex/lab-61850/devices
+      - EDGEX_PROFILES_DIR=/config/edgex/lab-61850/profiles
+
   goose-publisher:
     build:
       context: .

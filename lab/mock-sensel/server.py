@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
             limit = int(query.get("limit", ["100"])[0])
             self._json_response(200, {"events": _read_events(limit), "count": len(_read_events(limit))})
             return
-        if parsed.path in ("/", "/health"):
+        if parsed.path in ("/", "/health", "/api/health"):
             self._json_response(200, {"status": "ok", "service": "mock-sensel"})
             return
         self.send_error(404)
@@ -70,6 +70,19 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path.endswith("/security-events"):
             _append_event(body)
+        elif self.path.endswith("/api/v1/edge-sensors/register"):
+            sensor_id = str(body.get("sensor_id") or "ot-edge-lab")
+            self._json_response(
+                200,
+                {
+                    "status": "ok",
+                    "tenant_id": "lab-mock-tenant",
+                    "mqtt_tenant_id": "lab-mock-tenant",
+                    "sensor_id": sensor_id,
+                    "note": "mock-sensel lab only — use real Portal for production",
+                },
+            )
+            return
         elif self.path.endswith("/register") or self.path.endswith("/health"):
             pass
         else:

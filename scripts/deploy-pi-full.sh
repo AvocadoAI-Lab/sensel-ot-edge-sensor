@@ -32,7 +32,7 @@ if [[ "${PROFILE}" != "lab" && "${PROFILE}" != "production" ]]; then
   exit 1
 fi
 
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml"
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml -f docker-compose.pi-reliability.yml"
 if [[ "${PROFILE}" == "lab" ]]; then
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-lab.yml"
 else
@@ -63,7 +63,7 @@ echo "==> Stopping old stacks and starting full SenseL stack"
   bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/sensel-ot-edge-sensor
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml"
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml -f docker-compose.pi-reliability.yml"
 if [[ "${DEPLOY_PROFILE}" == "production" ]]; then
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-production.yml"
 else
@@ -84,33 +84,18 @@ MQTT_TENANT_ID=${MQTT_TENANT_ID:-default}
 CAP
 fi
 
-cat > .env <<ENV
-SITE_ID=factory-lab-001
-SENSOR_ID=ot-edge-pi4-001
-SENSOR_TYPE=ot-edge-sensor
-SENSEL_API_URL=http://192.168.1.108:8081
-SENSEL_API_KEY=sensel-ot-ingest-lab-2026
-OT_REGISTRATION_TOKEN=${OT_REGISTRATION_TOKEN:-}
-SENSEL_VERIFY_TLS=false
-MGMT_INTERFACE=eth0
-CAPTURE_INTERFACE=eth0
-CAPTURE_BPF_FILTER=(ether proto 0x88b8) or (tcp port 102)
-GOOSE_INTERFACE=eth0
-MMS_INTERFACE=eth0
-MMS_SRC_IP=192.168.10.88
-MMS_DST_IP=192.168.10.50
-LOCAL_MQTT_HOST=127.0.0.1
-LOCAL_MQTT_PORT=1884
-NORTHBOUND_MQTT_ENABLED=true
-CONTROL_PLANE_MQTT_HOST=192.168.1.203
-CONTROL_PLANE_MQTT_PORT=1883
-MQTT_TENANT_ID=${MQTT_TENANT_ID:-default}
-MQTT_REQUIRE_TENANT=$([[ "${DEPLOY_PROFILE}" == "production" ]] && echo true || echo false)
-EDGE_CONSOLE_DOCKER_RESTART=true
-EDGE_CONSOLE_AUTO_RESTART_AGENT=true
-DEPLOY_TARGET=pi4
-LOG_LEVEL=info
-ENV
+./scripts/seed-pi-env.sh
+if [[ -n "${OT_REGISTRATION_TOKEN:-}" ]] && ! grep -q '^OT_REGISTRATION_TOKEN=.' .env 2>/dev/null; then
+  echo "OT_REGISTRATION_TOKEN=${OT_REGISTRATION_TOKEN}" >> .env
+fi
+if [[ "${DEPLOY_PROFILE}" == "production" ]] && ! grep -q '^MQTT_REQUIRE_TENANT=' .env 2>/dev/null; then
+  echo "MQTT_REQUIRE_TENANT=true" >> .env
+fi
+if ! grep -q '^MQTT_TENANT_ID=' .env 2>/dev/null; then
+  echo "MQTT_TENANT_ID=${MQTT_TENANT_ID:-default}" >> .env
+fi
+
+./scripts/wait-for-upstream.sh
 
 echo "==> Stopping SenseL edge-only stack (if running)"
 docker compose -f docker-compose.edge-only.yml -f docker-compose.lab-61850.yml down --remove-orphans 2>/dev/null || true
@@ -125,6 +110,7 @@ sleep 5
 ss -tlnp | grep -E ':5432|:1883|:59880|:59881|:59890' || echo "  ports clear"
 
 echo "==> Building and starting full stack (${DEPLOY_PROFILE})"
+# Lab 61850: mqtt-feature only — no phase2 (opc-ua/s7) or modbus-lab unless explicitly enabled
 docker compose ${COMPOSE_FILES} up -d --build
 
 echo "==> Lab URLs"
@@ -152,7 +138,12 @@ echo "==> Service logs (tail)"
 docker logs sensel-edge-console --tail 5 2>&1 || true
 docker logs sensel-edge-agent --tail 8 2>&1 || true
 docker logs sensel-packet-sensor --tail 8 2>&1 || true
-docker logs edgex-device-modbus --tail 5 2>&1 || true
+chmod +x scripts/apply-lab-61850-edgex.sh 2>/dev/null || true
+./scripts/apply-lab-61850-edgex.sh
+docker logs edgex-device-mqtt --tail 8 2>&1 || true
+
+echo "==> Pi stack health gate"
+./scripts/verify-pi-stack-health.sh ${COMPOSE_FILES} || true
 REMOTE
 
 echo "==> Full stack deploy complete (${PROFILE}). SSH: ssh ${TARGET}"

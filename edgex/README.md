@@ -14,6 +14,8 @@ EdgeX 4.0 non-secure stack，已合併至根目錄 `docker-compose.yml`（`inclu
 | `device-modbus` | edgex-device-modbus | Modbus TCP 遙測 |
 | `modbus-simulator` | edgex-modbus-simulator | Lab Modbus TCP 模擬器（port 1502） |
 | `device-mqtt` | edgex-device-mqtt | 訂閱 local-mqtt 特徵摘要 |
+| `device-opc-ua` | edgex-device-opc-ua | OPC UA（`--profile phase2`） |
+| `device-s7` | edgex-device-s7 | Siemens S7 ISO-on-TCP（`--profile phase2`） |
 
 Lab UI（可選）：`make up-ui` → http://127.0.0.1:4000
 

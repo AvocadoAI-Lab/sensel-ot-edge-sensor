@@ -35,4 +35,6 @@ python3 lab/61850/generate_sample_pcap.py
 | `goose-publisher/` | Scapy GOOSE 發送器（host network，ARM OK） |
 | `mms-publisher/` | Scapy MMS TCP/102 探測（host network，ARM OK，取代 amd64 61850-sim） |
 | `pcap/goose_sample.pcap` | 樣本 GOOSE 封包 |
-| `docker-compose.lab-61850.yml` | GOOSE + MMS publisher overlay（`61850-sim-mms` 僅 amd64 profile） |
+| `docker-compose.lab-61850.yml` | GOOSE + MMS publishers；EdgeX **僅 mqtt-feature**（modbus/phase2 預設關閉） |
+| `config/edgex/lab-61850/` | `device-mqtt` 專用 devices/profiles |
+| `scripts/apply-lab-61850-edgex.sh` | 清除 metadata 殘留設備、重啟 device-mqtt |

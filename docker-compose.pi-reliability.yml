@@ -1,0 +1,60 @@
+# Pi reliability overlay — Docker healthchecks + startup ordering (S5-F1 Pi)
+# Usage (with lab stack):
+#   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
+#     -f docker-compose.lab-61850.yml -f docker-compose.pi-lab.yml \
+#     -f docker-compose.pi-reliability.yml up -d
+
+services:
+  sensel-edge-agent:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import json,sys,time,pathlib,datetime as dt; p=pathlib.Path('/app/data/agent-runtime.json');\nif not p.is_file(): sys.exit(1)\nd=json.loads(p.read_text());\nts=str(d.get('updated_at') or '');\nif not ts: sys.exit(1)\ntext=ts.replace('Z','+00:00'); age=time.time()-dt.datetime.fromisoformat(text).timestamp();\nsys.exit(0 if age<=180 else 1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  edge-console:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/', timeout=8)",
+        ]
+      interval: 30s
+      timeout: 12s
+      retries: 3
+      start_period: 45s
+    depends_on:
+      sensel-edge-agent:
+        condition: service_healthy
+      core-data:
+        condition: service_started
+      core-metadata:
+        condition: service_started
+
+  packet-sensor:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import os,sys,time,pathlib; p=pathlib.Path('/app/data/assets/capture-live.json');\nif not p.is_file(): sys.exit(1)\nif time.time()-p.stat().st_mtime>120: sys.exit(1)\nsys.exit(0)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    depends_on:
+      local-mqtt:
+        condition: service_started
+      sensel-edge-agent:
+        condition: service_healthy
