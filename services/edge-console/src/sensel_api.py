@@ -49,11 +49,42 @@ def register_sensor(config: PlatformConfig) -> dict[str, Any]:
         return data
 
 
+def _ping_error_message(exc: Exception, base: str) -> str:
+    if isinstance(exc, httpx.TimeoutException):
+        return (
+            f"連線逾時：無法在 10 秒內連到 {base}。"
+            " 請確認 Portal 已啟動、與 Pi 同網段，或 Lab 改用 "
+            "http://192.168.1.123:8765（mock-sensel）。"
+        )
+    if isinstance(exc, httpx.ConnectError):
+        return f"無法連線到 {base}（主機拒絕或路由不通）。"
+    return str(exc)
+
+
 def ping_sensel(config: PlatformConfig) -> dict[str, Any]:
     base = config.sensel_api_url.rstrip("/")
     if not base:
         raise ValueError("SenseL API URL is required")
+    paths = ("/api/health", "/health")
+    last_exc: Exception | None = None
     with httpx.Client(timeout=10.0, verify=config.sensel_verify_tls) as client:
-        response = client.get(f"{base}/api/health")
-        response.raise_for_status()
-        return response.json() if response.content else {"status": "ok"}
+        for path in paths:
+            try:
+                response = client.get(f"{base}{path}")
+                if response.status_code == 404 and path == "/api/health":
+                    continue
+                response.raise_for_status()
+                return response.json() if response.content else {"status": "ok"}
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404 and path == "/api/health":
+                    continue
+                raise RuntimeError(_ping_error_message(exc, base)) from exc
+            except (httpx.TimeoutException, httpx.ConnectError) as exc:
+                last_exc = exc
+                break
+            except httpx.HTTPError as exc:
+                last_exc = exc
+                break
+    if last_exc is not None:
+        raise RuntimeError(_ping_error_message(last_exc, base)) from last_exc
+    raise RuntimeError(f"SenseL 健康檢查失敗：{base}")

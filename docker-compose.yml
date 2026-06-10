@@ -41,15 +41,43 @@ services:
       - EDGE_CONSOLE_PASSWORD=${EDGE_CONSOLE_PASSWORD:-}
       - EDGE_CONSOLE_DOCKER_RESTART=${EDGE_CONSOLE_DOCKER_RESTART:-true}
       - EDGE_CONSOLE_AUTO_RESTART_AGENT=${EDGE_CONSOLE_AUTO_RESTART_AGENT:-true}
+      - EDGE_CONSOLE_NET_ADMIN=${EDGE_CONSOLE_NET_ADMIN:-true}
+      - EDGE_CONSOLE_WIFI_ADMIN=${EDGE_CONSOLE_WIFI_ADMIN:-true}
+      # Opt-in read-only active probe (TCP fingerprint + Modbus FC43) via packet-sensor
+      - EDGE_CONSOLE_ACTIVE_PROBE=${EDGE_CONSOLE_ACTIVE_PROBE:-false}
+      # Baseline pcap learning limits (Pi-friendly defaults)
+      - BASELINE_MAX_PCAP_MB=${BASELINE_MAX_PCAP_MB:-100}
+      - BASELINE_AUTO_LIMIT_MB=${BASELINE_AUTO_LIMIT_MB:-50}
+      - BASELINE_AUTO_LIMIT_PACKETS=${BASELINE_AUTO_LIMIT_PACKETS:-500000}
+      - BASELINE_LEARN_TIMEOUT_SEC=${BASELINE_LEARN_TIMEOUT_SEC:-600}
       - EDGE_AGENT_CONTAINER=sensel-edge-agent
       - PACKET_SENSOR_CONTAINER=sensel-packet-sensor
+      - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - EDGEX_CORE_METADATA_URL=http://edgex-core-metadata:59881
+      - EDGEX_DEVICES_DIR=/config/edgex/devices
+      - EDGEX_PROFILES_DIR=/config/edgex/profiles
+      - EDGEX_UI_URL=http://127.0.0.1:4000
+      - EDGEX_COMPOSE_PROJECT_DIR=/project
+      - EDGEX_COMPOSE_FILES=-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml -f docker-compose.pi-lab.yml -f docker-compose.pi-reliability.yml
+      - EDGE_CONSOLE_AUDIT_LOG=/data/agent/console-audit.jsonl
+      - DETECTION_POLICY_PATH=/data/agent/detection-policy.json
+      - DETECTION_POLICY_STAMP_PATH=/data/agent/detection-policy.stamp
     volumes:
       - ./data/agent:/data/agent
       - ./data/assets:/data/assets:ro
+      - ./config/edgex:/config/edgex
+      - ./:/project:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker:ro
+      # Host system D-Bus socket — lets nmcli drive the host NetworkManager
+      # (Wi-Fi scan/connect). Requires NetworkManager active on host.
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
     networks:
       - sensel-edge
+      - edgex-network
+    depends_on:
+      - core-data
+      - core-metadata
 
   # ---------------------------------------------------------------------------
   # SenseL Edge Agent — platform comms, policy sync, health
@@ -79,6 +107,7 @@ services:
       - POLICY_SYNC_MQTT_HOST=${POLICY_SYNC_MQTT_HOST:-${CONTROL_PLANE_MQTT_HOST:-}}
       - POLICY_SYNC_MQTT_PORT=${POLICY_SYNC_MQTT_PORT:-${CONTROL_PLANE_MQTT_PORT:-1883}}
       - POLICY_SYNC_MQTT_TOPIC=${POLICY_SYNC_MQTT_TOPIC:-sensel/{tenant_id}/policy/blacklist}
+      - DETECTION_POLICY_MQTT_TOPIC=${DETECTION_POLICY_MQTT_TOPIC:-sensel/{tenant_id}/policy/ot-detection}
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
@@ -115,6 +144,12 @@ services:
       - IOC_CACHE_PATH=/app/data/agent/ioc-cache.json
       - IOC_CACHE_STAMP_PATH=/app/data/agent/ioc-cache.stamp
       - IOC_MATCH_COOLDOWN_SEC=${IOC_MATCH_COOLDOWN_SEC:-300}
+      - DETECTION_POLICY_PATH=/app/data/agent/detection-policy.json
+      - DETECTION_POLICY_STAMP_PATH=/app/data/agent/detection-policy.stamp
+      - DETECTION_POLICY_RELOAD_SEC=5
+      # Live baseline observation rolling window (drift): drop identities not
+      # seen within this many seconds. 0 = accumulate since start.
+      - LIVE_OBSERVE_WINDOW_SEC=${LIVE_OBSERVE_WINDOW_SEC:-900}
       - CAPTURE_BACKEND=${CAPTURE_BACKEND:-scapy}
       - XDP_MODE=${XDP_MODE:-native}
       - XDP_QUEUE_ID=${XDP_QUEUE_ID:-0}

@@ -18,6 +18,10 @@ from src.health.collector import collect_health
 from src.northbound.mqtt import NorthboundMqttClient
 from src.policy.sync import PolicySync
 from src.policy.mqtt_subscriber import PolicyMqttSubscriber
+from src.policy.detection_policy_sync import DetectionPolicySync
+from src.policy.detection_mqtt_subscriber import DetectionPolicyMqttSubscriber
+from src.runtime.agent_snapshot import write_agent_runtime
+from src.runtime.registration import RegistrationState, attempt_registration
 from src.sighting.reporter import SightingReporter
 from src.upload.buffer import UploadBuffer
 from src.upload.events import SecurityEventTailer
@@ -106,11 +110,12 @@ def main() -> int:
     logging.getLogger().setLevel(log_level)
 
     logger.info(
-        "SenseL Edge Agent v%s starting (sensor=%s site=%s mqtt=%s)",
+        "SenseL Edge Agent v%s starting (sensor=%s site=%s mqtt=%s register_retry=%ss)",
         config.sensor.software_version,
         config.sensor.id,
         config.sensor.site_id,
         config.northbound_mqtt.host if config.northbound_mqtt.enabled else "disabled",
+        config.sensel.register_retry_sec,
     )
 
     if not config.sensel.api_url or not config.sensel.api_key:
@@ -133,7 +138,14 @@ def main() -> int:
         if policy_sync and config.policy_sync.mqtt_enabled
         else None
     )
+    detection_policy_sync = DetectionPolicySync(config)
+    detection_policy_mqtt = (
+        DetectionPolicyMqttSubscriber(config, detection_policy_sync)
+        if detection_policy_sync.enabled and config.policy_sync.mqtt_enabled
+        else None
+    )
     sighting_reporter = SightingReporter(config)
+    registration = RegistrationState()
     last_policy_sync = 0.0
 
     if policy_mqtt and policy_mqtt.enabled:
@@ -142,20 +154,27 @@ def main() -> int:
             config.policy_sync.mqtt_host,
             config.policy_sync.mqtt_topic_template,
         )
+    if detection_policy_mqtt and detection_policy_mqtt.enabled:
+        logger.info(
+            "Detection policy MQTT enabled host=%s topic_tpl=%s",
+            config.policy_sync.mqtt_host,
+            config.policy_sync.detection_policy_mqtt_topic_template,
+        )
 
     try:
-        try:
-            reg = client.register()
-            tenant_id = str(reg.get("tenant_id") or reg.get("mqtt_tenant_id") or "").strip()
-            if tenant_id and mqtt.enabled:
-                mqtt.update_tenant_id(tenant_id)
-            if policy_mqtt:
-                policy_mqtt.refresh_subscription()
-        except Exception:
-            logger.exception("Initial registration failed; will retry on health cycle")
+        attempt_registration(
+            client=client,
+            config=config,
+            mqtt=mqtt,
+            policy_mqtt=policy_mqtt,
+            state=registration,
+            force=True,
+        )
 
-        if policy_mqtt:
+        if policy_mqtt and policy_mqtt.enabled:
             policy_mqtt.start()
+        if detection_policy_mqtt and detection_policy_mqtt.enabled:
+            detection_policy_mqtt.start()
 
         if policy_sync:
             initial = policy_sync.pull_http_feed(force=True)
@@ -175,18 +194,22 @@ def main() -> int:
         elif config.sighting_report.enabled and not config.sighting_report.smb_intel_api_key:
             logger.warning("Sighting report enabled but SMB_INTEL_API_KEY is not set")
 
-        if mqtt.enabled:
-            mqtt.publish_state(
-                {
-                    "status": "online",
-                    "sensor_type": config.sensor.type,
-                    "capabilities": config.sensor.capabilities,
-                }
-            )
-
         interval = config.sensel.health_interval_sec
 
         while not _shutdown:
+            attempt_registration(
+                client=client,
+                config=config,
+                mqtt=mqtt,
+                policy_mqtt=policy_mqtt,
+                state=registration,
+            )
+
+            if policy_mqtt and policy_mqtt.enabled:
+                policy_mqtt.ensure_connected()
+            if detection_policy_mqtt and detection_policy_mqtt.enabled:
+                detection_policy_mqtt.ensure_connected()
+
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None)
 
@@ -209,6 +232,29 @@ def main() -> int:
                     last_policy_sync = time.monotonic()
 
             health = collect_health(config)
+
+            write_agent_runtime(
+                registered=registration.complete,
+                tenant_id=registration.tenant_id or config.northbound_mqtt.tenant_id,
+                mqtt_connected=mqtt.connected if mqtt.enabled else None,
+            )
+
+            # Northbound MQTT heartbeat: publish_state lazily (re)connects, so a
+            # periodic state message keeps the control-plane bus alive and
+            # re-establishes it after a transient broker outage even when no
+            # security events are flowing. Without this the bus shows
+            # disconnected during quiet periods. On success publish_state writes
+            # mqtt_connected=True + last_mqtt_publish_at to the runtime snapshot.
+            if mqtt.enabled:
+                mqtt.publish_state(
+                    {
+                        "status": "online",
+                        "registered": registration.complete,
+                        "tenant_id": registration.tenant_id or config.northbound_mqtt.tenant_id,
+                        "health": health,
+                    }
+                )
+
             try:
                 client.upload_health(health)
                 logger.info(
@@ -226,6 +272,8 @@ def main() -> int:
                     break
                 time.sleep(1)
     finally:
+        if detection_policy_mqtt:
+            detection_policy_mqtt.stop()
         if policy_mqtt:
             policy_mqtt.stop()
         buffer.close()

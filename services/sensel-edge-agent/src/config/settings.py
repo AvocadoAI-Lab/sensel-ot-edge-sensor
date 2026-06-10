@@ -80,6 +80,7 @@ class SenselConfig(BaseModel):
     buffer: BufferConfig = Field(default_factory=BufferConfig)
     events: EventsConfig = Field(default_factory=EventsConfig)
     health_interval_sec: int = 30
+    register_retry_sec: int = 60
     verify_tls: bool = True
 
 
@@ -102,6 +103,11 @@ class PolicySyncConfig(BaseModel):
     mqtt_qos: int = 1
     mqtt_username: str = ""
     mqtt_password: str = ""
+    detection_policy_enabled: bool = True
+    detection_policy_path: str = "/app/data/detection-policy.json"
+    detection_policy_stamp_path: str = "/app/data/detection-policy.stamp"
+    detection_policy_mqtt_enabled: bool = True
+    detection_policy_mqtt_topic_template: str = "sensel/{tenant_id}/policy/ot-detection"
 
 
 class SightingReportConfig(BaseModel):
@@ -165,6 +171,16 @@ def load_config(path: Path | None = None) -> AppConfig:
     sensel_raw["events"] = events_raw
     sensel_raw["health_interval_sec"] = int(
         capture_raw.get("health_check_interval_sec", 30)
+    )
+    retry_raw = sensel_raw.get("retry") or {}
+    sensel_raw["register_retry_sec"] = int(
+        os.environ.get(
+            "REGISTER_RETRY_SEC",
+            sensel_raw.get(
+                "register_retry_sec",
+                retry_raw.get("backoff_sec", 60),
+            ),
+        )
     )
     if os.environ.get("SENSEL_VERIFY_TLS", "").lower() in ("0", "false", "no"):
         sensel_raw["verify_tls"] = False
@@ -272,6 +288,31 @@ def load_config(path: Path | None = None) -> AppConfig:
         os.environ.get(
             "POLICY_SYNC_MQTT_PASSWORD",
             os.environ.get("CONTROL_PLANE_MQTT_PASSWORD", ""),
+        ),
+    )
+    det_enabled_env = os.environ.get("DETECTION_POLICY_ENABLED", "").lower()
+    if det_enabled_env in ("0", "false", "no"):
+        policy_raw["detection_policy_enabled"] = False
+    elif det_enabled_env in ("1", "true", "yes"):
+        policy_raw["detection_policy_enabled"] = True
+    policy_raw.setdefault(
+        "detection_policy_path",
+        os.environ.get("DETECTION_POLICY_PATH", "/app/data/detection-policy.json"),
+    )
+    policy_raw.setdefault(
+        "detection_policy_stamp_path",
+        os.environ.get("DETECTION_POLICY_STAMP_PATH", "/app/data/detection-policy.stamp"),
+    )
+    det_mqtt_env = os.environ.get("DETECTION_POLICY_MQTT_ENABLED", "").lower()
+    if det_mqtt_env in ("0", "false", "no"):
+        policy_raw["detection_policy_mqtt_enabled"] = False
+    elif det_mqtt_env in ("1", "true", "yes"):
+        policy_raw["detection_policy_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "detection_policy_mqtt_topic_template",
+        os.environ.get(
+            "DETECTION_POLICY_MQTT_TOPIC",
+            "sensel/{tenant_id}/policy/ot-detection",
         ),
     )
 

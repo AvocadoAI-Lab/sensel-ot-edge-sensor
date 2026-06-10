@@ -132,6 +132,7 @@ class PolicyMqttSubscriber:
             client.on_message = self._on_message
 
             try:
+                client.reconnect_delay_set(min_delay=2, max_delay=60)
                 client.connect(ps.mqtt_host, ps.mqtt_port, keepalive=60)
             except Exception:
                 logger.exception(
@@ -150,6 +151,14 @@ class PolicyMqttSubscriber:
                 tenant_id,
             )
             return True
+
+    def ensure_connected(self) -> bool:
+        """Start or verify policy MQTT client (e.g. after registration retry)."""
+        if not self.enabled:
+            return False
+        if self._client is not None and self._connected:
+            return True
+        return self.start()
 
     def refresh_subscription(self) -> None:
         """Re-subscribe when feed tenant changes after registration."""

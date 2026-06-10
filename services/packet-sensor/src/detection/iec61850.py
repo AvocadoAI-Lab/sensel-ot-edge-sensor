@@ -19,6 +19,7 @@ class Iec61850Detector:
     site_id: str
     sensor_id: str
     policy: dict
+    rules_enabled: set[str] = field(default_factory=set)
     known_goose: set[str] = field(default_factory=set)
     known_mms_pairs: set[str] = field(default_factory=set)
     alerted_unauthorized_mms: set[str] = field(default_factory=set)
@@ -29,6 +30,9 @@ class Iec61850Detector:
         self._event_seq += 1
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
         return f"evt-{day}-61850-{self._event_seq:05d}"
+
+    def _enabled(self, rule_id: str) -> bool:
+        return not self.rules_enabled or rule_id in self.rules_enabled
 
     def _goose_publishers(self) -> list[dict]:
         return self.policy.get("iec61850", {}).get("goose_publishers", [])
@@ -126,7 +130,7 @@ class Iec61850Detector:
                     )
                 )
         self.last_stnum[key] = frame.st_num
-        return events
+        return [e for e in events if self._enabled(e.rule_id)]
 
     def evaluate_mms(self, obs: MmsObservation) -> list[SecurityEvent]:
         events: list[SecurityEvent] = []
@@ -196,7 +200,7 @@ class Iec61850Detector:
                     evidence={"ied_ip": ied_ip, "mms_pdu_type": obs.pdu_type},
                 )
             )
-        return events
+        return [e for e in events if self._enabled(e.rule_id)]
 
     def _ied_in_baseline(self, ied_ip: str) -> bool:
         return any(entry.get("ied_ip") == ied_ip for entry in self._mms_ieds())

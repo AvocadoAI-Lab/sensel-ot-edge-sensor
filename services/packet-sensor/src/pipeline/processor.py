@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.baseline.collector import BaselineCollector
 from src.detection.iec61850 import Iec61850Detector
 from src.detection.ioc import IocMatcher
 from src.detection.mvp import MvpDetector
@@ -19,6 +20,7 @@ from src.parser.l7.iec61850.goose import GooseStats, parse_goose_packet, record_
 from src.parser.l7.iec61850.mms import MmsStats, parse_mms_packet, record_mms
 from src.parser.l7.modbus.tcp import parse_modbus_tcp
 from src.policy.loader import load_policy
+from src.policy.detection_policy_store import DetectionPolicyStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +53,20 @@ class PacketPipeline:
         ioc_stamp_path: str = "/app/data/agent/ioc-cache.stamp",
         ioc_cooldown_sec: int = 300,
         ioc_reload_check_sec: int = 5,
+        detection_policy_path: str = "/app/data/agent/detection-policy.json",
+        detection_policy_stamp_path: str = "/app/data/agent/detection-policy.stamp",
+        detection_policy_reload_sec: int = 5,
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
-        policy = load_policy(policy_path)
-        enabled = set(rules_enabled or [])
+        self._policy_store = DetectionPolicyStore(
+            policy_path=detection_policy_path,
+            stamp_path=detection_policy_stamp_path,
+            fallback_policy_path=policy_path,
+            reload_check_sec=float(detection_policy_reload_sec),
+        )
+        policy = self._policy_store.policy()
+        enabled = self._policy_store.rules_enabled() or set(rules_enabled or [])
         self._mvp = MvpDetector(
             site_id=site_id,
             sensor_id=sensor_id,
@@ -66,6 +77,7 @@ class PacketPipeline:
             site_id=site_id,
             sensor_id=sensor_id,
             policy=policy,
+            rules_enabled=enabled,
         )
         self._ioc: IocMatcher | None = None
         if ioc_enabled:
@@ -84,6 +96,9 @@ class PacketPipeline:
                 cooldown_sec=ioc_cooldown_sec,
             )
         self._ring = PcapRingBuffer(max_packets=ring_buffer_max_packets)
+        # Passive observer for drift detection (live vs active baseline). It
+        # accumulates identities seen since start; it never emits events.
+        self._baseline = BaselineCollector()
         self._events = EventStore(assets_dir)
         self._features = FeaturePublisher(
             sensor_id=sensor_id,
@@ -96,6 +111,28 @@ class PacketPipeline:
             edgex_data_topic=edgex_data_topic,
         )
 
+    def reload_detection_policy(self) -> bool:
+        if not self._policy_store.maybe_reload():
+            return False
+        policy = self._policy_store.policy()
+        enabled = self._policy_store.rules_enabled()
+        self._mvp.policy = policy
+        if enabled:
+            self._mvp.rules_enabled = enabled
+        self._detector.policy = policy
+        if enabled:
+            self._detector.rules_enabled = enabled
+        if self._ioc is not None:
+            self._ioc.policy = policy
+            if enabled:
+                self._ioc.rules_enabled = enabled
+        logger.info(
+            "Detection policy reloaded version=%s rules=%s",
+            self._policy_store.version,
+            len(enabled),
+        )
+        return True
+
     def _emit(self, events) -> None:
         for event in events:
             self._events.append(event, ring_buffer=self._ring)
@@ -107,6 +144,7 @@ class PacketPipeline:
             )
 
     def process(self, packet) -> None:
+        self.reload_detection_policy()
         try:
             packet_bytes = bytes(packet)
         except Exception:
@@ -118,6 +156,7 @@ class PacketPipeline:
         record_l2(self.state.l2, src_mac)
         src_ip, dst_ip, version = parse_ip(packet)
         record_l3(self.state.l3, src_ip, version)
+        self._baseline.feed_endpoints(src_mac, src_ip, dst_ip)
 
         flow = parse_transport(packet)
         if self._ioc:
@@ -140,16 +179,19 @@ class PacketPipeline:
 
         modbus = parse_modbus_tcp(packet)
         if modbus:
+            self._baseline.feed_modbus(modbus)
             self._emit(self._mvp.evaluate_modbus(modbus))
 
         goose = parse_goose_packet(packet)
         if goose:
             record_goose(self.state.goose, goose)
+            self._baseline.feed_goose(goose)
             self._emit(self._detector.evaluate_goose(goose))
 
         mms = parse_mms_packet(packet)
         if mms:
             record_mms(self.state.mms, mms)
+            self._baseline.feed_mms(mms)
             self._emit(self._detector.evaluate_mms(mms))
 
     def flush_features(self) -> None:
@@ -164,6 +206,11 @@ class PacketPipeline:
 
     def close(self) -> None:
         self._features.close()
+
+    def live_baseline_snapshot(self, window_sec: float | None = None) -> dict:
+        return self._baseline.to_candidate(
+            source="live_observed", source_ref="live", window_sec=window_sec
+        )
 
     @property
     def event_store(self) -> EventStore:

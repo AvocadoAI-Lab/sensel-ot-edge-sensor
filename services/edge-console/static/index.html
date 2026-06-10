@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SenseL EdgeX Console</title>
+  <title>SenseL OT Edge Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/tokens.css?v=10" />
-  <link rel="stylesheet" href="/style.css?v=10" />
+  <link rel="stylesheet" href="/tokens.css?v=17" />
+  <link rel="stylesheet" href="/style.css?v=17" />
 </head>
 <body>
   <div id="loginView" class="login-wrap hidden">
     <div class="login-card panel">
       <img src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="login-logo" width="340" height="auto" />
       <p class="login-tagline">
-        Multi-Protocol Connectivity · Real-time Telemetry · Policy Enforcement
+        OT Edge Runtime · Telemetry Pipeline · Security Validation
       </p>
       <label>管理密碼
         <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入 Console 密碼" />
@@ -33,36 +33,7 @@
           <img src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="sidebar-logo-horizontal" width="200" height="auto" />
         </div>
       </div>
-      <nav class="sidebar-nav">
-        <button type="button" class="nav-item active" data-tab="dashboard" title="總覽">
-          <span class="nav-icon" aria-hidden="true">◉</span>
-          <span class="nav-label">總覽</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="edgex" title="EdgeX 平台">
-          <span class="nav-icon" aria-hidden="true">⬡</span>
-          <span class="nav-label">EdgeX 平台</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="devices" title="設備與協定">
-          <span class="nav-icon" aria-hidden="true">🏭</span>
-          <span class="nav-label">設備與協定</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="setup" title="設定精靈">
-          <span class="nav-icon" aria-hidden="true">✦</span>
-          <span class="nav-label">設定精靈</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="events" title="安全事件">
-          <span class="nav-icon" aria-hidden="true">⚠</span>
-          <span class="nav-label">安全事件</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="traffic" title="即時流量">
-          <span class="nav-icon" aria-hidden="true">〰</span>
-          <span class="nav-label">即時流量</span>
-        </button>
-        <button type="button" class="nav-item" data-tab="settings" title="進階設定">
-          <span class="nav-icon" aria-hidden="true">⚙</span>
-          <span class="nav-label">進階</span>
-        </button>
-      </nav>
+      <nav class="sidebar-nav" id="sidebarNav"></nav>
       <div class="sidebar-footer">
         <button type="button" class="nav-item nav-logout" id="logoutBtn" title="登出">
           <span class="nav-icon" aria-hidden="true">⎋</span>
@@ -80,383 +51,17 @@
         </div>
         <div class="header-actions">
           <button type="button" class="btn btn-primary btn-sm header-add-device hidden" id="headerAddDeviceBtn">＋ 新增設備</button>
+          <span id="headerClock" class="header-clock mono" title="系統時間 (GMT+8 · Asia/Taipei)">—</span>
           <span id="headerShield" class="header-shield ok" title="Policy / Baseline">🛡</span>
           <span id="headerAvatar" class="avatar" title="感測器">SE</span>
         </div>
       </header>
 
-      <main class="content">
-        <section id="tab-dashboard" class="page panel">
-          <p class="hint">註冊成功後，事件將經 MQTT 北向送至 Control Plane，並在 SenseL Portal 工控安全防護中顯示。</p>
-          <div class="dashboard-widgets grid-2">
-            <div class="card-ot dashboard-widget">
-              <div class="title">Telemetry Flow</div>
-              <div class="telemetry-rate-row">
-                <span id="dashTelemetryRate" class="traffic-rate-big">—</span>
-                <span class="sub"> pkt/s</span>
-              </div>
-              <canvas id="dashTelemetryChart" width="420" height="88" aria-label="Telemetry 趨勢"></canvas>
-              <div class="sub" id="dashTelemetryMeta">等待流量…</div>
-            </div>
-            <div class="card-ot dashboard-widget">
-              <div class="title">Policy Status</div>
-              <div class="policy-gauge-wrap">
-                <svg id="policyGaugeSvg" viewBox="0 0 120 120" class="policy-gauge-svg" aria-hidden="true">
-                  <circle cx="60" cy="60" r="48" class="policy-gauge-track"></circle>
-                  <circle cx="60" cy="60" r="48" class="policy-gauge-fill" id="policyGaugeFill"></circle>
-                </svg>
-                <div class="policy-gauge-center">
-                  <span id="policyGaugePct" class="policy-gauge-pct">—</span>
-                  <span id="policyGaugeLabel" class="policy-gauge-label">—</span>
-                </div>
-              </div>
-              <div class="sub" id="policyGaugeFactors"></div>
-            </div>
-          </div>
-          <div id="statusCards" class="grid-4" style="margin-top:1rem"></div>
-          <div id="ruleSummary" class="card-ot hidden" style="margin-top:1rem"></div>
-          <div class="actions">
-            <button type="button" class="btn btn-secondary" id="refreshStatusBtn">重新整理</button>
-            <button type="button" class="btn btn-ghost" id="restartAgentBtn">重啟 Edge Agent</button>
-          </div>
-        </section>
-
-        <section id="tab-edgex" class="page panel hidden">
-          <div class="traffic-header">
-            <p class="hint" style="margin:0">EdgeX Foundry 4.0 · Console 代理 core-metadata / core-data</p>
-            <div class="traffic-status">
-              <span id="edgexReachDot" class="status-dot unk"></span>
-              <span id="edgexReachLabel" class="mono">檢查中…</span>
-            </div>
-          </div>
-
-          <div id="edgexBusCard" class="card-ot" style="margin-bottom:1rem"></div>
-
-          <div class="table-wrap">
-            <table class="edgex-services-table">
-              <thead>
-                <tr>
-                  <th>服務</th>
-                  <th>容器</th>
-                  <th>埠</th>
-                  <th>Docker</th>
-                  <th>API</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="edgexServicesRows"></tbody>
-            </table>
-          </div>
-
-          <div class="actions">
-            <button type="button" class="btn btn-secondary" id="refreshEdgexBtn">重新整理</button>
-            <a class="btn btn-ghost" id="edgexUiLink" href="#" target="_blank" rel="noopener">開啟 EdgeX UI ↗</a>
-          </div>
-        </section>
-
-        <section id="tab-devices" class="page panel hidden">
-          <p class="hint">Modbus / MQTT / OPC UA / S7 由 EdgeX 管理；GOOSE/MMS 由 Packet Sensor 鏡像被動擷取</p>
-          <div id="protocolMatrix" class="protocol-matrix"></div>
-
-          <div id="phase2Banner" class="card-ot phase2-banner hidden">
-            <div class="title">Phase 2 · OPC UA &amp; S7</div>
-            <div class="sub" id="phase2StatusText">檢查中…</div>
-            <div class="actions" style="margin-top:0.65rem">
-              <button type="button" class="btn btn-primary btn-sm" id="enablePhase2Btn">啟用 Phase 2 服務</button>
-            </div>
-          </div>
-
-          <div class="devices-toolbar" id="devicesToolbar">
-            <div class="devices-toolbar-top">
-              <span id="devicesSummary" class="mono">載入中…</span>
-            </div>
-            <div class="devices-toolbar-actions">
-              <button type="button" class="btn btn-primary" id="toggleWizardBtn">＋ 新增設備</button>
-              <button type="button" class="btn btn-secondary btn-sm" id="diagSuiteBtn">連線診斷</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="refreshDevicesBtn">重新整理</button>
-            </div>
-          </div>
-
-          <div id="deviceWizard" class="card-ot device-wizard hidden">
-            <div class="title">新增 / 更新設備</div>
-            <div class="grid-2">
-              <label>協定
-                <select id="dwProtocol">
-                  <option value="modbus">Modbus TCP</option>
-                  <option value="mqtt">MQTT</option>
-                  <option value="opcua">OPC UA</option>
-                  <option value="s7">S7 / ISO-on-TCP</option>
-                </select>
-              </label>
-              <label>設備名稱
-                <input id="dwName" placeholder="plc-opcua-01" class="mono" />
-              </label>
-              <label>Host / 位址
-                <input id="dwHost" placeholder="192.168.1.50" class="mono" />
-              </label>
-              <label>Port
-                <input id="dwPort" type="number" placeholder="4840" class="mono" />
-              </label>
-              <label id="dwRackLabel" class="hidden">Rack
-                <input id="dwRack" type="number" value="0" class="mono" />
-              </label>
-              <label id="dwSlotLabel" class="hidden">Slot
-                <input id="dwSlot" type="number" value="1" class="mono" />
-              </label>
-              <label id="dwEndpointLabel" class="hidden col-span-2">OPC UA Endpoint（可選）
-                <input id="dwEndpoint" placeholder="opc.tcp://192.168.1.50:4840" class="mono" />
-              </label>
-              <label>輪詢間隔
-                <input id="dwInterval" value="10s" class="mono" />
-              </label>
-            </div>
-            <div class="actions">
-              <button type="button" class="btn btn-ghost btn-sm" id="dwProbeBtn">測試連線</button>
-              <button type="button" class="btn btn-primary btn-sm" id="dwSaveBtn">儲存並重載驅動</button>
-            </div>
-            <pre id="dwResult" class="mono muted" style="margin:0.5rem 0 0;font-size:0.8rem;white-space:pre-wrap"></pre>
-          </div>
-
-          <div id="diagResults" class="card-ot hidden" style="margin-top:0.75rem">
-            <div class="title">連線診斷</div>
-            <div id="diagResultsBody" class="traffic-list muted"></div>
-          </div>
-
-          <div class="card-ot" style="margin-top:0.75rem">
-            <div class="title">被動發現（Mirror + EdgeX）</div>
-            <div class="sub" id="discoverySummary">載入中…</div>
-            <div class="table-wrap" style="margin-top:0.5rem">
-              <table>
-                <thead>
-                  <tr><th>資產</th><th>IP</th><th>來源</th><th>EdgeX 設備</th><th>視窗封包</th></tr>
-                </thead>
-                <tbody id="discoveryRows"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="table-wrap" style="margin-top:0.75rem">
-            <div class="title" style="margin-bottom:0.5rem;color:var(--text-muted);font-size:0.82rem">EdgeX 已納管設備</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>設備</th>
-                  <th>協定</th>
-                  <th>Profile</th>
-                  <th>端點</th>
-                  <th>狀態</th>
-                  <th>最後遙測</th>
-                </tr>
-              </thead>
-              <tbody id="devicesRows"></tbody>
-            </table>
-          </div>
-
-          <div id="deviceDetail" class="card-ot device-detail hidden">
-            <div class="title">設備詳情 · <span id="deviceDetailName" class="mono"></span></div>
-            <div id="deviceReadings" class="traffic-list muted">選擇設備以載入點位</div>
-            <div class="actions">
-              <button type="button" class="btn btn-ghost btn-sm" id="deleteDeviceBtn">刪除 config 設備</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="tab-setup" class="page panel hidden">
-          <p class="hint">三步完成：感測器身分 → 連線 SenseL → 測試註冊</p>
-          <div class="wizard-steps">
-            <span class="step-pill active" data-step="1">1 感測器</span>
-            <span class="step-pill" data-step="2">2 SenseL</span>
-            <span class="step-pill" data-step="3">3 註冊</span>
-          </div>
-
-          <div id="wizardStep1">
-            <div class="grid-2">
-              <label>Sensor ID
-                <input id="wSensorId" placeholder="ot-edge-001" />
-              </label>
-              <label>Site ID
-                <input id="wSiteId" placeholder="factory-lab-001" />
-              </label>
-            </div>
-            <div class="actions">
-              <button type="button" class="btn btn-primary" data-next="2">下一步</button>
-            </div>
-          </div>
-
-          <div id="wizardStep2" class="hidden">
-            <div class="grid-2">
-              <label>SenseL API URL
-                <input id="wApiUrl" placeholder="http://192.168.1.108:8081" />
-                <span class="hint">Lab：若 108 連不到，可填 <code>http://192.168.1.123:8765</code>（本機 mock-sensel）</span>
-              </label>
-              <label>API Key
-                <input id="wApiKey" type="password" placeholder="ingest secret" />
-              </label>
-              <label>企業邀請碼 (Registration Token)
-                <input id="wInvite" type="password" placeholder="Avocado AI 邀請碼" autocomplete="off" />
-              </label>
-              <label>MQTT Host (Control Plane)
-                <input id="wMqttHost" placeholder="192.168.1.203" />
-              </label>
-            </div>
-            <div class="actions">
-              <button type="button" class="btn btn-ghost" data-next="1">上一步</button>
-              <button type="button" class="btn btn-secondary" id="pingSenselBtn">測試 SenseL 連線</button>
-              <button type="button" class="btn btn-primary" data-next="3">下一步</button>
-            </div>
-          </div>
-
-          <div id="wizardStep3" class="hidden">
-            <div class="card" id="wizardSummary"></div>
-            <div class="actions">
-              <button type="button" class="btn btn-ghost" data-next="2">上一步</button>
-              <button type="button" class="btn btn-primary" id="saveAndRegisterBtn">儲存並註冊</button>
-            </div>
-            <pre id="registerResult" class="card" style="margin-top:1rem; white-space:pre-wrap; font-size:0.85rem;"></pre>
-          </div>
-        </section>
-
-        <section id="tab-events" class="page panel hidden">
-          <p class="hint">來自本地 packet-sensor 偵測（security-events.jsonl）</p>
-          <div class="event-filters">
-            <label>嚴重度
-              <select id="eventFilterSeverity">
-                <option value="">全部</option>
-                <option value="critical">critical</option>
-                <option value="high">high</option>
-                <option value="medium">medium</option>
-                <option value="low">low</option>
-              </select>
-            </label>
-            <label>Rule 前綴
-              <input id="eventFilterRule" placeholder="OT-01" class="mono" />
-            </label>
-            <button type="button" class="btn btn-ghost btn-sm" id="eventFilterClear">清除篩選</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>時間</th><th>Rule</th><th>來源 / 設備</th><th>嚴重度</th><th>Purdue</th><th>描述</th></tr>
-              </thead>
-              <tbody id="eventsRows"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="tab-traffic" class="page panel hidden">
-          <div class="traffic-header">
-            <div>
-              <p class="hint" style="margin:0">Mirror 埠鏡像擷取 · packet-sensor 每秒更新</p>
-            </div>
-            <div class="traffic-status">
-              <span id="trafficLiveDot" class="status-dot unk"></span>
-              <span id="trafficLiveLabel" class="mono">連線中…</span>
-            </div>
-          </div>
-
-          <div id="labTrafficPanel" class="lab-traffic-panel card-ot hidden" style="margin-top:1rem">
-            <div class="lab-traffic-head">
-              <div>
-                <div class="title">Lab 流量模擬 <span class="lab-badge">僅 PoC</span></div>
-                <p class="hint lab-traffic-hint">本機 GOOSE/MMS publisher，非外部 SPAN。接真實 mirror 請用「僅 Mirror」並在進階改擷取介面。</p>
-              </div>
-            </div>
-            <div id="labTrafficCards" class="lab-traffic-cards"></div>
-            <div id="labTrafficPresets" class="lab-traffic-presets"></div>
-            <p id="labTrafficMsg" class="hint muted" style="margin:0.5rem 0 0"></p>
-          </div>
-
-          <div class="traffic-meta card-ot">
-            <div class="sub">
-              介面 <span id="trafficIface" class="mono">—</span>
-              · 後端 <span id="trafficBackend" class="mono">—</span>
-              · BPF <span id="trafficBpf" class="mono">—</span>
-            </div>
-          </div>
-
-          <div id="trafficMetrics" class="grid-4" style="margin-top:1rem"></div>
-
-          <div class="traffic-chart-wrap card-ot" style="margin-top:1rem">
-            <div class="title">Telemetry Flow · 封包速率 (pkt/s)</div>
-            <canvas id="trafficRateChart" width="900" height="120" aria-label="封包速率圖表"></canvas>
-          </div>
-
-          <div class="grid-2" style="margin-top:1rem">
-            <div class="card-ot">
-              <div class="title">視窗 Top MAC</div>
-              <div id="trafficTopMacs" class="traffic-list muted">尚無資料</div>
-            </div>
-            <div class="card-ot">
-              <div class="title">Top 來源 IP</div>
-              <div id="trafficTopIps" class="traffic-list muted">尚無資料</div>
-            </div>
-          </div>
-
-          <div class="table-wrap" style="margin-top:1rem">
-            <div class="title" style="margin-bottom:0.5rem;color:var(--text-muted);font-size:0.82rem">最近封包</div>
-            <table>
-              <thead>
-                <tr><th>時間</th><th>協定</th><th>來源 MAC</th><th>來源 IP</th><th>目的 IP</th><th>大小</th></tr>
-              </thead>
-              <tbody id="trafficRecentRows"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="tab-settings" class="page panel hidden">
-          <p class="hint">修改後請儲存，並重啟 Edge Agent / Packet Sensor 使設定生效。</p>
-
-          <p class="settings-section-title">SenseL 北向</p>
-          <div class="grid-2">
-            <label>MQTT Port
-              <input id="sMqttPort" type="number" value="1883" />
-            </label>
-            <label>TLS 驗證 SenseL
-              <select id="sVerifyTls">
-                <option value="false">關閉 (Lab)</option>
-                <option value="true">開啟</option>
-              </select>
-            </label>
-            <label>MQTT Tenant（唯讀）
-              <input id="sMqttTenant" readonly placeholder="註冊後自動填入" />
-            </label>
-          </div>
-
-          <p class="settings-section-title">擷取 (Packet Sensor)</p>
-          <div class="grid-2">
-            <label>擷取介面 (CAPTURE_INTERFACE)
-              <input id="sCaptureInterface" placeholder="eth0" />
-            </label>
-            <label class="col-span-2">BPF Filter
-              <input id="sCaptureBpf" placeholder="(ether proto 0x88b8) or (tcp port 102)" />
-            </label>
-          </div>
-
-          <p class="settings-section-title">Console</p>
-          <div class="grid-2">
-            <label>新密碼
-              <input id="sNewPassword" type="password" autocomplete="new-password" />
-            </label>
-            <label>確認新密碼
-              <input id="sNewPassword2" type="password" autocomplete="new-password" />
-            </label>
-          </div>
-
-          <p class="settings-section-title">安全審計</p>
-          <p class="hint">登入、改密、設備變更、容器重啟等操作寫入 <span class="mono">data/agent/console-audit.jsonl</span></p>
-          <div id="auditLogBox" class="card mono muted" style="font-size:0.8rem;max-height:160px;overflow:auto">載入中…</div>
-          <button type="button" class="btn btn-ghost btn-sm" id="refreshAuditBtn" style="margin-top:0.5rem">重新整理審計</button>
-
-          <div class="actions">
-            <button type="button" class="btn btn-primary" id="saveSettingsBtn">儲存設定</button>
-            <button type="button" class="btn btn-secondary" id="reloadCaptureBtn">重啟 Packet Sensor</button>
-          </div>
-        </section>
-      </main>
+      <main class="content" id="viewRoot"></main>
     </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/app.js?v=10"></script>
+  <script type="module" src="/assets/app.js?v=19"></script>
 </body>
 </html>

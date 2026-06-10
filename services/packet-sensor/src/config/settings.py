@@ -63,6 +63,9 @@ class FeaturesConfig(BaseModel):
 class DetectionConfig(BaseModel):
     policy_file: str = "/app/config/policy/baseline.json"
     rules_enabled: list[str] = Field(default_factory=list)
+    policy_path: str = "/app/data/agent/detection-policy.json"
+    policy_stamp_path: str = "/app/data/agent/detection-policy.stamp"
+    reload_check_sec: int = 5
 
 
 class IocConfig(BaseModel):
@@ -153,6 +156,18 @@ def load_config(path: Path | None = None) -> AppConfig:
     detection_raw.setdefault(
         "policy_file",
         os.environ.get("POLICY_FILE", "/app/config/policy/baseline.json"),
+    )
+    detection_raw.setdefault(
+        "policy_path",
+        os.environ.get("DETECTION_POLICY_PATH", "/app/data/agent/detection-policy.json"),
+    )
+    detection_raw.setdefault(
+        "policy_stamp_path",
+        os.environ.get("DETECTION_POLICY_STAMP_PATH", "/app/data/agent/detection-policy.stamp"),
+    )
+    detection_raw.setdefault(
+        "reload_check_sec",
+        int(os.environ.get("DETECTION_POLICY_RELOAD_SEC", detection_raw.get("reload_check_sec", 5))),
     )
 
     ioc_raw = expanded.get("ioc", {})

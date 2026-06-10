@@ -1,47 +1,94 @@
 :root {
+  /* SenseL EdgeX brand (AvocadoAI style guide) */
+  --bg-primary: #0b1220;
+  --bg-elevated: #111b2e;
+  --bg-hover: #162338;
+  --bg-sidebar: #0d1526;
+
+  --brand-purple: #3b1558;
+  --brand-forest: #1f5e2e;
+  --brand-lime: #d8f25a;
+  --brand-lime-dim: rgba(216, 242, 90, 0.12);
+  --brand-lime-glow: rgba(216, 242, 90, 0.45);
+
+  --text-primary: #ddeaf2;
+  --text-muted: #8fa3b8;
+  --border-subtle: rgba(221, 234, 242, 0.12);
+  --border-forest: rgba(31, 94, 46, 0.45);
+
+  --status-ok: #4ade80;
+  --status-warn: #fbbf24;
+  --status-alarm: #f87171;
+  --status-info: #38bdf8;   /* learning / syncing */
+  --status-off: #64748b;    /* disabled */
+
+  /* Legacy aliases (style.css + app.js) */
+  --bg: var(--bg-primary);
+  --surface: var(--bg-elevated);
+  --surface-2: var(--bg-hover);
+  --surface-panel: var(--bg-elevated);
+  --border: var(--border-subtle);
+  --border-ot: var(--border-forest);
+  --text: var(--text-primary);
+  --muted: var(--text-muted);
+  --accent: var(--brand-lime);
+  --accent-ot: var(--brand-lime);
+  --accent-ot-dim: var(--brand-lime-dim);
+  --success: var(--status-ok);
+  --warn: var(--status-warn);
+  --danger: var(--status-alarm);
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 72px;
+  --header-height: 60px;
+
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono-id: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+
   /* Purdue layer palette */
   --purdue-l0: #64748b;
   --purdue-l1: #94a3b8;
-  --purdue-l2: #14b8a6;
+  --purdue-l2: var(--brand-lime);
   --purdue-l3: #38bdf8;
   --purdue-l4: #a78bfa;
   --purdue-l5: #f87171;
-
-  --mono-id: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
-  --status-ok: #14b8a6;
-  --status-warn: #f59e0b;
-  --status-alarm: #ef4444;
-
-  --surface-panel: #0f1419;
-  --border-ot: #2a3544;
-  --accent-ot: #14b8a6;
-  --accent-ot-dim: rgba(20, 184, 166, 0.15);
 }
 
 .card-ot {
-  background: var(--surface-panel);
-  border: 1px solid var(--border-ot);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-forest);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
   min-height: 5.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card-ot:hover {
+  border-color: rgba(216, 242, 90, 0.25);
+  box-shadow: 0 0 24px rgba(59, 21, 88, 0.15);
 }
 
 .card-ot .title {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
   margin-bottom: 0.35rem;
+  font-weight: 500;
 }
 
 .card-ot .value {
   font-size: 0.95rem;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .card-ot .sub {
   font-size: 0.8rem;
-  color: var(--muted);
+  color: var(--text-muted);
   margin-top: 0.35rem;
 }
 
@@ -56,9 +103,9 @@
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
-  background: var(--accent-ot-dim);
-  color: var(--accent-ot);
-  border: 1px solid rgba(20, 184, 166, 0.35);
+  background: var(--brand-lime-dim);
+  color: var(--brand-lime);
+  border: 1px solid rgba(216, 242, 90, 0.35);
 }
 
 .sev-high td:first-child { border-left: 3px solid var(--status-alarm); }
@@ -69,23 +116,31 @@
 .rule-chip {
   font-family: var(--mono-id);
   font-size: 0.8rem;
-  background: rgba(20, 184, 166, 0.12);
-  padding: 0.1rem 0.4rem;
+  background: var(--brand-lime-dim);
+  color: var(--brand-lime);
+  padding: 0.12rem 0.45rem;
   border-radius: 4px;
+  border: 1px solid rgba(216, 242, 90, 0.2);
 }
 
-.topbar .logo {
-  background: linear-gradient(135deg, var(--accent-ot), #0d9488);
-}
-
-.tab.active {
-  border-color: var(--accent-ot);
-  color: var(--accent-ot);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent-ot), #0d9488);
-}
-
-.status-dot.ok { background: var(--status-ok); }
+.status-dot.ok { background: var(--status-ok); box-shadow: 0 0 8px rgba(74, 222, 128, 0.55); }
 .status-dot.bad { background: var(--status-alarm); }
+.status-dot.unk { background: var(--status-warn); }
+
+/* Unified 5-state status system (green/yellow/red/blue/gray) */
+.status-dot.green  { background: var(--status-ok); box-shadow: 0 0 8px rgba(74, 222, 128, 0.55); }
+.status-dot.yellow { background: var(--status-warn); }
+.status-dot.red    { background: var(--status-alarm); box-shadow: 0 0 8px rgba(248, 113, 113, 0.45); }
+.status-dot.blue   { background: var(--status-info); box-shadow: 0 0 8px rgba(56, 189, 248, 0.45); }
+.status-dot.gray   { background: var(--status-off); }
+
+.traffic-rate-big {
+  font-size: 1.85rem;
+  font-weight: 700;
+  font-family: var(--mono-id);
+  color: var(--brand-lime);
+  text-shadow: 0 0 20px var(--brand-lime-glow);
+}
+
+.proto-goose { color: var(--status-warn); }
+.proto-mms { color: var(--brand-lime); }

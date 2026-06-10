@@ -2,65 +2,42 @@
 
 from __future__ import annotations
 
-import json
 import os
-import socket
-from datetime import datetime, timezone
+import time
 from pathlib import Path
 from typing import Any
 
+from src.agent_runtime import load_agent_runtime, northbound_mqtt_ok
 from src.config_store import ConfigStore, PlatformConfig
+from src.events_index import scan_events_stats
+from src.traffic_service import read_live_traffic
+
+_PING_CACHE_TTL_SEC = 30.0
+_ping_cache: dict[str, Any] = {"at": 0.0, "ok": False, "url": ""}
 
 
-def _read_jsonl_tail(path: Path, limit: int = 5) -> list[dict[str, Any]]:
-    if not path.is_file():
-        return []
-    lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    events: list[dict[str, Any]] = []
-    for line in reversed(lines[-500:]):
-        try:
-            events.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-        if len(events) >= limit:
-            break
-    return events
-
-
-def _tcp_reachable(host: str, port: int, timeout: float = 2.0) -> bool:
-    if not host:
+def _cached_sensel_ping(config: PlatformConfig) -> bool:
+    url = (config.sensel_api_url or "").strip()
+    if not url:
         return False
+    now = time.monotonic()
+    if (
+        _ping_cache["url"] == url
+        and (now - float(_ping_cache["at"])) < _PING_CACHE_TTL_SEC
+    ):
+        return bool(_ping_cache["ok"])
+    ok = False
     try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+        from src.sensel_api import ping_sensel
 
-
-def _rule_counts_24h(events_path: Path) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    if not events_path.is_file():
-        return counts
-    cutoff = datetime.now(timezone.utc).timestamp() - 86400
-    for line in events_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            ev = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        ts = ev.get("timestamp") or ev.get("detected_at") or ""
-        try:
-            if ts.endswith("Z"):
-                ts = ts.replace("Z", "+00:00")
-            dt = datetime.fromisoformat(ts)
-            if dt.timestamp() < cutoff:
-                continue
-        except ValueError:
-            continue
-        rid = str(ev.get("rule_id") or ev.get("event_class") or "unknown").upper()
-        counts[rid] = counts.get(rid, 0) + 1
-    return counts
+        ping_sensel(config)
+        ok = True
+    except Exception:
+        ok = False
+    _ping_cache["url"] = url
+    _ping_cache["ok"] = ok
+    _ping_cache["at"] = now
+    return ok
 
 
 def _baseline_stats() -> dict[str, Any]:
@@ -72,6 +49,8 @@ def _baseline_stats() -> dict[str, Any]:
     if not baseline_path.is_file():
         return {"loaded": False, "assets": 0, "comm_pairs": 0}
     try:
+        import json
+
         data = json.loads(baseline_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {"loaded": False, "assets": 0, "comm_pairs": 0}
@@ -84,52 +63,83 @@ def _baseline_stats() -> dict[str, Any]:
     }
 
 
+def _policy_gauge(
+    config: PlatformConfig,
+    baseline: dict[str, Any],
+    events_24h: int,
+    traffic: dict[str, Any],
+    *,
+    mqtt_ok: bool,
+) -> dict[str, Any]:
+    score = 0
+    factors: list[str] = []
+    if baseline.get("loaded"):
+        score += 35
+        factors.append("baseline")
+    if config.last_register_ok is True:
+        score += 30
+        factors.append("registered")
+    elif config.configured:
+        score += 10
+        factors.append("configured")
+    if traffic.get("live"):
+        score += 20
+        factors.append("telemetry")
+    m = traffic.get("metrics") or {}
+    if int(m.get("ioc_entries") or 0) > 0:
+        score += 10
+        factors.append("ioc")
+    if mqtt_ok and config.mqtt_enabled:
+        score += 5
+        factors.append("mqtt")
+    if events_24h > 50:
+        score = max(0, score - 10)
+        factors.append("high_events")
+    percent = min(100, score)
+    return {
+        "percent": percent,
+        "factors": factors,
+        "label": "合規" if percent >= 85 else "部分就緒" if percent >= 50 else "待設定",
+    }
+
+
 def build_status(store: ConfigStore) -> dict[str, Any]:
     config = store.load()
     assets_dir = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
     events_path = assets_dir / "security-events.jsonl"
 
-    recent = _read_jsonl_tail(events_path, limit=8)
-    events_24h = 0
-    if events_path.is_file():
-        cutoff = datetime.now(timezone.utc).timestamp() - 86400
-        for line in events_path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                ev = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            ts = ev.get("timestamp") or ev.get("detected_at") or ""
-            try:
-                if ts.endswith("Z"):
-                    ts = ts.replace("Z", "+00:00")
-                dt = datetime.fromisoformat(ts)
-                if dt.timestamp() >= cutoff:
-                    events_24h += 1
-            except ValueError:
-                pass
-
-    mqtt_ok = _tcp_reachable(config.mqtt_host, config.mqtt_port) if config.mqtt_enabled else None
-    sensel_ok = False
-    if config.sensel_api_url:
-        try:
-            from src.sensel_api import ping_sensel
-
-            ping_sensel(config)
-            sensel_ok = True
-        except Exception:
-            sensel_ok = False
-
-    rule_counts = _rule_counts_24h(events_path)
-    top_rules = sorted(rule_counts.items(), key=lambda x: -x[1])[:5]
+    stats = scan_events_stats(events_path, recent_limit=8)
+    runtime = load_agent_runtime()
+    mqtt_ok, mqtt_detail = northbound_mqtt_ok(
+        config.mqtt_enabled,
+        config.mqtt_host,
+        config.mqtt_port,
+        runtime,
+    )
+    sensel_ok = _cached_sensel_ping(config)
+    top_rules = sorted(stats.rule_counts_24h.items(), key=lambda x: -x[1])[:5]
     baseline = _baseline_stats()
+    traffic = read_live_traffic(store)
+    tm = traffic.get("metrics") or {}
+    policy = _policy_gauge(
+        config,
+        baseline,
+        stats.events_24h,
+        traffic,
+        mqtt_ok=mqtt_ok,
+    )
+
+    tenant_id = (
+        config.last_register_tenant_id
+        or config.mqtt_tenant_id
+        or str(runtime.get("tenant_id") or "")
+    )
 
     return {
         "configured": config.configured,
         "sensor_id": config.sensor_id,
         "site_id": config.site_id,
-        "tenant_id": config.last_register_tenant_id or config.mqtt_tenant_id,
+        "tenant_id": tenant_id,
         "cards": {
             "sensel": {
                 "label": "SenseL Platform",
@@ -138,18 +148,21 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
             },
             "registration": {
                 "label": "感測器註冊",
-                "ok": config.last_register_ok is True,
-                "detail": config.last_register_tenant_id or config.last_register_error or "尚未註冊",
+                "ok": config.last_register_ok is True or bool(runtime.get("registered")),
+                "detail": config.last_register_tenant_id
+                or config.last_register_error
+                or runtime.get("last_error")
+                or "尚未註冊",
             },
             "mqtt": {
                 "label": "北向 MQTT",
-                "ok": mqtt_ok,
-                "detail": f"{config.mqtt_host}:{config.mqtt_port}" if config.mqtt_enabled else "已停用",
+                "ok": mqtt_ok if config.mqtt_enabled else None,
+                "detail": mqtt_detail if config.mqtt_enabled else "已停用",
             },
             "capture": {
                 "label": "事件擷取",
                 "ok": events_path.is_file(),
-                "detail": f"24h {events_24h} 筆" if events_path.is_file() else "等待首筆事件",
+                "detail": f"24h {stats.events_24h} 筆" if events_path.is_file() else "等待首筆事件",
             },
             "baseline": {
                 "label": "Baseline",
@@ -161,14 +174,30 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
                 ),
             },
         },
+        "northbound": {
+            "mqtt_connected": bool(runtime.get("mqtt_connected")),
+            "last_mqtt_publish_at": runtime.get("last_mqtt_publish_at"),
+            "agent_updated_at": runtime.get("updated_at"),
+            "registered": bool(runtime.get("registered")),
+            "last_error": runtime.get("last_error"),
+        },
         "metrics": {
-            "events_24h": events_24h,
-            "recent_events": recent,
-            "rule_counts_24h": rule_counts,
+            "events_24h": stats.events_24h,
+            "recent_events": stats.recent_events,
+            "rule_counts_24h": stats.rule_counts_24h,
             "top_rules_24h": top_rules,
             "baseline": baseline,
             "capture_interface": config.capture_interface or os.environ.get("CAPTURE_INTERFACE", ""),
             "capture_bpf": config.capture_bpf_filter or "",
+            "policy_gauge": policy,
+            "telemetry": {
+                "live": traffic.get("live") is True,
+                "instant_rate": tm.get("instant_rate", 0),
+                "unique_ips": tm.get("unique_ips", 0),
+                "unique_macs": tm.get("unique_macs", 0),
+                "goose_messages": tm.get("goose_messages", 0),
+                "ioc_entries": tm.get("ioc_entries", 0),
+            },
         },
-        "last_register_at": config.last_register_at,
+        "last_register_at": config.last_register_at or runtime.get("last_register_at"),
     }

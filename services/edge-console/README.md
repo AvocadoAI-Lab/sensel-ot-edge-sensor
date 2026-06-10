@@ -19,6 +19,7 @@ Lab：`http://192.168.1.123:8090`
 | **設備與協定** | 協定矩陣 · **被動發現** · 新增設備精靈 · EdgeX 設備表 |
 | **設定精靈** | 感測器身分、SenseL 註冊、企業邀請碼 |
 | **安全事件** | 本地 JSONL · **來源 IP / 關聯 EdgeX 設備** |
+| **偵測政策** | **唯讀** — 目前套用的 `rules_enabled`、MMS 白名單（來自 Portal MQTT） |
 | **即時流量** | Mirror 鏡像每秒更新 |
 | **進階** | 北向、擷取、Console 密碼、**審計 log** |
 
@@ -71,6 +72,7 @@ docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
 | 路徑 | 說明 |
 |------|------|
 | `GET /api/status` | 總覽（含 `policy_gauge`、`telemetry`、`northbound` agent 快照） |
+| `GET /api/detection-policy/applied` | 唯讀：目前套用的 OT 偵測政策（`detection-policy.json`） |
 | `GET /api/edgex/discovery` | Mirror + EdgeX 資產合併 |
 | `GET /api/events/recent` | 事件（含 `matched_device`） |
 | `GET /api/audit/recent` | 審計記錄 |
@@ -90,6 +92,7 @@ PLATFORM_CONFIG_PATH=/tmp/platform.json ASSETS_DIR=../../data/assets \
 ```bash
 EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-edgex.sh
 EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-traffic.sh
+EDGE_CONSOLE_URL=http://192.168.1.123:8090 ./scripts/verify-edge-console-detection-policy.sh
 ```
 
 ## Lab 流量控制（草案）

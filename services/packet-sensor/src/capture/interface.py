@@ -103,6 +103,9 @@ class CaptureSession:
             ioc_stamp_path=config.ioc.stamp_path,
             ioc_cooldown_sec=config.ioc.cooldown_sec,
             ioc_reload_check_sec=config.ioc.reload_check_sec,
+            detection_policy_path=config.detection.policy_path,
+            detection_policy_stamp_path=config.detection.policy_stamp_path,
+            detection_policy_reload_sec=config.detection.reload_check_sec,
         )
 
     @property

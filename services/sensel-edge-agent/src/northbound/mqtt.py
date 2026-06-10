@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from src.config.settings import NorthboundMqttConfig, SensorIdentity
 from src.northbound.topics import events_topic, state_topic
+from src.runtime.agent_snapshot import write_agent_runtime
 
 logger = logging.getLogger(__name__)
+
+_RECONNECT_MIN_SEC = 2.0
+_RECONNECT_MAX_SEC = 60.0
 
 
 def _utc_now_iso() -> str:
@@ -23,10 +28,16 @@ class NorthboundMqttClient:
         self._cfg = mqtt_config
         self._sensor = sensor
         self._client = None
+        self._lock = threading.Lock()
+        self._connected = False
 
     @property
     def enabled(self) -> bool:
         return self._cfg.enabled and bool(self._cfg.host)
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
 
     def update_tenant_id(self, tenant_id: str) -> None:
         tid = (tenant_id or "").strip()
@@ -34,32 +45,98 @@ class NorthboundMqttClient:
             self._cfg.tenant_id = tid
             logger.info("Northbound MQTT tenant_id updated to %s", tid)
 
-    def _ensure_client(self):
+    def _on_connect(
+        self,
+        client: Any,
+        userdata: Any,
+        flags: Any,
+        reason_code: Any,
+        properties: Any = None,
+    ) -> None:
+        if getattr(reason_code, "is_failure", False) or (
+            isinstance(reason_code, int) and reason_code != 0
+        ):
+            self._connected = False
+            logger.warning("Northbound MQTT connect refused rc=%s", reason_code)
+            return
+        self._connected = True
+        logger.info(
+            "Northbound MQTT connected to %s:%s",
+            self._cfg.host,
+            self._cfg.port,
+        )
+        write_agent_runtime(
+            mqtt_connected=True,
+            tenant_id=self._cfg.tenant_id,
+            last_error="",  # clear stale error once the bus is back up
+        )
+
+    def _on_disconnect(
+        self,
+        client: Any,
+        userdata: Any,
+        disconnect_flags: Any,
+        reason_code: Any,
+        properties: Any = None,
+    ) -> None:
+        self._connected = False
+        logger.warning("Northbound MQTT disconnected rc=%s", reason_code)
+        write_agent_runtime(mqtt_connected=False)
+        # Keep the client object alive: paho's network loop auto-reconnects in
+        # the background (see reconnect_delay_set). We deliberately do NOT tear
+        # it down and re-connect synchronously from the main loop, which is what
+        # previously hung the agent for minutes when the host IP/route changed
+        # and the stale socket black-holed.
+
+    def _disconnect_locked(self) -> None:
+        client = self._client
+        self._client = None
+        self._connected = False
+        if client is None:
+            return
+        try:
+            client.loop_stop()
+            client.disconnect()
+        except Exception:
+            logger.exception("Northbound MQTT disconnect failed")
+
+    def _ensure_client(self) -> Any | None:
         if not self.enabled:
             return None
-        if self._client is not None:
-            return self._client
-        try:
-            import paho.mqtt.client as mqtt
+        with self._lock:
+            if self._client is not None:
+                return self._client
+            try:
+                import paho.mqtt.client as mqtt
 
-            client_id = f"ot-edge-{self._sensor.id}-{uuid.uuid4().hex[:8]}"
-            self._client = mqtt.Client(
-                mqtt.CallbackAPIVersion.VERSION2,
-                client_id=client_id,
-            )
-            if self._cfg.username:
-                self._client.username_pw_set(self._cfg.username, self._cfg.password or None)
-            self._client.connect(self._cfg.host, self._cfg.port, keepalive=60)
-            self._client.loop_start()
-            logger.info(
-                "Northbound MQTT connected to %s:%s",
-                self._cfg.host,
-                self._cfg.port,
-            )
-        except Exception:
-            logger.exception("Northbound MQTT connect failed")
-            self._client = None
-        return self._client
+                client_id = f"ot-edge-{self._sensor.id}-{uuid.uuid4().hex[:8]}"
+                client = mqtt.Client(
+                    mqtt.CallbackAPIVersion.VERSION2,
+                    client_id=client_id,
+                )
+                client.on_connect = self._on_connect
+                client.on_disconnect = self._on_disconnect
+                if self._cfg.username:
+                    client.username_pw_set(self._cfg.username, self._cfg.password or None)
+                client.reconnect_delay_set(
+                    min_delay=int(_RECONNECT_MIN_SEC),
+                    max_delay=int(_RECONNECT_MAX_SEC),
+                )
+                # connect_async + loop_start keeps the initial connect AND every
+                # reconnect on paho's background thread, so a dead route can
+                # never stall the agent main loop.
+                client.connect_async(self._cfg.host, self._cfg.port, keepalive=60)
+                client.loop_start()
+                self._client = client
+                logger.info(
+                    "Northbound MQTT client started host=%s port=%s",
+                    self._cfg.host,
+                    self._cfg.port,
+                )
+            except Exception:
+                logger.exception("Northbound MQTT client start failed")
+                self._client = None
+            return self._client
 
     def _envelope(self, message_type: str, payload: dict[str, Any], observed_at: str = "") -> dict:
         return {
@@ -81,6 +158,10 @@ class NorthboundMqttClient:
         client = self._ensure_client()
         if client is None:
             return False
+        if not self._connected:
+            # Background thread is still (re)connecting; skip this publish
+            # without blocking. Callers fall back to HTTP / buffering.
+            return False
         qos = self._cfg.qos_events if qos is None else qos
         try:
             info = client.publish(topic, json.dumps(body, ensure_ascii=False), qos=qos)
@@ -88,6 +169,11 @@ class NorthboundMqttClient:
             if info.rc != 0 or (qos > 0 and not info.is_published()):
                 logger.warning("MQTT publish not confirmed topic=%s rc=%s", topic, info.rc)
                 return False
+            write_agent_runtime(
+                mqtt_connected=True,
+                tenant_id=self._cfg.tenant_id,
+                last_mqtt_publish_at=_utc_now_iso(),
+            )
             return True
         except Exception:
             logger.exception("MQTT publish failed topic=%s", topic)
@@ -121,10 +207,5 @@ class NorthboundMqttClient:
         return self.publish_json(topic, body, qos=1)
 
     def close(self) -> None:
-        if self._client is not None:
-            try:
-                self._client.loop_stop()
-                self._client.disconnect()
-            except Exception:
-                logger.exception("Northbound MQTT disconnect failed")
-            self._client = None
+        with self._lock:
+            self._disconnect_locked()

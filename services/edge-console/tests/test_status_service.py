@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 from src.config_store import ConfigStore
-from src.status_service import build_status, _rule_counts_24h
+from src.events_index import scan_events_stats
+from src.status_service import build_status
 
 
 def test_rule_counts_24h(tmp_path: Path):
@@ -16,8 +17,8 @@ def test_rule_counts_24h(tmp_path: Path):
         + json.dumps({"rule_id": "OT-016", "timestamp": "2099-01-01T01:00:00+00:00"}) + "\n",
         encoding="utf-8",
     )
-    counts = _rule_counts_24h(events)
-    assert counts.get("OT-016") == 2
+    stats = scan_events_stats(events)
+    assert stats.rule_counts_24h.get("OT-016") == 2
 
 
 def test_build_status_includes_baseline_card(tmp_path: Path, monkeypatch):

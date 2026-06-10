@@ -12,6 +12,12 @@
 | `health/` | Pi 資源、擷取統計、服務狀態 |
 | `upload/` | 離線緩衝與重試上傳（NFR-3） |
 
+## 連線韌性（S5 / 階段 2）
+
+- **註冊重試**：未成功 `register` 前，每 `REGISTER_RETRY_SEC`（預設 60，或 `sensel.retry.backoff_sec`）重試；成功後更新 MQTT `tenant_id` 並發布 `state`。
+- **北向 MQTT**：斷線或 publish 失敗時指數退避重連（2s～60s）；`on_disconnect` 觸發重建連線。
+- **Policy MQTT**（可選）：`reconnect_delay_set` + 主迴圈 `ensure_connected()`。
+
 ## API 端點
 
 - `POST /api/v1/edge-sensors/register`

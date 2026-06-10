@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -32,12 +32,19 @@ from src.lab_traffic_service import apply_lab_traffic_action, build_lab_traffic_
 from src.edgex_service import (
     build_platform,
     build_protocol_matrix,
+    container_logs,
     get_device_readings,
     list_devices,
     restart_edgex_container,
+    start_edgex_container,
 )
 from src.audit_service import log_audit, read_audit_recent
+from src.detection_policy_service import build_applied_detection_policy
+from src import baseline_service
+from src import asset_probe_service
 from src.discovery_service import build_discovery, build_ip_device_map, enrich_events
+from src.network_service import collect_interfaces, set_interface_state
+from src import wifi_service
 from src.edgex_config_service import (
     delete_config_device,
     enable_phase2_services,
@@ -54,6 +61,19 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 store = ConfigStore()
 
 app = FastAPI(title="SenseL Edge Console", version=APP_VERSION)
+
+
+@app.middleware("http")
+async def _revalidate_static_assets(request: Request, call_next):
+    """Force browsers to revalidate JS/CSS/HTML so deploys take effect without
+    a manual hard refresh. ``no-cache`` keeps the cached copy but requires an
+    ETag/Last-Modified revalidation (cheap 304 when unchanged), avoiding stale
+    ES module subresources (e.g. /assets/pages/ops.js) after an update."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".js", ".css", ".html")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 class LoginBody(BaseModel):
@@ -105,6 +125,28 @@ class LabTrafficActionBody(BaseModel):
     action: Optional[str] = Field(None, max_length=16)
     targets: Optional[list[str]] = None
     preset: Optional[str] = Field(None, max_length=32)
+
+
+class InterfaceStateBody(BaseModel):
+    up: bool
+
+
+class WifiRadioBody(BaseModel):
+    on: bool
+
+
+class WifiConnectBody(BaseModel):
+    ssid: str = Field(..., max_length=64)
+    password: Optional[str] = Field(None, max_length=128)
+    iface: Optional[str] = Field(None, max_length=16)
+
+
+class WifiDisconnectBody(BaseModel):
+    iface: Optional[str] = Field(None, max_length=16)
+
+
+class WifiPrimaryBody(BaseModel):
+    iface: str = Field(..., max_length=16)
 
 
 @app.get("/api/health")
@@ -180,6 +222,200 @@ def put_config(body: ConfigPatch, _: None = Depends(require_session)) -> dict[st
 @app.get("/api/status")
 def get_status(_: None = Depends(require_session)) -> dict[str, Any]:
     return build_status(store)
+
+
+@app.get("/api/network/interfaces")
+def network_interfaces(_: None = Depends(require_session)) -> dict[str, Any]:
+    cfg = store.load()
+    return collect_interfaces(capture_interface=cfg.capture_interface)
+
+
+@app.post("/api/network/interfaces/{name}/state")
+def network_interface_state(
+    name: str,
+    body: InterfaceStateBody,
+    _: None = Depends(require_session),
+) -> dict[str, Any]:
+    cfg = store.load()
+    result = set_interface_state(name, body.up, capture_interface=cfg.capture_interface)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("network.interface_state", {"name": name, "up": body.up})
+    return result
+
+
+@app.get("/api/network/wifi")
+def network_wifi(rescan: bool = False, _: None = Depends(require_session)) -> dict[str, Any]:
+    return wifi_service.status(rescan=rescan)
+
+
+@app.post("/api/network/wifi/radio")
+def network_wifi_radio(body: WifiRadioBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = wifi_service.set_radio(body.on)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("network.wifi_radio", {"on": body.on})
+    return result
+
+
+@app.post("/api/network/wifi/connect")
+def network_wifi_connect(body: WifiConnectBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = wifi_service.connect(body.ssid, body.password, body.iface)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    # Never log the password.
+    log_audit("network.wifi_connect", {"ssid": body.ssid, "iface": body.iface})
+    return result
+
+
+@app.post("/api/network/wifi/disconnect")
+def network_wifi_disconnect(body: WifiDisconnectBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = wifi_service.disconnect(body.iface)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("network.wifi_disconnect", {"iface": body.iface})
+    return result
+
+
+@app.post("/api/network/wifi/primary")
+def network_wifi_primary(body: WifiPrimaryBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = wifi_service.set_primary(body.iface)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("network.wifi_primary", {"iface": body.iface})
+    return result
+
+
+@app.get("/api/detection-policy/applied")
+def detection_policy_applied(_: None = Depends(require_session)) -> dict[str, Any]:
+    return build_applied_detection_policy()
+
+
+# --- Baseline lifecycle (MVP-1: pcap → candidate → approve / rollback) ------
+
+
+class BaselineRollbackBody(BaseModel):
+    version: str = Field(..., max_length=64)
+
+
+@app.get("/api/baseline")
+def baseline_state(_: None = Depends(require_session)) -> dict[str, Any]:
+    return baseline_service.get_state()
+
+
+@app.get("/api/baseline/candidate")
+def baseline_candidate(_: None = Depends(require_session)) -> dict[str, Any]:
+    cand = baseline_service.get_candidate()
+    if cand is None:
+        raise HTTPException(status_code=404, detail="尚無候選 baseline")
+    return cand
+
+
+@app.post("/api/baseline/learn")
+async def baseline_learn(
+    request: Request,
+    filename: str = "capture.pcap",
+    limit: int = 0,
+    _: None = Depends(require_session),
+) -> dict[str, Any]:
+    # Stream the upload straight to disk so RAM stays flat regardless of size.
+    max_bytes = baseline_service.max_pcap_bytes()
+    host_pcap, fname = baseline_service.upload_target(filename)
+    written = 0
+    try:
+        with open(host_pcap, "wb") as fh:
+            async for chunk in request.stream():
+                if not chunk:
+                    continue
+                written += len(chunk)
+                if written > max_bytes:
+                    raise HTTPException(status_code=413, detail=f"pcap 超過 {max_bytes // 1024 // 1024}MB 上限")
+                fh.write(chunk)
+    except HTTPException:
+        host_pcap.unlink(missing_ok=True)
+        raise
+    except Exception:
+        host_pcap.unlink(missing_ok=True)
+        raise
+    if written == 0:
+        host_pcap.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="空的 pcap 內容")
+
+    result = baseline_service.run_learn(fname, limit=limit)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("baseline.learn", {
+        "filename": filename, "bytes": written,
+        "auto_limited": result.get("auto_limited"),
+        "stats": result.get("candidate", {}).get("stats", {}),
+    })
+    return result
+
+
+@app.post("/api/baseline/approve")
+def baseline_approve(_: None = Depends(require_session)) -> dict[str, Any]:
+    result = baseline_service.approve_candidate()
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("baseline.approve", {"version": result.get("version")})
+    return result
+
+
+@app.post("/api/baseline/rollback")
+def baseline_rollback(body: BaselineRollbackBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = baseline_service.rollback(body.version)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("baseline.rollback", {"from": body.version, "version": result.get("version")})
+    return result
+
+
+class AssetIdentityBody(BaseModel):
+    ip: str = Field(..., max_length=64)
+    vendor: Optional[str] = Field(None, max_length=128)
+    model: Optional[str] = Field(None, max_length=128)
+    firmware: Optional[str] = Field(None, max_length=128)
+
+
+class AssetProbeBody(BaseModel):
+    ip: str = Field(..., max_length=64)
+
+
+@app.get("/api/assets/inventory")
+def assets_inventory(_: None = Depends(require_session)) -> dict[str, Any]:
+    return asset_probe_service.get_inventory()
+
+
+@app.put("/api/assets/identity")
+def assets_identity(body: AssetIdentityBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = asset_probe_service.set_identity(body.ip, vendor=body.vendor, model=body.model, firmware=body.firmware)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("assets.identity_set", {"ip": body.ip})
+    return result
+
+
+@app.post("/api/assets/probe")
+def assets_probe(body: AssetProbeBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = asset_probe_service.probe(body.ip)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("assets.probe", {"ip": body.ip, "reachable": result.get("probe", {}).get("reachable")})
+    return result
+
+
+@app.get("/api/baseline/drift")
+def baseline_drift(_: None = Depends(require_session)) -> dict[str, Any]:
+    return baseline_service.compute_drift()
+
+
+@app.post("/api/baseline/approve-drift")
+def baseline_approve_drift(_: None = Depends(require_session)) -> dict[str, Any]:
+    result = baseline_service.approve_drift()
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 500)), detail=result.get("error"))
+    log_audit("baseline.approve_drift", {"version": result.get("version")})
+    return result
 
 
 @app.get("/api/traffic/live")
@@ -293,6 +529,27 @@ def edgex_restart_container(container: str, _: None = Depends(require_session)) 
         raise HTTPException(status_code=400 if "not allowed" in detail.lower() else 503, detail=detail)
     log_audit("docker.restart", {"container": container})
     return {"ok": True, "message": detail}
+
+
+@app.post("/api/edgex/actions/start/{container}")
+def edgex_start_container(container: str, _: None = Depends(require_session)) -> dict[str, Any]:
+    ok, detail = start_edgex_container(container)
+    if not ok:
+        raise HTTPException(status_code=400 if "not allowed" in detail.lower() else 503, detail=detail)
+    log_audit("docker.start", {"container": container})
+    return {"ok": True, "message": detail}
+
+
+@app.get("/api/edgex/actions/logs/{container}")
+def edgex_container_logs(
+    container: str,
+    tail: int = 200,
+    _: None = Depends(require_session),
+) -> dict[str, Any]:
+    ok, text = container_logs(container, tail=tail)
+    if not ok:
+        raise HTTPException(status_code=400 if "not allowed" in text.lower() else 503, detail=text)
+    return {"ok": True, "container": container, "logs": text}
 
 
 @app.get("/api/edgex/config/devices")

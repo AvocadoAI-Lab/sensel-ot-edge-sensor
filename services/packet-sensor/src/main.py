@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 
+from src.baseline.snapshot import write_live_observed
 from src.capture.interface import CaptureSession
 from src.config.settings import load_config
 from src.live_stats import LiveStatsTracker, write_live_stats
@@ -73,6 +74,7 @@ def main() -> int:
         int(os.environ.get("LIVE_STATS_INTERVAL_SEC", "1")),
     )
     feature_interval = config.features.window_sec
+    live_observe_window = max(0, int(os.environ.get("LIVE_OBSERVE_WINDOW_SEC", "900")))
     ticks_since_feature = 0
     ticks_since_log = 0
     live_tracker = LiveStatsTracker()
@@ -105,6 +107,15 @@ def main() -> int:
             ticks_since_feature += live_interval
             if ticks_since_feature >= feature_interval:
                 session.pipeline.flush_features()
+                try:
+                    write_live_observed(
+                        session.pipeline.live_baseline_snapshot(
+                            window_sec=live_observe_window or None
+                        ),
+                        config.features.assets_dir,
+                    )
+                except Exception:
+                    logger.debug("live baseline snapshot write failed", exc_info=True)
                 ticks_since_feature = 0
             for _ in range(live_interval):
                 if _shutdown or capture_error:
