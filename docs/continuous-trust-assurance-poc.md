@@ -465,8 +465,21 @@ Trust Engine 同時建立**攻擊者實體 `ip:192.168.1.153`（Kali via NAT）*
 - [x] ~~在邊緣/MQTT 層做覆蓋率計數~~ → **已完成並驗證（§9.12）**
 - [x] ~~CP 側接 `coverage/v1`：`layera-mqtt-bridge` topic map + 消費端聚合 `cta.coverage.v1`~~ → **已完成並驗證（§9.13）**
 - [x] ~~Portal CTA 覆蓋率熱圖 + gap 清單~~ → **已完成（§9.13 Portal UI）**
-- [ ] （可選）將 `event_ingestion.py` hardening 同步部署到 `.108`
-- [ ] demo 完還原：`.124` BPF 視需要放回；`layerb-worker` 已自然重新累積信任
+- [x] ~~（可選）將 `event_ingestion.py` hardening 同步部署到 `.108`~~ → **已完成（2026-06-13）**：`deploy_docker_compose.sh` 全量部署後容器內 `ingest_ot_security_event` 已為穩健 `inner_map.get("src_ip")` 寫法（實測 `hardened`）。
+- [x] ~~demo 完還原：`.124` BPF 視需要放回；`layerb-worker` 已自然重新累積信任~~ → **已完成（2026-06-13）**：
+  - `.124` `CAPTURE_BPF_FILTER` 還原為正式預設 `(ether proto 0x88b8) or (tcp port 102)`，`sensel-packet-sensor` 已重啟。
+  - `.203` `docker restart layerb-worker` 重置 `InMemoryTrustStore`（全實體 trust 回 1.0）；CTA 聚合器 trust/investigate 需等新一輪 edge coverage 或換 consumer group 重建（見 §9.13 已知考量）。
+
+### 9.15 部署收斂驗證紀錄（2026-06-13）
+
+| 步驟 | 結果 |
+|------|------|
+| `.108` `deploy_docker_compose.sh` + alembic | ✅ SMB portal build + API 重啟 |
+| `.108` `event_ingestion.py` hardening | ✅ 容器內已驗證 |
+| `.203` `deploy-layerA-remote.sh` | ✅ 含 `cta-coverage-aggregator` healthy（rsync 不再 `--delete` runtime `outputs/`） |
+| `.124` `deploy-pi-full.sh` | ✅ 三服務 healthy |
+| `.124` BPF 還原 | ✅ 正式 GOOSE/MMS BPF |
+| `verify-cta-lab.sh` | ✅ Layer C / CP health + coverage JSON schema |
 
 ### 9.14 Partner Deploy Runbook（2026-06-13）
 

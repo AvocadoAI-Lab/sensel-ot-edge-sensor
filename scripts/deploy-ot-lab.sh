@@ -138,7 +138,10 @@ deploy_pi() {
   if [[ -z "$OT_REGISTRATION_TOKEN" ]]; then
     echo "WARNING: OT_REGISTRATION_TOKEN unset — Pi will register but may stay on tenant=default" >&2
   fi
+  _lab_sshpass="${SSHPASS:-}"
+  export SSHPASS="${PI_SSHPASS:-edgex}"
   "$ROOT/scripts/deploy-pi-full.sh" "$PI_TARGET"
+  export SSHPASS="$_lab_sshpass"
 }
 
 verify_layerc() {
