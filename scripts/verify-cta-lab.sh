@@ -68,7 +68,7 @@ fi
 # Aggregator container health (optional when SSH available)
 if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
   agg_status="$(sshpass -e ssh -o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no \
-    "${CP_TARGET}" 'docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" layera-cta-coverage-aggregator 2>/dev/null || echo missing' 2>/dev/null || echo skip)"
+    "${CP_TARGET}" 'export PATH="/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin:$PATH"; docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" layera-cta-coverage-aggregator 2>/dev/null || echo missing' 2>/dev/null || echo skip)"
   case "$agg_status" in
     healthy) echo "OK  cta-coverage-aggregator healthy" ;;
     skip|missing) warn "cta-coverage-aggregator not checked (${agg_status})" ;;
