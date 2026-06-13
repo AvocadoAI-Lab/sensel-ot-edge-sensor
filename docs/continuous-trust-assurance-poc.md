@@ -524,9 +524,31 @@ curl -s "${LAYERC_URL}/api/cta/coverage?tenant_id=${TENANT_ID}" | jq '.summary'
 
 #### 已知运维限制
 
-- 聚合器 trust/investigate 狀態為 **in-memory**；`cta-coverage-aggregator` 重啟後需換 `CTA_COVERAGE_GROUP_ID` 或等 edge 重新 emit `coverage/v1`
-- `.108` 事件表因 Layer C dedupe 不隨 edge 偵測線性增長；CTA detect 走 coverage 通道
+- 聚合器 trust/investigate 已可经 `{tenant}.state.json` 冷啟動（`CTA_COVERAGE_BOOTSTRAP_SNAPSHOT=1`，见 §9.16）；无 state 文件时仍可换 consumer group 或等 edge 重发 `coverage/v1`
+- `.108` 事件表因 Layer C dedupe 不随 edge 侦测线性增长；CTA detect 走 coverage 通道（Portal 双通道说明见 §9.16）
+- `outputs/cta_coverage` 须 **RW** 挂载；`verify-cta-lab.sh` 会 WARN 若不可写
 - 勿用手動 `docker cp` 補 BFF；應 `guacamole-ai/scripts/deploy_docker_compose.sh`（含 portal build）
+
+### 9.16 架構已知債與路線圖
+
+| 債項 | Phase | 緩解 | 狀態 |
+|------|-------|------|------|
+| 聚合器 trust/investigate in-memory | 0 | `{tenant}.state.json` sidecar + 啟動 hydrate | 已實作 |
+| `outputs/` 須 RW 寫 snapshot | 0 | compose RW + verify 腳本 | 已實作 |
+| Portal 事件數 ≠ edge 偵測量 | 1 | 双通道文档 + Portal 說明文案 | 已實作 |
+| Trust artifact 无 `tenant_id` | 1 | Layer B publish + 聚合器按 tenant 分桶 | 已實作 |
+| `/api/layerc/events` 依赖 Wazuh | 2 | `LAYERC_EVENTS_SOURCE=auto` → filesystem fallback | 已實作 |
+
+**双通道语意（Partner 交接必读）**
+
+- **CTA detect**：edge `coverage/v1` → 保留原始 rule 命中量（不受 episode 聚合稀釋）
+- **Portal 工控事件**：Layer C writeback episode；`duplicate_cluster_suppressed` 会去重，**不应**与 CTA `detect_count` 对齐
+
+**冷启动**：聚合器 emit 时写 `outputs/cta_coverage/{tenant}.json` + `{tenant}.state.json`；重启后默认读取 `.state.json` 恢复三支柱状态。
+
+**Layer C events（lab）**：`GET /api/layerc/events` 在无 `WAZUH_INDEXER_URL` 时自动读 `outputs/layerc_bridge/*.json`（与 investigate 支柱同源）。
+
+设计细节见 [Aristaconnector-Control-Plane/docs/adr/cta-aggregator-persistence.md](../Aristaconnector-Control-Plane/docs/adr/cta-aggregator-persistence.md)（相对路径供 monorepo 参考；实际位于 infer repo）。
 
 ---
 

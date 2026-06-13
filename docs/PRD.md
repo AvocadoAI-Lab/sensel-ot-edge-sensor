@@ -37,6 +37,14 @@
 
 見 PRD §18 — 72 小時 lab 穩定運行、新設備/Modbus write 事件可於 SenseL 檢視。
 
+## Portal Baseline Live Learning（Cloud）
+
+SMB Portal 三模式（聆聽 / 學習 / 偵測）、Baseline Profile 與中斷 Rollback 之完整 PRD 見 **guacamole-ai** repo：
+
+- `guacamole-ai/docs/PRD_OT_BASELINE_LIVE_LEARNING.md`（主文件）
+
+Edge 本機 baseline 生命週期（pcap / drift）見 [baseline-prd.md](baseline-prd.md)。
+
 ## Sprint 執行
 
 詳細 backlog 與 checklist 見 [sprint-plan.md](sprint-plan.md)。

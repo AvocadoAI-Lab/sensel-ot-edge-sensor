@@ -102,8 +102,8 @@ deploy_108() {
     else
       export DEPLOY_COMPOSE_SERVICES="postgres redis api"
     fi
-    export DEPLOY_WITH_EDR=0
-    export DEPLOY_WITH_INVESTIGATION=0
+    export DEPLOY_WITH_EDR="${DEPLOY_WITH_EDR:-1}"
+    export DEPLOY_WITH_INVESTIGATION="${DEPLOY_WITH_INVESTIGATION:-auto}"
     ./scripts/deploy_docker_compose.sh
   )
   echo "==> [108] Run alembic migrations (OT security tables)"

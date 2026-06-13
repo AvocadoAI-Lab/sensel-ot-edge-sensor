@@ -74,6 +74,18 @@ if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
     skip|missing) warn "cta-coverage-aggregator not checked (${agg_status})" ;;
     *) fail "cta-coverage-aggregator status=${agg_status}" ;;
   esac
+  rw_status="$(sshpass -e ssh -o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+    "${CP_TARGET}" 'export PATH="/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin:$PATH"; docker exec layera-cta-coverage-aggregator test -w /app/outputs/cta_coverage && echo writable || echo readonly' 2>/dev/null || echo skip)"
+  case "$rw_status" in
+    writable) echo "OK  cta_coverage dir writable in aggregator container" ;;
+    readonly) warn "cta_coverage dir not writable — snapshot/state writes will fail" ;;
+    *) warn "cta_coverage RW not checked (${rw_status})" ;;
+  esac
+  if curl -sf --max-time 8 "${LAYERC_URL}/api/layerc/events?limit=1" >/dev/null 2>&1; then
+    echo "OK  GET /api/layerc/events (filesystem or wazuh)"
+  else
+    warn "GET /api/layerc/events unavailable"
+  fi
 else
   warn "SSHPASS unset — skipping aggregator container check"
 fi

@@ -3,6 +3,8 @@
 > 產品：SenseL OT Edge Sensor — Edge Console「偵測與政策 / Baseline Management」
 > 文件版本：1.0　|　最後更新：2026-06-10　|　狀態：MVP-1 + MVP-2 已上線（Pi `192.168.1.123`）
 
+**Cloud / Portal 延伸：** SMB Portal Live Learning、三模式（listen/learning/detect）、Baseline Profile 与中断 Rollback 见 guacamole-ai [`docs/PRD_OT_BASELINE_LIVE_LEARNING.md`](../../guacamole-ai/docs/PRD_OT_BASELINE_LIVE_LEARNING.md)。本文件保留 **Edge Console 本机** pcap 学习、drift、rollback 路径。
+
 ---
 
 ## 1. 背景與問題

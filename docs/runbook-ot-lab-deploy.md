@@ -71,9 +71,26 @@ cd guacamole-ai
 export DEPLOY_SSH_HOST=192.168.1.108 DEPLOY_SSH_USER=ubuntu SSHPASS='avocado@@'
 export DEPLOY_REMOTE_REPO_DIR=/home/ubuntu/guacamole-ai
 export DEPLOY_COMPOSE_SERVICES="postgres redis api"
+export DEPLOY_WITH_INVESTIGATION=auto   # SMB 調查 + layerc-mvp-ui（若 .env 已啟用）
+export DEPLOY_WITH_EDR=1                # Wazuh 端點防護（EDR / 調查所需）
 ./scripts/deploy_docker_compose.sh
-ssh ubuntu@192.168.1.108 'cd /home/ubuntu/guacamole-ai && docker compose exec -T api alembic upgrade head'
 ```
+
+**SMB 調查 / 端點防護故障排除：**
+
+若 Portal 顯示「無法連線端點防護後端（Wazuh）」或調查分頁錯誤：
+
+```bash
+# 一鍵修復（108 lab）
+SSHPASS='avocado@@' DEPLOY_SSH_HOST=192.168.1.108 DEPLOY_SSH_PORT=22 \
+  ./scripts/enable_investigation_layerc_remote.sh
+```
+
+確認：
+- `SMB_INVESTIGATION_ENABLED=true`
+- `LAYERC_MVP_UI_URL=http://layerc-mvp-ui:8000`（Docker 內網，**勿**指向 203:8000）
+- 容器 Up：`wazuh-manager`、`wazuh-indexer`、`layerc-mvp-ui`
+- 主機埠：`layerc-mvp-ui` 預設 **8002**（避免與本機 uvicorn :8000 衝突）
 
 ### 203 — Control Plane Layer A + C
 
@@ -236,14 +253,17 @@ export SSHPASS='avocado@@'
 | 主機 | 變數 | Lab 值 |
 |------|------|--------|
 | `.203` | `CTA_COVERAGE_GROUP_ID` | `cta-coverage-aggregator-v3` |
-| `.203` | `outputs` mount | **RW**（寫 `outputs/cta_coverage/{tenant}.json`） |
+| `.203` | `CTA_COVERAGE_BOOTSTRAP_SNAPSHOT` | `1`（重启读 `{tenant}.state.json`） |
+| `.203` | `outputs` mount | **RW**（写 `{tenant}.json` + `{tenant}.state.json`；禁止 `:ro` overlay） |
+| `.203` | `LAYERC_EVENTS_SOURCE` | `auto`（无 Wazuh 时 `/api/layerc/events` 读 `layerc_bridge/`） |
 | `.108` | `LAYERC_API_URL` | `http://192.168.1.203:8001`（或 auto-discover） |
 | `.108` | `TZ` | `Asia/Taipei` |
 
 ### 驗收預期
 
 - `curl http://192.168.1.203:8001/api/cta/coverage?tenant_id=company-a9ae1234648ee138` → `summary.fully_covered >= 1`
-- `docker inspect layera-cta-coverage-aggregator` → `healthy`
+- `curl http://192.168.1.203:8001/api/layerc/events?limit=5` → 200（filesystem fallback）
+- `docker restart layera-cta-coverage-aggregator` 后 30s 内 `fully_covered` 应维持（state bootstrap）
 - Portal → **工控安全防護 → CTA 覆蓋率** 熱圖與 gap 清單
 
 SSH 到 `.203` Mac 若 key 衝突：`ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no avocado.ai@192.168.1.203`
