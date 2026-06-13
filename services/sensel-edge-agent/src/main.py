@@ -7,10 +7,12 @@ Northbound: MQTT to Control Plane EMQX (primary), HTTP fallback.
 
 from __future__ import annotations
 
+import json
 import logging
 import signal
 import sys
 import time
+from pathlib import Path
 
 from src.api.client import SenseLClient
 from src.config.settings import load_config
@@ -39,6 +41,34 @@ def _handle_signal(signum: int, _frame) -> None:
     global _shutdown
     logger.info("Received signal %s, shutting down", signum)
     _shutdown = True
+
+
+def _maybe_publish_coverage(
+    mqtt: NorthboundMqttClient, path: Path, last_mtime: float
+) -> float:
+    """Publish the edge coverage tally northbound when it changed since last send.
+
+    Reads packet-sensor's ``coverage-counters.json`` (shared volume) and forwards
+    it on the ``.../coverage/v1`` topic. mtime-gated so we only emit on new
+    detections; on publish failure we keep the old mtime to retry next loop.
+    """
+    try:
+        if not path.exists():
+            return last_mtime
+        mtime = path.stat().st_mtime
+        if mtime <= last_mtime:
+            return last_mtime
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if mqtt.publish_coverage(data):
+            logger.info(
+                "MQTT coverage published — events=%s techniques=%s",
+                (data.get("totals") or {}).get("events"),
+                (data.get("totals") or {}).get("techniques_hit"),
+            )
+            return mtime
+    except Exception:
+        logger.debug("coverage publish skipped", exc_info=True)
+    return last_mtime
 
 
 def _flush_buffer(client: SenseLClient, buffer: UploadBuffer, mqtt: NorthboundMqttClient | None) -> None:
@@ -132,6 +162,8 @@ def main() -> int:
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
     )
+    coverage_path = Path(config.sensel.events.watch_path).parent / "coverage-counters.json"
+    last_coverage_mtime = 0.0
     policy_sync = PolicySync(config) if config.policy_sync.enabled else None
     policy_mqtt = (
         PolicyMqttSubscriber(config, policy_sync)
@@ -253,6 +285,9 @@ def main() -> int:
                         "tenant_id": registration.tenant_id or config.northbound_mqtt.tenant_id,
                         "health": health,
                     }
+                )
+                last_coverage_mtime = _maybe_publish_coverage(
+                    mqtt, coverage_path, last_coverage_mtime
                 )
 
             try:

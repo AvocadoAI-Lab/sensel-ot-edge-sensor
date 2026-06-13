@@ -13,8 +13,9 @@ import * as events from "./pages/events.js";
 import * as policy from "./pages/policy.js";
 import * as traffic from "./pages/traffic.js";
 import * as ops from "./pages/ops.js";
+import * as vpn from "./pages/vpn.js";
 
-const PAGES = { dashboard, runtime, assets, setup, events, policy, traffic, ops };
+const PAGES = { dashboard, runtime, assets, setup, events, policy, traffic, ops, vpn };
 
 const NAV = [
   { id: "dashboard", icon: "◉", label: "總覽" },
@@ -24,6 +25,7 @@ const NAV = [
   { id: "events", icon: "⚠", label: "安全事件" },
   { id: "policy", icon: "🛡", label: "偵測與政策" },
   { id: "traffic", icon: "〰", label: "即時流量" },
+  { id: "vpn", icon: "🔒", label: "VPN 連線" },
   { id: "ops", icon: "⚙", label: "系統維運" },
 ];
 

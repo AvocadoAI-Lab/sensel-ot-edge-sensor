@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from src.config.settings import NorthboundMqttConfig, SensorIdentity
-from src.northbound.topics import events_topic, state_topic
+from src.northbound.topics import coverage_topic, events_topic, state_topic
 from src.runtime.agent_snapshot import write_agent_runtime
 
 logger = logging.getLogger(__name__)
@@ -204,6 +204,18 @@ class NorthboundMqttClient:
     def publish_state(self, state: dict[str, Any]) -> bool:
         topic = state_topic(self._cfg.tenant_id, self._sensor.site_id, self._sensor.id)
         body = self._envelope("state", state)
+        return self.publish_json(topic, body, qos=1)
+
+    def publish_coverage(self, coverage: dict[str, Any]) -> bool:
+        """Publish the edge BAS coverage tally northbound (pre-aggregation)."""
+        if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):
+            return False
+        topic = coverage_topic(self._cfg.tenant_id, self._sensor.site_id, self._sensor.id)
+        body = self._envelope(
+            "coverage",
+            coverage,
+            observed_at=str(coverage.get("generated_at") or _utc_now_iso()),
+        )
         return self.publish_json(topic, body, qos=1)
 
     def close(self) -> None:

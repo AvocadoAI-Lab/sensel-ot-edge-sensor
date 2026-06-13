@@ -60,6 +60,11 @@ echo "==> Stopping old stacks and starting full SenseL stack"
   OT_REGISTRATION_TOKEN="${OT_REGISTRATION_TOKEN:-}" \
   MQTT_TENANT_ID="${MQTT_TENANT_ID:-default}" \
   DEPLOY_PROFILE="${PROFILE}" \
+  MDNS_NAME="${MDNS_NAME:-sensel}" \
+  CONSOLE_PORT="${CONSOLE_PORT:-8090}" \
+  CONSOLE_HTTPS_PORT="${CONSOLE_HTTPS_PORT:-8443}" \
+  CONSOLE_TLS_HOSTS="${CONSOLE_TLS_HOSTS:-${MDNS_NAME:-sensel}.local,localhost,127.0.0.1}" \
+  SUDO_PASS="${SUDO_PASS:-${SSHPASS:-}}" \
   bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/sensel-ot-edge-sensor
@@ -113,10 +118,42 @@ echo "==> Building and starting full stack (${DEPLOY_PROFILE})"
 # Lab 61850: mqtt-feature only — no phase2 (opc-ua/s7) or modbus-lab unless explicitly enabled
 docker compose ${COMPOSE_FILES} up -d --build
 
+echo "==> Publishing mDNS name (${MDNS_NAME:-sensel}.local) for the Edge Console"
+chmod +x deploy/avahi/setup-mdns.sh 2>/dev/null || true
+if [[ -f deploy/avahi/setup-mdns.sh ]]; then
+  if sudo -n true 2>/dev/null; then
+    sudo env MDNS_NAME="${MDNS_NAME:-sensel}" CONSOLE_PORT="${CONSOLE_PORT:-8090}" CONSOLE_HTTPS_PORT="${CONSOLE_HTTPS_PORT:-8443}" \
+      bash deploy/avahi/setup-mdns.sh || echo "  mDNS setup failed (non-fatal)"
+  elif [[ -n "${SUDO_PASS:-}" ]]; then
+    echo "${SUDO_PASS}" | sudo -S env MDNS_NAME="${MDNS_NAME:-sensel}" CONSOLE_PORT="${CONSOLE_PORT:-8090}" CONSOLE_HTTPS_PORT="${CONSOLE_HTTPS_PORT:-8443}" \
+      bash deploy/avahi/setup-mdns.sh || echo "  mDNS setup failed (non-fatal)"
+  else
+    echo "  Skipping mDNS: no sudo. Run manually: sudo MDNS_NAME=${MDNS_NAME:-sensel} ./deploy/avahi/setup-mdns.sh"
+  fi
+fi
+
+echo "==> Installing offline Wi-Fi failover watchdog (systemd timer)"
+chmod +x deploy/netwatch/setup-failover.sh deploy/netwatch/net-failover.sh 2>/dev/null || true
+if [[ -f deploy/netwatch/setup-failover.sh ]]; then
+  WPF="${HOME}/sensel-ot-edge-sensor/data/agent/wifi-priority.json"
+  if sudo -n true 2>/dev/null; then
+    sudo env WIFI_PRIORITY_FILE="${WPF}" bash deploy/netwatch/setup-failover.sh || echo "  failover setup failed (non-fatal)"
+  elif [[ -n "${SUDO_PASS:-}" ]]; then
+    echo "${SUDO_PASS}" | sudo -S env WIFI_PRIORITY_FILE="${WPF}" bash deploy/netwatch/setup-failover.sh || echo "  failover setup failed (non-fatal)"
+  else
+    echo "  Skipping failover: no sudo. Run manually: sudo WIFI_PRIORITY_FILE=${WPF} ./deploy/netwatch/setup-failover.sh"
+  fi
+fi
+
 echo "==> Lab URLs"
 PI_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
 PI_IP=${PI_IP:-192.168.1.123}
 echo "  Edge Console:  http://${PI_IP}:8090  ← 設定企業邀請碼 / 註冊"
+echo "  By name:       https://${MDNS_NAME:-sensel}.local:${CONSOLE_HTTPS_PORT:-8443}  (mDNS + 本地 CA 簽發)"
+echo "                 http://${MDNS_NAME:-sensel}.local:${CONSOLE_PORT:-8090}   (HTTP)"
+echo "  綠鎖零警告：每台用戶端安裝一次本地 CA 根憑證："
+echo "                 curl -fsSL http://${MDNS_NAME:-sensel}.local:${CONSOLE_PORT:-8090}/sensel-root-ca.crt -o sensel-root-ca.crt"
+echo "                 macOS: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain sensel-root-ca.crt"
 if [[ "${DEPLOY_PROFILE}" == "lab" ]]; then
   echo "  Events Viewer: http://${PI_IP}:8080"
 fi

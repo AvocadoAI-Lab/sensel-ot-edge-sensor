@@ -34,15 +34,22 @@ services:
     restart: unless-stopped
     ports:
       - "8090:8090"
+      - "8443:8443"
     environment:
       - PLATFORM_CONFIG_PATH=/data/agent/platform.json
       - ASSETS_DIR=/data/assets
+      # HTTPS (self-signed) SAN list — must include the mDNS name used below.
+      - CONSOLE_TLS_HOSTS=${CONSOLE_TLS_HOSTS:-sensel.local,localhost,127.0.0.1}
       - DEFAULT_SENSEL_API_KEY=${SENSEL_API_KEY:-sensel-ot-ingest-lab-2026}
       - EDGE_CONSOLE_PASSWORD=${EDGE_CONSOLE_PASSWORD:-}
       - EDGE_CONSOLE_DOCKER_RESTART=${EDGE_CONSOLE_DOCKER_RESTART:-true}
       - EDGE_CONSOLE_AUTO_RESTART_AGENT=${EDGE_CONSOLE_AUTO_RESTART_AGENT:-true}
       - EDGE_CONSOLE_NET_ADMIN=${EDGE_CONSOLE_NET_ADMIN:-true}
       - EDGE_CONSOLE_WIFI_ADMIN=${EDGE_CONSOLE_WIFI_ADMIN:-true}
+      # OpenVPN client control (profiles + connect/disconnect via vpn-client sidecar)
+      - EDGE_CONSOLE_VPN_ADMIN=${EDGE_CONSOLE_VPN_ADMIN:-true}
+      - VPN_CLIENT_CONTAINER=sensel-vpn-client
+      - VPN_STATE_DIR=/data/agent/vpn
       # Opt-in read-only active probe (TCP fingerprint + Modbus FC43) via packet-sensor
       - EDGE_CONSOLE_ACTIVE_PROBE=${EDGE_CONSOLE_ACTIVE_PROBE:-false}
       # Baseline pcap learning limits (Pi-friendly defaults)
@@ -78,6 +85,31 @@ services:
     depends_on:
       - core-data
       - core-metadata
+
+  # ---------------------------------------------------------------------------
+  # SenseL VPN Client — declarative OpenVPN sidecar (host net + tun)
+  # Runs the tunnel in the HOST network namespace so pushed LAN routes apply to
+  # the appliance (lets the sensor reach the remote internal network). The Edge
+  # Console manages profiles + desired state on the shared ./data/agent/vpn
+  # volume; this container's supervisor reconciles OpenVPN to that state and
+  # self-heals on failure / restart.
+  # ---------------------------------------------------------------------------
+  vpn-client:
+    build:
+      context: ./services/vpn-client
+      dockerfile: Dockerfile
+    container_name: sensel-vpn-client
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_STATE_DIR=/data/agent/vpn
+      - VPN_MGMT_PORT=7505
+    volumes:
+      - ./data/agent/vpn:/data/agent/vpn
 
   # ---------------------------------------------------------------------------
   # SenseL Edge Agent — platform comms, policy sync, health

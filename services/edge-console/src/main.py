@@ -45,6 +45,7 @@ from src import asset_probe_service
 from src.discovery_service import build_discovery, build_ip_device_map, enrich_events
 from src.network_service import collect_interfaces, set_interface_state
 from src import wifi_service
+from src import vpn_service
 from src.edgex_config_service import (
     delete_config_device,
     enable_phase2_services,
@@ -58,6 +59,7 @@ from src.edgex_config_service import (
 
 APP_VERSION = "0.1.0"
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+TLS_DIR = Path(os.environ.get("CONSOLE_TLS_DIR", "/data/agent/tls"))
 store = ConfigStore()
 
 app = FastAPI(title="SenseL Edge Console", version=APP_VERSION)
@@ -149,9 +151,43 @@ class WifiPrimaryBody(BaseModel):
     iface: str = Field(..., max_length=16)
 
 
+class WifiPriorityBody(BaseModel):
+    order: list[str] = Field(default_factory=list, max_length=10)
+
+
+class VpnConnectBody(BaseModel):
+    profile: str = Field(..., max_length=64)
+    redirect_gateway: bool = False
+    username: Optional[str] = Field(None, max_length=256)
+    password: Optional[str] = Field(None, max_length=256)
+    auto_reconnect: bool = True
+
+
+class VpnAutoReconnectBody(BaseModel):
+    on: bool
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "edge-console", "version": APP_VERSION}
+
+
+@app.get("/sensel-root-ca.crt")
+def download_root_ca() -> FileResponse:
+    """Public download of the appliance's local CA root certificate.
+
+    Operators install this once per client to get a green-lock, warning-free
+    https://<name>.local. Served unauthenticated (and reachable over plain
+    HTTP:8090) so trust can be bootstrapped before HTTPS is trusted. Returns
+    404 when the console is using a plain self-signed cert (no local CA)."""
+    ca_crt = TLS_DIR / "ca" / "rootCA.crt"
+    if not ca_crt.is_file():
+        raise HTTPException(status_code=404, detail="No local CA configured")
+    return FileResponse(
+        ca_crt,
+        media_type="application/x-x509-ca-cert",
+        filename="sensel-root-ca.crt",
+    )
 
 
 @app.get("/api/auth/status")
@@ -283,6 +319,106 @@ def network_wifi_primary(body: WifiPrimaryBody, _: None = Depends(require_sessio
     if not result.get("ok"):
         raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
     log_audit("network.wifi_primary", {"iface": body.iface})
+    return result
+
+
+@app.post("/api/network/wifi/priority")
+def network_wifi_priority(body: WifiPriorityBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = wifi_service.set_wifi_priority(body.order)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("network.wifi_priority", {"order": body.order})
+    return result
+
+
+# --- OpenVPN client -----------------------------------------------------------
+
+
+@app.get("/api/vpn/profiles")
+def vpn_profiles(_: None = Depends(require_session)) -> dict[str, Any]:
+    return vpn_service.list_profiles()
+
+
+@app.post("/api/vpn/profiles")
+async def vpn_upload_profile(
+    request: Request,
+    name: str,
+    _: None = Depends(require_session),
+) -> dict[str, Any]:
+    body = await request.body()
+    result = vpn_service.save_profile(name, body)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("vpn.profile_upload", {"name": name, "bytes": len(body)})
+    return result
+
+
+@app.delete("/api/vpn/profiles/{name}")
+def vpn_delete_profile(name: str, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = vpn_service.delete_profile(name)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("vpn.profile_delete", {"name": name})
+    return result
+
+
+@app.get("/api/vpn/profiles/{name}/view")
+def vpn_view_profile(name: str, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = vpn_service.view_profile(name)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    return result
+
+
+@app.get("/api/vpn/status")
+def vpn_status(_: None = Depends(require_session)) -> dict[str, Any]:
+    return vpn_service.get_status()
+
+
+@app.post("/api/vpn/connect")
+def vpn_connect(body: VpnConnectBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = vpn_service.connect(
+        body.profile,
+        redirect_gateway=body.redirect_gateway,
+        username=body.username,
+        password=body.password,
+        auto_reconnect=body.auto_reconnect,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    # Never log credentials.
+    log_audit("vpn.connect", {"profile": body.profile, "redirect_gateway": body.redirect_gateway, "auto_reconnect": body.auto_reconnect})
+    return result
+
+
+@app.post("/api/vpn/auto-reconnect")
+def vpn_auto_reconnect(body: VpnAutoReconnectBody, _: None = Depends(require_session)) -> dict[str, Any]:
+    result = vpn_service.set_auto_reconnect(body.on)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("vpn.auto_reconnect", {"on": body.on})
+    return result
+
+
+@app.post("/api/vpn/disconnect")
+def vpn_disconnect(_: None = Depends(require_session)) -> dict[str, Any]:
+    result = vpn_service.disconnect()
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 400)), detail=result.get("error"))
+    log_audit("vpn.disconnect", {})
+    return result
+
+
+@app.post("/api/vpn/diagnose")
+def vpn_diagnose(
+    host: str = "192.168.1.203",
+    port: int = 1883,
+    _: None = Depends(require_session),
+) -> dict[str, Any]:
+    result = vpn_service.diagnose(target_host=host, target_port=port)
+    if not result.get("ok"):
+        raise HTTPException(status_code=int(result.get("status", 502)), detail=result.get("error"))
+    log_audit("vpn.diagnose", {"host": host, "port": port, "reachable": result.get("reachable")})
     return result
 
 
@@ -627,6 +763,25 @@ def recent_events(limit: int = 50, _: None = Depends(require_session)) -> dict[s
     ip_map = build_ip_device_map(device_payload.get("devices") or [])
     enriched = enrich_events(events, ip_map)
     return {"count": len(enriched), "events": enriched}
+
+
+@app.get("/api/coverage")
+def coverage(_: None = Depends(require_session)) -> dict[str, Any]:
+    """Edge BAS coverage tally (per-rule / per-ATT&CK, pre-aggregation).
+
+    Served straight from the packet-sensor's ``coverage-counters.json`` so the
+    raw detection volume is not lost to Control-Plane episode aggregation.
+    """
+    assets = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
+    path = assets / "coverage-counters.json"
+    if not path.exists():
+        return {"available": False, "schema": "ot-edge.coverage.v1", "techniques": {}, "rules": {}}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"available": False, "schema": "ot-edge.coverage.v1", "techniques": {}, "rules": {}}
+    data["available"] = True
+    return data
 
 
 def _restart_agent() -> tuple[bool, str]:

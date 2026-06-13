@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OT-B4: one-click lab deploy — Pi (123) + Control Plane Layer A/C (203) + SenseL (108).
+# OT-B4: one-click lab deploy — Pi (124) + Control Plane Layer A/C (203) + SenseL (108).
 #
 # Prerequisites:
 #   - sshpass installed locally
@@ -10,6 +10,7 @@
 #   export SSHPASS='avocado@@'
 #   export OT_REGISTRATION_TOKEN='your-invite-code'
 #   ./scripts/deploy-ot-lab.sh              # deploy all three
+#   ./scripts/deploy-ot-lab.sh --cta      # CTA PoC: deploy all + verify CTA coverage
 #   ./scripts/deploy-ot-lab.sh --108-only # SenseL only
 #   ./scripts/deploy-ot-lab.sh --203-only # Layer A + Layer C only
 #   ./scripts/deploy-ot-lab.sh --pi-only    # Pi edge sensor only
@@ -19,6 +20,7 @@
 #   ./scripts/deploy-ot-lab.sh --track-b    # deploy all + Track B E2E gate
 #   ./scripts/deploy-ot-lab.sh --sprint4    # deploy all + Sprint4 gate (S5-G1)
 #   ./scripts/deploy-ot-lab.sh --verify-sprint4  # Sprint4 gate only (no deploy)
+#   ./scripts/deploy-ot-lab.sh --verify-cta    # CTA coverage gate only (no deploy)
 #
 set -euo pipefail
 
@@ -33,7 +35,7 @@ if [[ -f "$ROOT/.env.lab" ]]; then
   set +a
 fi
 
-PI_TARGET="${PI_TARGET:-edgex@192.168.1.123}"
+PI_TARGET="${PI_TARGET:-edgex@192.168.1.124}"
 CP_TARGET="${CP_TARGET:-avocado.ai@192.168.1.203}"
 SENSEL_HOST="${SENSEL_HOST:-192.168.1.108}"
 SENSEL_USER="${SENSEL_USER:-ubuntu}"
@@ -42,6 +44,7 @@ SENSEL_REMOTE_DIR="${SENSEL_REMOTE_DIR:-/home/ubuntu/guacamole-ai}"
 CONTROL_PLANE_BASE_URL="${CONTROL_PLANE_BASE_URL:-http://${SENSEL_HOST}:8081}"
 OT_SECURITY_INGEST_SECRET="${OT_SECURITY_INGEST_SECRET:-sensel-ot-ingest-lab-2026}"
 LAYERC_URL="${LAYERC_URL:-http://192.168.1.203:8001}"
+TENANT_ID="${TENANT_ID:-company-a9ae1234648ee138}"
 
 DEPLOY_108=1
 DEPLOY_203=1
@@ -50,6 +53,8 @@ VERIFY_ONLY=0
 VERIFY_TRACK_B=0
 SPRINT4=0
 VERIFY_SPRINT4=0
+VERIFY_CTA=0
+CTA_MODE=0
 EXPECT_LLM=0
 
 for arg in "$@"; do
@@ -60,8 +65,10 @@ for arg in "$@"; do
     --verify)   VERIFY_ONLY=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
     --verify-track-b) VERIFY_ONLY=1; VERIFY_TRACK_B=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
     --verify-sprint4) VERIFY_ONLY=1; VERIFY_SPRINT4=1; SPRINT4=1; EXPECT_LLM=1 ;;
+    --verify-cta) VERIFY_ONLY=1; VERIFY_CTA=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
     --track-b)  VERIFY_TRACK_B=1 ;;
     --sprint4)  SPRINT4=1; VERIFY_SPRINT4=1; EXPECT_LLM=1 ;;
+    --cta)      CTA_MODE=1; VERIFY_CTA=1 ;;
     --expect-llm) EXPECT_LLM=1 ;;
     -h|--help)
       sed -n '2,22p' "$0"
@@ -172,7 +179,25 @@ if [[ "$SPRINT4" == "1" ]]; then
   echo "==> Sprint 4 mode: OT_LLM_ENRICH=$OT_LLM_ENRICH OT_BEHAVIOR_AE_ENABLED=$OT_BEHAVIOR_AE_ENABLED EXPECT_LLM=$EXPECT_LLM"
 fi
 
+verify_cta_lab() {
+  echo "==> [CTA] Coverage lab acceptance gate"
+  chmod +x "$ROOT/scripts/verify-cta-lab.sh" 2>/dev/null || true
+  export LAYERC_URL CONTROL_PLANE_BASE_URL TENANT_ID CP_TARGET SENSEL_HOST
+  if "$ROOT/scripts/verify-cta-lab.sh"; then
+    return 0
+  fi
+  if [[ "${CTA_MODE:-0}" == "1" ]]; then
+    echo "WARN: CTA verify failed after deploy (see above)" >&2
+    return 0
+  fi
+  return 1
+}
+
 if [[ "$VERIFY_ONLY" == "1" ]]; then
+  if [[ "$VERIFY_CTA" == "1" ]]; then
+    verify_cta_lab
+    exit $?
+  fi
   if [[ "$VERIFY_SPRINT4" == "1" ]]; then
     verify_sprint4_lab
     exit $?
@@ -196,6 +221,8 @@ fi
 
 if [[ "$VERIFY_SPRINT4" == "1" ]]; then
   verify_sprint4_lab
+elif [[ "$VERIFY_CTA" == "1" ]]; then
+  verify_cta_lab || true
 else
   verify_layerc
 fi
@@ -214,6 +241,7 @@ echo "==> OT lab deploy complete"
 echo "  SenseL Portal:  http://${SENSEL_HOST}:8081"
 echo "  Layer C API:    ${LAYERC_URL}"
 echo "  EMQX MQTT:      mqtt://192.168.1.203:1883"
-echo "  Pi events UI:   http://192.168.1.123:8080"
+echo "  Pi Edge Console: http://192.168.1.124:8090"
 echo ""
-echo "Verify Portal: 工控安全防護 → 事件 / 感測器 / 資產"
+echo "CTA verify: ./scripts/verify-cta-lab.sh  (or ./scripts/deploy-ot-lab.sh --verify-cta)"
+echo "Verify Portal: 工控安全防護 → CTA 覆蓋率 / 事件 / 感測器 / 資產"

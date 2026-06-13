@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.baseline.collector import BaselineCollector
+from src.coverage.counter import CoverageCounter
 from src.detection.iec61850 import Iec61850Detector
 from src.detection.ioc import IocMatcher
 from src.detection.mvp import MvpDetector
@@ -56,6 +57,7 @@ class PacketPipeline:
         detection_policy_path: str = "/app/data/agent/detection-policy.json",
         detection_policy_stamp_path: str = "/app/data/agent/detection-policy.stamp",
         detection_policy_reload_sec: int = 5,
+        coverage_enabled: bool = True,
     ) -> None:
         self.state = PipelineState()
         self._feature_window_sec = feature_window_sec
@@ -100,6 +102,12 @@ class PacketPipeline:
         # accumulates identities seen since start; it never emits events.
         self._baseline = BaselineCollector()
         self._events = EventStore(assets_dir)
+        self._coverage = CoverageCounter(
+            assets_dir=assets_dir,
+            sensor_id=sensor_id,
+            site_id=site_id,
+            enabled=coverage_enabled,
+        )
         self._features = FeaturePublisher(
             sensor_id=sensor_id,
             site_id=site_id,
@@ -136,6 +144,7 @@ class PacketPipeline:
     def _emit(self, events) -> None:
         for event in events:
             self._events.append(event, ring_buffer=self._ring)
+            self._coverage.record(event)
             logger.warning(
                 "Security event %s (%s): %s",
                 event.rule_id,
@@ -202,6 +211,7 @@ class PacketPipeline:
             self.state.goose,
             self.state.mms,
         )
+        self._coverage.flush()
         reset_l2_window(self.state.l2)
 
     def close(self) -> None:

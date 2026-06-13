@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -106,6 +107,8 @@ class CaptureSession:
             detection_policy_path=config.detection.policy_path,
             detection_policy_stamp_path=config.detection.policy_stamp_path,
             detection_policy_reload_sec=config.detection.reload_check_sec,
+            coverage_enabled=os.environ.get("COVERAGE_COUNTER_ENABLED", "true").strip().lower()
+            not in ("0", "false", "no", "off"),
         )
 
     @property

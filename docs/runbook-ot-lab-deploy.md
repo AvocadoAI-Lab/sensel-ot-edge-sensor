@@ -4,7 +4,8 @@
 
 | 節點 | IP | 角色 | SSH |
 |------|-----|------|-----|
-| Pi 4 | 192.168.1.123 | EdgeX + packet sensor + SenseL agent | `edgex` / `edgex` |
+| Pi 4 | 192.168.1.124 | EdgeX + packet sensor + SenseL agent（CTA PoC 主 Edge） | `edgex` / `edgex` |
+| Pi 4（legacy） | 192.168.1.123 | 舊 Sprint lab Edge | `edgex` / `edgex` |
 | Mac CP | 192.168.1.203 | EMQX + Layer A/B/C dataplane | `avocado.ai` / `avocado@@` |
 | VM SenseL | 192.168.1.108 | Portal + OT ingest API | `ubuntu` / `avocado@@` |
 
@@ -194,6 +195,58 @@ PYTHONPATH=. python3 scripts/e2e-ot-layerc-analyze.py --layerc-url http://192.16
 2. mqtt-bridge → Redpanda → Layer B episode
 3. layerc-bridge → `/analyze`（OT profile）→ writeback → 108 ingest
 4. Portal **工控安全防護** 可見事件與 Layer C 摘要
+
+## CTA PoC 部署（Continuous Trust Assurance）
+
+完整設計與驗證紀錄見 [`continuous-trust-assurance-poc.md`](continuous-trust-assurance-poc.md) §9.14。
+
+**禁止**僅 `docker cp` / 手動 rsync 單檔到 `.108`；應走各 repo 正式 deploy 腳本（含 SMB portal `npm run build`）。
+
+### 一鍵（CTA lab）
+
+```bash
+cd sensel-ot-edge-sensor
+export SSHPASS='avocado@@'
+export OT_REGISTRATION_TOKEN='<invite-code>'   # 可選
+export TENANT_ID='company-a9ae1234648ee138'
+PI_TARGET=edgex@192.168.1.124 ./scripts/deploy-ot-lab.sh --cta
+```
+
+順序：**108 SenseL → 203 Layer A/C + aggregator → Pi .124 → CTA verify**
+
+僅驗收（不 deploy）：
+
+```bash
+export SSHPASS='avocado@@'
+./scripts/deploy-ot-lab.sh --verify-cta
+# 或
+./scripts/verify-cta-lab.sh
+```
+
+### 分段（手動）
+
+| 步驟 | 主機 | 命令 |
+|------|------|------|
+| 1 | `.108` | `cd guacamole-ai && DEPLOY_SSH_HOST=192.168.1.108 DEPLOY_SSH_USER=ubuntu SSHPASS='...' ./scripts/deploy_docker_compose.sh` + `alembic upgrade head` |
+| 2 | `.203` | `cd Aristaconnector-Control-Plane && SSHPASS='...' ./scripts/deploy-layerA-remote.sh avocado.ai@192.168.1.203` |
+| 3 | `.124` | `cd sensel-ot-edge-sensor && SSHPASS='edgex' ./scripts/deploy-pi-full.sh edgex@192.168.1.124` |
+
+### CTA 關鍵 env
+
+| 主機 | 變數 | Lab 值 |
+|------|------|--------|
+| `.203` | `CTA_COVERAGE_GROUP_ID` | `cta-coverage-aggregator-v3` |
+| `.203` | `outputs` mount | **RW**（寫 `outputs/cta_coverage/{tenant}.json`） |
+| `.108` | `LAYERC_API_URL` | `http://192.168.1.203:8001`（或 auto-discover） |
+| `.108` | `TZ` | `Asia/Taipei` |
+
+### 驗收預期
+
+- `curl http://192.168.1.203:8001/api/cta/coverage?tenant_id=company-a9ae1234648ee138` → `summary.fully_covered >= 1`
+- `docker inspect layera-cta-coverage-aggregator` → `healthy`
+- Portal → **工控安全防護 → CTA 覆蓋率** 熱圖與 gap 清單
+
+SSH 到 `.203` Mac 若 key 衝突：`ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no avocado.ai@192.168.1.203`
 
 ### Portal Layer C 驗收（S5-E1）
 

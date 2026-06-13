@@ -9,16 +9,51 @@ with argv lists (no shell) so SSIDs/passwords cannot inject commands.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Any, Optional
 
 _SSID_MAX = 64
 _PASSWORD_MAX = 128
+# How many recently-used Wi-Fi APs to remember for auto-reconnect on reboot.
+# NetworkManager auto-connects saved profiles on boot; we keep only the most
+# recent N and assign descending autoconnect-priority so the appliance tries the
+# most-recently-connected AP first, then the next, etc.
+_WIFI_HISTORY_KEEP = 3
+_WIFI_PRIORITY_BASE = 100
+# Operator-pinned fallback APs (e.g. phone hotspot, switch Wi-Fi) live in a
+# higher priority band so they always outrank the recency list, and they are
+# NEVER pruned — so the appliance can always fall back to them when offline.
+# Their order within the band is set explicitly from System Maintenance.
+_WIFI_PINNED_BASE = 200
+_WIFI_PINNED_MAX = 10
+_PINNED_FILE = Path(os.environ.get("WIFI_PRIORITY_FILE", "/data/agent/wifi-priority.json"))
 # Reject control chars in SSID/password (defence in depth; argv already avoids shell).
 _CTRL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _load_pinned() -> list[str]:
+    """Ordered list of operator-pinned fallback SSIDs (highest priority first)."""
+    try:
+        data = json.loads(_PINNED_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    order = data.get("order") if isinstance(data, dict) else data
+    if not isinstance(order, list):
+        return []
+    return [s for s in order if isinstance(s, str) and s]
+
+
+def _save_pinned(order: list[str]) -> None:
+    try:
+        _PINNED_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _PINNED_FILE.write_text(json.dumps({"order": order}, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def wifi_admin_enabled() -> bool:
@@ -142,6 +177,163 @@ def _has_other_primary(exclude: str) -> bool:
     return False
 
 
+def _saved_wifi_connections() -> list[dict[str, Any]]:
+    """Saved Wi-Fi connection profiles with their last-activation timestamp.
+
+    Returns rows ``{name, uuid, timestamp}`` (timestamp = epoch seconds of last
+    successful activation; 0 if never), unsorted.
+    """
+    try:
+        proc = _nmcli(["-t", "-f", "NAME,UUID,TYPE,TIMESTAMP", "connection", "show"], timeout=10.0)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return []
+    if proc.returncode != 0:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in proc.stdout.splitlines():
+        f = _split_terse(line)
+        if len(f) >= 4 and f[2] == "802-11-wireless":
+            try:
+                ts = int(f[3])
+            except ValueError:
+                ts = 0
+            rows.append({"name": f[0], "uuid": f[1], "timestamp": ts})
+    return rows
+
+
+def promote_and_prune_wifi(active_ssid: str, keep: int = _WIFI_HISTORY_KEEP) -> dict[str, Any]:
+    """Keep only the ``keep`` most-recently-used Wi-Fi APs and order their
+    auto-reconnect priority by recency (most recent tried first on reboot).
+
+    Called after a successful connect. ``active_ssid`` is forced to the front so
+    it always survives pruning and gets the highest priority, even if NM has not
+    yet flushed its activation timestamp.
+    """
+    if keep <= 0:
+        return {"kept": [], "deleted": [], "pinned": []}
+    conns = _saved_wifi_connections()
+    if not conns:
+        return {"kept": [], "deleted": [], "pinned": []}
+    # Operator-pinned fallback APs are never re-prioritised here (they keep their
+    # high pinned band) and are never pruned.
+    pinned = set(_load_pinned())
+    non_pinned = [c for c in conns if c["name"] not in pinned]
+    non_pinned.sort(key=lambda c: (c["name"] != active_ssid, -c["timestamp"]))
+    kept, pruned = non_pinned[:keep], non_pinned[keep:]
+    for i, c in enumerate(kept):
+        prio = _WIFI_PRIORITY_BASE - i
+        try:
+            _nmcli([
+                "connection", "modify", c["uuid"],
+                "connection.autoconnect", "yes",
+                "connection.autoconnect-priority", str(prio),
+            ], timeout=10.0)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+    deleted: list[str] = []
+    for c in pruned:
+        try:
+            r = _nmcli(["connection", "delete", "uuid", c["uuid"]], timeout=10.0)
+            if r.returncode == 0:
+                deleted.append(c["name"])
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+    return {
+        "kept": [c["name"] for c in kept],
+        "deleted": deleted,
+        "pinned": [c["name"] for c in conns if c["name"] in pinned],
+    }
+
+
+def pinned_networks() -> list[dict[str, Any]]:
+    """Operator-pinned fallback APs in tried-first order (for UI + watchdog)."""
+    saved = {c["name"]: c for c in _saved_wifi_connections()}
+    out: list[dict[str, Any]] = []
+    for idx, ssid in enumerate(_load_pinned()):
+        if ssid in saved:
+            out.append({
+                "ssid": ssid,
+                "order": idx + 1,
+                "last_connected_ts": saved[ssid]["timestamp"] or None,
+            })
+    return out
+
+
+def set_wifi_priority(order: list[Any]) -> dict[str, Any]:
+    """Set the explicit offline-fallback order of pinned APs (highest first).
+
+    ``order`` is a list of SSIDs; only SSIDs that already have a saved Wi-Fi
+    profile are accepted. Pinned APs get a high autoconnect-priority band so the
+    appliance tries them first when offline, and they are exempt from pruning.
+    SSIDs removed from the list fall back to the recency-managed band.
+    """
+    if not (wifi_admin_enabled() and nmcli_available()):
+        return {"ok": False, "status": 403, "error": "Wi-Fi 控制未啟用"}
+    if not isinstance(order, list):
+        return {"ok": False, "status": 400, "error": "順序格式無效"}
+    cleaned: list[str] = []
+    for s in order:
+        if not isinstance(s, str):
+            continue
+        s = s.strip()
+        if not s or len(s) > _SSID_MAX or _CTRL_RE.search(s):
+            continue
+        if s not in cleaned:
+            cleaned.append(s)
+    if len(cleaned) > _WIFI_PINNED_MAX:
+        return {"ok": False, "status": 400, "error": f"釘選數量上限為 {_WIFI_PINNED_MAX}"}
+
+    saved = {c["name"]: c for c in _saved_wifi_connections()}
+    new_order = [s for s in cleaned if s in saved]
+    old_order = _load_pinned()
+
+    for i, ssid in enumerate(new_order):
+        prio = _WIFI_PINNED_BASE - i
+        try:
+            _nmcli([
+                "connection", "modify", saved[ssid]["uuid"],
+                "connection.autoconnect", "yes",
+                "connection.autoconnect-priority", str(prio),
+            ], timeout=10.0)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+    # SSIDs that were unpinned drop back to the default (recency) band.
+    for ssid in old_order:
+        if ssid not in new_order and ssid in saved:
+            try:
+                _nmcli([
+                    "connection", "modify", saved[ssid]["uuid"],
+                    "connection.autoconnect-priority", "0",
+                ], timeout=10.0)
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+    _save_pinned(new_order)
+    return {"ok": True, "pinned": pinned_networks(), "message": "已更新離線自動重連順序"}
+
+
+def known_networks(keep: Optional[int] = None) -> list[dict[str, Any]]:
+    """All remembered APs, most-recently-used first, each flagged if pinned.
+
+    ``keep`` optionally caps the count (None = all saved), so the UI can let the
+    operator pin any remembered network as an offline fallback.
+    """
+    pinned = set(_load_pinned())
+    conns = _saved_wifi_connections()
+    conns.sort(key=lambda c: -c["timestamp"])
+    rows = conns if keep is None else conns[:keep]
+    out: list[dict[str, Any]] = []
+    for idx, c in enumerate(rows):
+        out.append({
+            "ssid": c["name"],
+            "last_connected_ts": c["timestamp"] or None,
+            "order": idx + 1,
+            "never_connected": c["timestamp"] == 0,
+            "pinned": c["name"] in pinned,
+        })
+    return out
+
+
 def radio_on() -> Optional[bool]:
     try:
         proc = _nmcli(["radio", "wifi"], timeout=10.0)
@@ -245,6 +437,10 @@ def status(include_scan: bool = True, rescan: bool = False) -> dict[str, Any]:
         "device": primary["device"] if primary else None,
         "active_ssid": primary["active_ssid"] if primary else None,
         "networks": primary["networks"] if primary else [],
+        # Remembered APs (most-recent first); each flagged if pinned as fallback.
+        "known": known_networks(),
+        # Operator-pinned offline-fallback order (tried first when offline).
+        "pinned": pinned_networks(),
     }
 
 
@@ -295,7 +491,10 @@ def connect(ssid: str, password: Optional[str] = None, iface: Optional[str] = No
         # primary uplink if no other connected Wi-Fi card already owns it.
         # Otherwise mark it never-default so two cards don't fight over routing.
         _set_device_never_default(iface, never_default=_has_other_primary(exclude=iface))
-    return {"ok": True, "ssid": ssid, "message": f"已連線到 {ssid}"}
+    # Remember this AP for boot-time auto-reconnect: keep the most-recent few and
+    # order their priority by recency (this SSID first).
+    history = promote_and_prune_wifi(ssid)
+    return {"ok": True, "ssid": ssid, "message": f"已連線到 {ssid}", "history": history}
 
 
 def set_primary(iface: str) -> dict[str, Any]:

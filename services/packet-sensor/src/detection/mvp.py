@@ -52,6 +52,17 @@ class MvpDetector:
     def _threshold(self, key: str, default: float | int) -> float | int:
         return self.policy.get("thresholds", {}).get(key, default)
 
+    def _is_ephemeral_dst_port(self, dst_port: int | None) -> bool:
+        """True if dst_port falls in the (configurable) ephemeral range.
+
+        Used to suppress OT-005 noise from client-side ephemeral ports. A
+        threshold of 0 disables the gate (keeps full OT-005 coverage).
+        """
+        if dst_port is None:
+            return False
+        ephemeral_min = int(self._threshold("ot005_ephemeral_dst_min", 32768))
+        return ephemeral_min > 0 and int(dst_port) >= ephemeral_min
+
     def _assets(self) -> list[dict]:
         return self.policy.get("assets", [])
 
@@ -114,20 +125,28 @@ class MvpDetector:
                     )
 
         if dst_ip and dst_port is not None and self._enabled("OT-005"):
-            port_key = f"{dst_ip}:{dst_port}"
-            if port_key not in self.inventory.known_dst_ports:
-                self.inventory.known_dst_ports.add(port_key)
-                allowed_ports = self._global_allowlist("ports")
-                if str(dst_port) not in allowed_ports and port_key.lower() not in allowed_ports:
-                    events.append(
-                        self._event(
-                            "OT-005",
-                            src_ip=src_ip or "",
-                            dst_ip=dst_ip,
-                            dst_port=dst_port,
-                            evidence={"destination": port_key},
+            # Ephemeral-port gate: client-side ephemeral ports (the high range used
+            # for the local end of an outbound connection) show up as `dst_port` on
+            # the return leg, so every legitimate outbound flow would otherwise emit a
+            # "new destination port" event. That is pure noise on IT/mixed segments.
+            # Gate them out here; genuine scan fan-out is still caught by OT-006, which
+            # samples every port regardless of this gate. Set `ot005_ephemeral_dst_min`
+            # to 0 in policy to disable (e.g. strict OT zones using low service ports).
+            if not self._is_ephemeral_dst_port(dst_port):
+                port_key = f"{dst_ip}:{dst_port}"
+                if port_key not in self.inventory.known_dst_ports:
+                    self.inventory.known_dst_ports.add(port_key)
+                    allowed_ports = self._global_allowlist("ports")
+                    if str(dst_port) not in allowed_ports and port_key.lower() not in allowed_ports:
+                        events.append(
+                            self._event(
+                                "OT-005",
+                                src_ip=src_ip or "",
+                                dst_ip=dst_ip,
+                                dst_port=dst_port,
+                                evidence={"destination": port_key},
+                            )
                         )
-                    )
 
         if src_ip and dst_port is not None and self._enabled("OT-006"):
             self.inventory.record_port_scan_sample(src_ip, dst_port)
