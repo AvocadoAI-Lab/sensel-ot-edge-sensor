@@ -41,6 +41,27 @@ export function updateShield(state) {
   }
 }
 
+const MODE_BADGE = {
+  listen: { label: "聆聽中", className: "listen" },
+  learning: { label: "學習中", className: "learning" },
+  detect: { label: "偵測中", className: "detect" },
+  idle: { label: "空閒", className: "idle" },
+};
+
+export function updateOperationalModeBadge(info) {
+  const badge = $("#headerModeBadge");
+  if (!badge) return;
+  const mode = String(info?.operational_mode || "idle").toLowerCase();
+  const ui = MODE_BADGE[mode] || MODE_BADGE.idle;
+  badge.className = `header-mode-badge ${ui.className}`;
+  badge.textContent = ui.label;
+  const parts = [ui.label];
+  if (info?.capture_interface) parts.push(info.capture_interface);
+  if (info?.session_id) parts.push(String(info.session_id).slice(0, 8));
+  if (info?.interrupt_hint) parts.push("上次學習已中斷");
+  badge.title = info?.cloud_controlled ? `雲端控制 · ${parts.join(" · ")}` : parts.join(" · ");
+}
+
 export function navigate(name) {
   window.dispatchEvent(new CustomEvent("edge:navigate", { detail: { name } }));
 }

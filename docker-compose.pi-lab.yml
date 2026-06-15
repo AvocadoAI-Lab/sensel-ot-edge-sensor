@@ -48,5 +48,5 @@ services:
       - LOCAL_MQTT_HOST=127.0.0.1
       - LOCAL_MQTT_PORT=1884
       - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
-      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-(ether proto 0x88b8) or (tcp port 102)}
+      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-(ether proto 0x88b8) or (tcp port 102) or (udp port 53) or (tcp port 389)}
       - DEPLOY_TARGET=pi4

@@ -66,6 +66,11 @@ class DetectionConfig(BaseModel):
     policy_path: str = "/app/data/agent/detection-policy.json"
     policy_stamp_path: str = "/app/data/agent/detection-policy.stamp"
     reload_check_sec: int = 5
+    operational_mode_path: str = "/app/data/agent/operational-mode.json"
+    operational_mode_stamp_path: str = "/app/data/agent/operational-mode.stamp"
+    operational_mode_reload_sec: int = 5
+    baseline_profile_path: str = "/app/data/agent/baseline-profile.json"
+    baseline_profile_stamp_path: str = "/app/data/agent/baseline-profile.stamp"
 
 
 class IocConfig(BaseModel):
@@ -168,6 +173,26 @@ def load_config(path: Path | None = None) -> AppConfig:
     detection_raw.setdefault(
         "reload_check_sec",
         int(os.environ.get("DETECTION_POLICY_RELOAD_SEC", detection_raw.get("reload_check_sec", 5))),
+    )
+    detection_raw.setdefault(
+        "operational_mode_path",
+        os.environ.get("OPERATIONAL_MODE_PATH", "/app/data/agent/operational-mode.json"),
+    )
+    detection_raw.setdefault(
+        "operational_mode_stamp_path",
+        os.environ.get("OPERATIONAL_MODE_STAMP_PATH", "/app/data/agent/operational-mode.stamp"),
+    )
+    detection_raw.setdefault(
+        "operational_mode_reload_sec",
+        int(os.environ.get("OPERATIONAL_MODE_RELOAD_SEC", detection_raw.get("operational_mode_reload_sec", 5))),
+    )
+    detection_raw.setdefault(
+        "baseline_profile_path",
+        os.environ.get("BASELINE_PROFILE_PATH", "/app/data/agent/baseline-profile.json"),
+    )
+    detection_raw.setdefault(
+        "baseline_profile_stamp_path",
+        os.environ.get("BASELINE_PROFILE_STAMP_PATH", "/app/data/agent/baseline-profile.stamp"),
     )
 
     ioc_raw = expanded.get("ioc", {})

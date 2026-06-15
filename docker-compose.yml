@@ -69,6 +69,8 @@ services:
       - EDGE_CONSOLE_AUDIT_LOG=/data/agent/console-audit.jsonl
       - DETECTION_POLICY_PATH=/data/agent/detection-policy.json
       - DETECTION_POLICY_STAMP_PATH=/data/agent/detection-policy.stamp
+      - OPERATIONAL_MODE_PATH=/data/agent/operational-mode.json
+      - LEARNING_SESSION_PATH=/data/agent/learning-session.json
     volumes:
       - ./data/agent:/data/agent
       - ./data/assets:/data/assets:ro
@@ -140,6 +142,26 @@ services:
       - POLICY_SYNC_MQTT_PORT=${POLICY_SYNC_MQTT_PORT:-${CONTROL_PLANE_MQTT_PORT:-1883}}
       - POLICY_SYNC_MQTT_TOPIC=${POLICY_SYNC_MQTT_TOPIC:-sensel/{tenant_id}/policy/blacklist}
       - DETECTION_POLICY_MQTT_TOPIC=${DETECTION_POLICY_MQTT_TOPIC:-sensel/{tenant_id}/policy/ot-detection}
+      - OPERATIONAL_MODE_PATH=/app/data/operational-mode.json
+      - OPERATIONAL_MODE_STAMP_PATH=/app/data/operational-mode.stamp
+      - LEARNING_SESSION_PATH=/app/data/learning-session.json
+      - OPERATIONAL_MODE_MQTT_ENABLED=${OPERATIONAL_MODE_MQTT_ENABLED:-false}
+      - OPERATIONAL_MODE_MQTT_TOPIC=${OPERATIONAL_MODE_MQTT_TOPIC:-sensel/{tenant_id}/cmd/{sensor_id}/operational}
+      - BASELINE_PROFILE_PATH=/app/data/baseline-profile.json
+      - BASELINE_PROFILE_STAMP_PATH=/app/data/baseline-profile.stamp
+      - BASELINE_PROFILE_MQTT_ENABLED=${BASELINE_PROFILE_MQTT_ENABLED:-false}
+      - BASELINE_PROFILE_MQTT_TOPIC=${BASELINE_PROFILE_MQTT_TOPIC:-sensel/{tenant_id}/baseline/+}
+      - TOPOLOGY_OVERRIDE_PATH=/app/data/topology-asset-overrides.json
+      - TOPOLOGY_OVERRIDE_STAMP_PATH=/app/data/topology-asset-overrides.stamp
+      - TOPOLOGY_OVERRIDE_MQTT_ENABLED=${TOPOLOGY_OVERRIDE_MQTT_ENABLED:-false}
+      - TOPOLOGY_OVERRIDE_MQTT_TOPIC=${TOPOLOGY_OVERRIDE_MQTT_TOPIC:-sensel/{tenant_id}/cmd/{sensor_id}/topology/override}
+      - OBSERVE_TICK_ENABLED=${OBSERVE_TICK_ENABLED:-true}
+      - OBSERVE_TICK_INTERVAL_SEC=${OBSERVE_TICK_INTERVAL_SEC:-60}
+      - TOPOLOGY_SNAPSHOT_ENABLED=${TOPOLOGY_SNAPSHOT_ENABLED:-true}
+      - TOPOLOGY_SNAPSHOT_INTERVAL_SEC=${TOPOLOGY_SNAPSHOT_INTERVAL_SEC:-120}
+      - TOPOLOGY_SNAPSHOT_DETECT_INTERVAL_SEC=${TOPOLOGY_SNAPSHOT_DETECT_INTERVAL_SEC:-300}
+      - CAPTURE_LIVE_PATH=/app/data/assets/capture-live.json
+      - LIVE_OBSERVED_PATH=/app/data/assets/baseline/live-observed.json
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
@@ -179,6 +201,11 @@ services:
       - DETECTION_POLICY_PATH=/app/data/agent/detection-policy.json
       - DETECTION_POLICY_STAMP_PATH=/app/data/agent/detection-policy.stamp
       - DETECTION_POLICY_RELOAD_SEC=5
+      - OPERATIONAL_MODE_PATH=/app/data/agent/operational-mode.json
+      - OPERATIONAL_MODE_STAMP_PATH=/app/data/agent/operational-mode.stamp
+      - BASELINE_PROFILE_PATH=/app/data/agent/baseline-profile.json
+      - BASELINE_PROFILE_STAMP_PATH=/app/data/agent/baseline-profile.stamp
+      - OPERATIONAL_MODE_RELOAD_SEC=5
       # Live baseline observation rolling window (drift): drop identities not
       # seen within this many seconds. 0 = accumulate since start.
       - LIVE_OBSERVE_WINDOW_SEC=${LIVE_OBSERVE_WINDOW_SEC:-900}

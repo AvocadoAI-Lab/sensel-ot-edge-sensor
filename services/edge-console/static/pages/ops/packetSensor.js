@@ -2,7 +2,7 @@
 import { $, $$, escapeHtml, toast } from "../../core/dom.js";
 import { fmtTime } from "../../core/format.js";
 import { getPacketSensorSettings, restartPacketSensor, testCapture,
-  validateBpf, buildBpfFromPresets, PROTOCOL_PRESETS } from "../../core/opsApi.js";
+  validateBpf, buildBpfFromPresets, PROTOCOL_PRESETS, getSystemStatus } from "../../core/opsApi.js";
 
 export const id = "packet";
 export const label = "Packet Sensor";
@@ -15,8 +15,17 @@ export function render(container, ctx) {
 }
 
 async function load(container, ctx) {
-  try { base = await getPacketSensorSettings(); }
-  catch (e) { container.innerHTML = `<div class="card-state is-error">${escapeHtml(e.message)}</div>`; return; }
+  let sys = null;
+  try {
+    [base, sys] = await Promise.all([getPacketSensorSettings(), getSystemStatus().catch(() => null)]);
+  } catch (e) { container.innerHTML = `<div class="card-state is-error">${escapeHtml(e.message)}</div>`; return; }
+
+  const op = sys?.operational_mode || {};
+  const opMode = String(op.operational_mode || "idle");
+  const OP_LABEL = { listen: "聆聽中", learning: "學習中", detect: "偵測中", idle: "空閒" };
+  const modeHint = (opMode === "learning" || opMode === "listen")
+    ? `<p class="ops-helper warn">目前模式：${OP_LABEL[opMode] || opMode} — 偵測規則未觸發告警</p>`
+    : `<p class="ops-helper muted">目前模式：${OP_LABEL[opMode] || opMode}</p>`;
 
   const curIface = ctx.value("capture.iface", base.capture_interface);
   const curBpf = ctx.value("capture.bpf", base.bpf);
@@ -26,6 +35,7 @@ async function load(container, ctx) {
     `<option value="${escapeHtml(i.name)}" ${i.name === curIface ? "selected" : ""}>${escapeHtml(i.name)} · ${escapeHtml(i.ipv4 || "無 IP")}</option>`).join("");
 
   container.innerHTML = `
+    ${modeHint}
     <div class="ops-grid ps-grid">
       <div class="ops-card">
         <div class="ops-card-head"><span class="ops-card-title">擷取介面</span>

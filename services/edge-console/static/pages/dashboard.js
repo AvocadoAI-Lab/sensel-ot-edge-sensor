@@ -4,7 +4,7 @@ import { api } from "../core/api.js";
 import { fmtTime, relTime, formatRate } from "../core/format.js";
 import { gauge, dot, badge, stateBlock, pipeline, copyField, STATE_LABEL, openDrawer } from "../ui/components.js";
 import { getReadiness, getBaseline, getEvents } from "../core/dataSource.js";
-import { setSensorMeta, updateShield, navigate } from "../core/shell.js";
+import { setSensorMeta, updateShield, updateOperationalModeBadge, navigate } from "../core/shell.js";
 
 export const meta = { title: "總覽 Dashboard", sub: "OT Edge Runtime + Security Validation" };
 
@@ -23,6 +23,7 @@ export function render(root) {
       <div class="grid-dash-top">
         <div class="card-ot readiness-card" id="readinessCard">${stateBlock("loading")}</div>
         <div class="card-ot" id="policyCard">${stateBlock("loading")}</div>
+        <div class="card-ot" id="operationalModeCard">${stateBlock("loading")}</div>
       </div>
 
       <div class="card-ot" id="pipelineCard" style="margin-top:1rem">
@@ -81,11 +82,42 @@ async function load() {
 
   renderReadiness(readiness);
   renderPolicy(status.metrics?.policy_gauge || {});
+  renderOperationalMode(status.operational_mode || {});
   renderPipeline(readiness, status, traffic);
   renderTelemetry(status.metrics?.telemetry || {}, status.metrics || {}, traffic);
   renderBaseline(baseline);
   renderEvents(evts);
   updateShield(baseline.state === "active" ? "green" : baseline.state === "not_loaded" ? "red" : "yellow");
+  updateOperationalModeBadge(status.operational_mode || {});
+}
+
+const OP_MODE_UI = {
+  listen: { label: "聆聽中", state: "blue" },
+  learning: { label: "學習中", state: "yellow" },
+  detect: { label: "偵測中", state: "green" },
+  idle: { label: "空閒", state: "gray" },
+};
+
+function renderOperationalMode(op) {
+  const card = $("#operationalModeCard");
+  if (!card) return;
+  const mode = String(op.operational_mode || "idle").toLowerCase();
+  const ui = OP_MODE_UI[mode] || OP_MODE_UI.idle;
+  const session = op.session_id ? `<div class="sub mono">Session ${escapeHtml(String(op.session_id).slice(0, 12))}</div>` : "";
+  const iface = op.capture_interface
+    ? `<div class="sub mono">Interface ${escapeHtml(op.capture_interface)}</div>`
+    : "";
+  const hint = op.interrupt_hint
+    ? `<div class="sub warn">上次學習已中斷</div>`
+    : (mode === "learning" || mode === "listen")
+      ? `<div class="sub muted">不產生安全告警</div>`
+      : "";
+  card.innerHTML = `
+    <div class="title">運行模式</div>
+    <div class="baseline-state">${badge(ui.label, ui.state)}</div>
+    ${iface}
+    ${session}
+    ${hint}`;
 }
 
 function renderReadiness(r) {

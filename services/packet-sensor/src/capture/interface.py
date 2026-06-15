@@ -107,6 +107,11 @@ class CaptureSession:
             detection_policy_path=config.detection.policy_path,
             detection_policy_stamp_path=config.detection.policy_stamp_path,
             detection_policy_reload_sec=config.detection.reload_check_sec,
+            operational_mode_path=config.detection.operational_mode_path,
+            operational_mode_stamp_path=config.detection.operational_mode_stamp_path,
+            operational_mode_reload_sec=config.detection.operational_mode_reload_sec,
+            baseline_profile_path=config.detection.baseline_profile_path,
+            baseline_profile_stamp_path=config.detection.baseline_profile_stamp_path,
             coverage_enabled=os.environ.get("COVERAGE_COUNTER_ENABLED", "true").strip().lower()
             not in ("0", "false", "no", "off"),
         )

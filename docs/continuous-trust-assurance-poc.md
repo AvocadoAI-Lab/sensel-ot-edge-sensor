@@ -550,6 +550,30 @@ curl -s "${LAYERC_URL}/api/cta/coverage?tenant_id=${TENANT_ID}" | jq '.summary'
 
 设计细节见 [Aristaconnector-Control-Plane/docs/adr/cta-aggregator-persistence.md](../Aristaconnector-Control-Plane/docs/adr/cta-aggregator-persistence.md)（相对路径供 monorepo 参考；实际位于 infer repo）。
 
+### 9.17 Baseline Live Learning × CTA 联调（P4，2026-06-13）
+
+Baseline Live Learning 引入 **operational mode**（`listen` / `learning` / `detect`），与 CTA 支柱 1「detect 计数」存在**互斥期**：
+
+| operational mode | packet-sensor 告警 | CTA `detect_count` | 说明 |
+|------------------|-------------------|-------------------|------|
+| `listen` | 抑制（不 emit） | 不应增长 | 纯观察，建立 baseline session |
+| `learning` | 抑制 | 不应增长 | profile 建议期；仍不计入 BAS detect |
+| `detect` | 正常 emit | 可增长 | 与 CTA T1046 等技法验证同源 |
+
+**验证脚本**（需 Portal 凭据 + lab `.env.lab`）：
+
+```bash
+cd sensel-ot-edge-sensor
+./scripts/verify-baseline-live-learning-lab.sh
+# 或 deploy 一键：PI_TARGET=edgex@192.168.1.124 ./scripts/deploy-ot-lab.sh --baseline-live-learning
+```
+
+**手动 §13 流程**（listen → learning → detect + CTA compare）见 [`runbook-baseline-live-learning-lab.md`](runbook-baseline-live-learning-lab.md)。
+
+**PRD / 实现锚点**：[`guacamole-ai/docs/PRD_OT_BASELINE_LIVE_LEARNING.md`](../guacamole-ai/docs/PRD_OT_BASELINE_LIVE_LEARNING.md)（P0–P4）；edge gating 在 `packet-sensor` `OperationalModeStore` + `processor._emit()`。
+
+**与 §9.16 双通道关系不变**：CTA detect 仍走 `coverage/v1`；baseline mode 仅 gate **edge 是否产生 coverage 计数**，不改变 Portal episode 去重语意。
+
 ---
 
 ## 附錄 — 關鍵程式碼錨點

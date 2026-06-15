@@ -32,3 +32,5 @@ def test_build_status_includes_baseline_card(tmp_path: Path, monkeypatch):
     out = build_status(store)
     assert "baseline" in out["cards"]
     assert "rule_counts_24h" in out["metrics"]
+    assert "operational_mode" in out
+    assert out["operational_mode"]["operational_mode"] == "idle"

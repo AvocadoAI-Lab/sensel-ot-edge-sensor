@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from src.policy.loader import load_policy
+from src.policy.baseline_profile_store import BaselineProfileStore
 
 
 class DetectionPolicyStore:
@@ -17,6 +18,8 @@ class DetectionPolicyStore:
         policy_path: str | Path,
         stamp_path: str | Path,
         fallback_policy_path: str | Path,
+        baseline_profile_path: str | Path | None = None,
+        baseline_profile_stamp_path: str | Path | None = None,
         reload_check_sec: float = 5.0,
     ) -> None:
         self._policy_path = Path(policy_path)
@@ -29,6 +32,15 @@ class DetectionPolicyStore:
         self._rules_enabled: set[str] = set()
         self._baseline: dict[str, Any] = {}
         self._version = ""
+        self._profile_store = (
+            BaselineProfileStore(
+                profile_path=baseline_profile_path,
+                stamp_path=baseline_profile_stamp_path or Path(str(baseline_profile_path) + ".stamp"),
+                reload_check_sec=reload_check_sec,
+            )
+            if baseline_profile_path
+            else None
+        )
         self.maybe_reload(force=True)
 
     @property
@@ -68,11 +80,24 @@ class DetectionPolicyStore:
         if isinstance(rules, list):
             self._rules_enabled = {str(r).strip().upper() for r in rules if str(r).strip()}
 
-        baseline = artifact.get("baseline")
-        if isinstance(baseline, dict) and baseline:
-            self._baseline = baseline
+        if self._profile_store is not None:
+            self._profile_store.maybe_reload(force=force)
+
+        profile_baseline = (
+            self._profile_store.baseline() if self._profile_store is not None else {}
+        )
+        if profile_baseline:
+            self._baseline = profile_baseline
         else:
-            self._baseline = load_policy(self._fallback_policy_path)
+            baseline = artifact.get("baseline")
+            if isinstance(baseline, dict) and baseline:
+                self._baseline = baseline
+            else:
+                self._baseline = load_policy(self._fallback_policy_path)
+
+        thresholds = artifact.get("thresholds")
+        if isinstance(thresholds, dict) and thresholds:
+            self._baseline.setdefault("thresholds", {}).update(thresholds)
 
         return changed
 

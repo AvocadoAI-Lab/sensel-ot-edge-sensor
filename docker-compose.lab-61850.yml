@@ -57,6 +57,24 @@ services:
       MMS_DST_IP: ${MMS_DST_IP:-192.168.10.50}
       MMS_INTERVAL_SEC: ${MMS_INTERVAL_SEC:-2}
 
+  it-traffic-publisher:
+    build:
+      context: .
+      dockerfile: lab/it-traffic/Dockerfile
+    container_name: sensel-it-traffic-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      IT_INTERFACE: ${IT_INTERFACE:-eth0}
+      IT_SRC_IP: ${IT_SRC_IP:-192.168.10.88}
+      IT_DNS_IP: ${IT_DNS_IP:-192.168.10.10}
+      IT_LDAP_IP: ${IT_LDAP_IP:-192.168.10.10}
+      IT_EXTERNAL_DNS_IP: ${IT_EXTERNAL_DNS_IP:-8.8.8.8}
+      IT_INTERVAL_SEC: ${IT_INTERVAL_SEC:-3}
+
   61850-sim-mms:
     profiles: [lab-mms-amd64]
     image: stinging/61850-sim:latest

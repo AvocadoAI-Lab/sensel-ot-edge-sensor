@@ -14,6 +14,8 @@ from src.config.settings import AppConfig
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = "ot_detection_policy.v1"
+SCHEMA_VERSION_V2 = "ot_detection_policy.v2"
+_SUPPORTED_SCHEMAS = frozenset({SCHEMA_VERSION, SCHEMA_VERSION_V2})
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,15 @@ class DetectionPolicySync:
     def enabled(self) -> bool:
         return self._enabled
 
+    def read_version(self) -> str:
+        if not self._policy_path.is_file():
+            return ""
+        try:
+            raw = json.loads(self._policy_path.read_text(encoding="utf-8"))
+            return str(raw.get("version") or "") if isinstance(raw, dict) else ""
+        except (json.JSONDecodeError, OSError):
+            return ""
+
     def apply_artifact(
         self,
         artifact: dict[str, Any],
@@ -61,13 +72,24 @@ class DetectionPolicySync:
 
         version = str(artifact.get("version") or artifact.get("artifact_version") or "").strip()
         site_id = str(artifact.get("site_id") or "").strip()
+        schema = str(artifact.get("schema_version") or SCHEMA_VERSION).strip()
         rules = artifact.get("rules_enabled")
         baseline = artifact.get("baseline")
+        thresholds = artifact.get("thresholds")
+
+        if schema not in _SUPPORTED_SCHEMAS:
+            return DetectionPolicyResult(
+                ok=False,
+                changed=False,
+                error=f"unsupported schema_version: {schema}",
+            )
 
         if rules is not None and not isinstance(rules, list):
             return DetectionPolicyResult(ok=False, changed=False, error="rules_enabled must be a list")
         if baseline is not None and not isinstance(baseline, dict):
             return DetectionPolicyResult(ok=False, changed=False, error="baseline must be an object")
+        if thresholds is not None and not isinstance(thresholds, dict):
+            return DetectionPolicyResult(ok=False, changed=False, error="thresholds must be an object")
 
         existing: dict[str, Any] = {}
         if self._policy_path.is_file():
@@ -91,7 +113,7 @@ class DetectionPolicySync:
             )
 
         payload: dict[str, Any] = {
-            "schema_version": str(artifact.get("schema_version") or SCHEMA_VERSION),
+            "schema_version": schema,
             "tenant_id": tenant_id,
             "site_id": site_id,
             "sensor_id": artifact.get("sensor_id"),
@@ -105,10 +127,18 @@ class DetectionPolicySync:
         elif existing.get("rules_enabled"):
             payload["rules_enabled"] = existing["rules_enabled"]
 
-        if baseline is not None:
-            payload["baseline"] = baseline
-        elif existing.get("baseline"):
-            payload["baseline"] = existing["baseline"]
+        if schema == SCHEMA_VERSION_V2:
+            if thresholds is not None:
+                payload["thresholds"] = thresholds
+            elif existing.get("thresholds"):
+                payload["thresholds"] = existing["thresholds"]
+        else:
+            if baseline is not None:
+                payload["baseline"] = baseline
+            elif existing.get("baseline"):
+                payload["baseline"] = existing["baseline"]
+            if thresholds is not None:
+                payload["thresholds"] = thresholds
 
         self._policy_path.parent.mkdir(parents=True, exist_ok=True)
         self._policy_path.write_text(

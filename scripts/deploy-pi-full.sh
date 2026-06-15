@@ -81,7 +81,25 @@ if [[ ! -f config/policy/baseline.json ]]; then
   cp config/policy/baseline.example.json config/policy/baseline.json
 fi
 
-if [[ ! -f data/agent/capture.env ]]; then
+LAB_CAPTURE_BPF='(ether proto 0x88b8) or (tcp port 102) or (udp port 53) or (tcp port 389)'
+LAB_MQTT_FLAGS=(
+  OPERATIONAL_MODE_MQTT_ENABLED=true
+  BASELINE_PROFILE_MQTT_ENABLED=true
+  TOPOLOGY_OVERRIDE_MQTT_ENABLED=true
+  TOPOLOGY_SNAPSHOT_DETECT_INTERVAL_SEC=60
+)
+mkdir -p data/agent
+if [[ "${DEPLOY_PROFILE}" == "lab" ]]; then
+  if [[ -f data/agent/capture.env ]] && grep -q '^CAPTURE_BPF_FILTER=' data/agent/capture.env; then
+    sed -i "s|^CAPTURE_BPF_FILTER=.*|CAPTURE_BPF_FILTER=${LAB_CAPTURE_BPF}|" data/agent/capture.env
+  elif [[ ! -f data/agent/capture.env ]]; then
+    cat > data/agent/capture.env <<CAP
+CAPTURE_INTERFACE=eth0
+CAPTURE_BPF_FILTER=${LAB_CAPTURE_BPF}
+MQTT_TENANT_ID=${MQTT_TENANT_ID:-default}
+CAP
+  fi
+elif [[ ! -f data/agent/capture.env ]]; then
   cat > data/agent/capture.env <<CAP
 CAPTURE_INTERFACE=eth0
 CAPTURE_BPF_FILTER=(ether proto 0x88b8) or (tcp port 102)
@@ -90,6 +108,16 @@ CAP
 fi
 
 ./scripts/seed-pi-env.sh
+if [[ "${DEPLOY_PROFILE}" == "lab" ]] && [[ -f .env ]]; then
+  for kv in "${LAB_MQTT_FLAGS[@]}"; do
+    key="${kv%%=*}"
+    if grep -q "^${key}=" .env; then
+      sed -i "s|^${key}=.*|${kv}|" .env
+    else
+      echo "${kv}" >> .env
+    fi
+  done
+fi
 if [[ -n "${OT_REGISTRATION_TOKEN:-}" ]] && ! grep -q '^OT_REGISTRATION_TOKEN=.' .env 2>/dev/null; then
   echo "OT_REGISTRATION_TOKEN=${OT_REGISTRATION_TOKEN}" >> .env
 fi

@@ -108,6 +108,31 @@ class PolicySyncConfig(BaseModel):
     detection_policy_stamp_path: str = "/app/data/detection-policy.stamp"
     detection_policy_mqtt_enabled: bool = True
     detection_policy_mqtt_topic_template: str = "sensel/{tenant_id}/policy/ot-detection"
+    operational_mode_enabled: bool = True
+    operational_mode_path: str = "/app/data/operational-mode.json"
+    operational_mode_stamp_path: str = "/app/data/operational-mode.stamp"
+    operational_mode_mqtt_enabled: bool = True
+    operational_mode_mqtt_topic_template: str = "sensel/{tenant_id}/cmd/{sensor_id}/operational"
+    learning_session_path: str = "/app/data/learning-session.json"
+    baseline_profile_enabled: bool = True
+    baseline_profile_path: str = "/app/data/baseline-profile.json"
+    baseline_profile_stamp_path: str = "/app/data/baseline-profile.stamp"
+    baseline_profile_mqtt_enabled: bool = True
+    baseline_profile_mqtt_topic_template: str = "sensel/{tenant_id}/baseline/+"
+    topology_override_enabled: bool = True
+    topology_override_path: str = "/app/data/topology-asset-overrides.json"
+    topology_override_stamp_path: str = "/app/data/topology-asset-overrides.stamp"
+    topology_override_mqtt_enabled: bool = True
+    topology_override_mqtt_topic_template: str = "sensel/{tenant_id}/cmd/{sensor_id}/topology/override"
+    observe_tick_enabled: bool = True
+    observe_tick_interval_sec: int = 60
+    capture_live_path: str = "/app/data/assets/capture-live.json"
+    live_observed_path: str = "/app/data/assets/baseline/live-observed.json"
+    observe_tick_state_path: str = "/app/data/observe-tick-state.json"
+    topology_snapshot_enabled: bool = True
+    topology_snapshot_interval_sec: int = 120
+    topology_snapshot_detect_interval_sec: int = 300
+    topology_snapshot_state_path: str = "/app/data/topology-snapshot-state.json"
 
 
 class SightingReportConfig(BaseModel):
@@ -314,6 +339,125 @@ def load_config(path: Path | None = None) -> AppConfig:
             "DETECTION_POLICY_MQTT_TOPIC",
             "sensel/{tenant_id}/policy/ot-detection",
         ),
+    )
+    op_enabled_env = os.environ.get("OPERATIONAL_MODE_ENABLED", "").lower()
+    if op_enabled_env in ("0", "false", "no"):
+        policy_raw["operational_mode_enabled"] = False
+    elif op_enabled_env in ("1", "true", "yes"):
+        policy_raw["operational_mode_enabled"] = True
+    policy_raw.setdefault(
+        "operational_mode_path",
+        os.environ.get("OPERATIONAL_MODE_PATH", "/app/data/operational-mode.json"),
+    )
+    policy_raw.setdefault(
+        "operational_mode_stamp_path",
+        os.environ.get("OPERATIONAL_MODE_STAMP_PATH", "/app/data/operational-mode.stamp"),
+    )
+    op_mqtt_env = os.environ.get("OPERATIONAL_MODE_MQTT_ENABLED", "").lower()
+    if op_mqtt_env in ("0", "false", "no"):
+        policy_raw["operational_mode_mqtt_enabled"] = False
+    elif op_mqtt_env in ("1", "true", "yes"):
+        policy_raw["operational_mode_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "operational_mode_mqtt_topic_template",
+        os.environ.get(
+            "OPERATIONAL_MODE_MQTT_TOPIC",
+            "sensel/{tenant_id}/cmd/{sensor_id}/operational",
+        ),
+    )
+    policy_raw.setdefault(
+        "learning_session_path",
+        os.environ.get("LEARNING_SESSION_PATH", "/app/data/learning-session.json"),
+    )
+    policy_raw.setdefault(
+        "baseline_profile_path",
+        os.environ.get("BASELINE_PROFILE_PATH", "/app/data/baseline-profile.json"),
+    )
+    policy_raw.setdefault(
+        "baseline_profile_stamp_path",
+        os.environ.get("BASELINE_PROFILE_STAMP_PATH", "/app/data/baseline-profile.stamp"),
+    )
+    bprof_mqtt_env = os.environ.get("BASELINE_PROFILE_MQTT_ENABLED", "").lower()
+    if bprof_mqtt_env in ("0", "false", "no"):
+        policy_raw["baseline_profile_mqtt_enabled"] = False
+    elif bprof_mqtt_env in ("1", "true", "yes"):
+        policy_raw["baseline_profile_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "baseline_profile_mqtt_topic_template",
+        os.environ.get("BASELINE_PROFILE_MQTT_TOPIC", "sensel/{tenant_id}/baseline/+"),
+    )
+    topo_env = os.environ.get("TOPOLOGY_OVERRIDE_ENABLED", "").lower()
+    if topo_env in ("0", "false", "no"):
+        policy_raw["topology_override_enabled"] = False
+    elif topo_env in ("1", "true", "yes"):
+        policy_raw["topology_override_enabled"] = True
+    policy_raw.setdefault(
+        "topology_override_path",
+        os.environ.get("TOPOLOGY_OVERRIDE_PATH", "/app/data/topology-asset-overrides.json"),
+    )
+    policy_raw.setdefault(
+        "topology_override_stamp_path",
+        os.environ.get("TOPOLOGY_OVERRIDE_STAMP_PATH", "/app/data/topology-asset-overrides.stamp"),
+    )
+    topo_mqtt_env = os.environ.get("TOPOLOGY_OVERRIDE_MQTT_ENABLED", "").lower()
+    if topo_mqtt_env in ("0", "false", "no"):
+        policy_raw["topology_override_mqtt_enabled"] = False
+    elif topo_mqtt_env in ("1", "true", "yes"):
+        policy_raw["topology_override_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "topology_override_mqtt_topic_template",
+        os.environ.get(
+            "TOPOLOGY_OVERRIDE_MQTT_TOPIC",
+            "sensel/{tenant_id}/cmd/{sensor_id}/topology/override",
+        ),
+    )
+    observe_env = os.environ.get("OBSERVE_TICK_ENABLED", "").lower()
+    if observe_env in ("0", "false", "no"):
+        policy_raw["observe_tick_enabled"] = False
+    elif observe_env in ("1", "true", "yes"):
+        policy_raw["observe_tick_enabled"] = True
+    policy_raw.setdefault(
+        "observe_tick_interval_sec",
+        int(os.environ.get("OBSERVE_TICK_INTERVAL_SEC", policy_raw.get("observe_tick_interval_sec", 60))),
+    )
+    policy_raw.setdefault(
+        "capture_live_path",
+        os.environ.get("CAPTURE_LIVE_PATH", "/app/data/assets/capture-live.json"),
+    )
+    policy_raw.setdefault(
+        "live_observed_path",
+        os.environ.get("LIVE_OBSERVED_PATH", "/app/data/assets/baseline/live-observed.json"),
+    )
+    policy_raw.setdefault(
+        "observe_tick_state_path",
+        os.environ.get("OBSERVE_TICK_STATE_PATH", "/app/data/observe-tick-state.json"),
+    )
+    topo_snap_env = os.environ.get("TOPOLOGY_SNAPSHOT_ENABLED", "").lower()
+    if topo_snap_env in ("0", "false", "no"):
+        policy_raw["topology_snapshot_enabled"] = False
+    elif topo_snap_env in ("1", "true", "yes"):
+        policy_raw["topology_snapshot_enabled"] = True
+    policy_raw.setdefault(
+        "topology_snapshot_interval_sec",
+        int(
+            os.environ.get(
+                "TOPOLOGY_SNAPSHOT_INTERVAL_SEC",
+                policy_raw.get("topology_snapshot_interval_sec", 120),
+            )
+        ),
+    )
+    policy_raw.setdefault(
+        "topology_snapshot_detect_interval_sec",
+        int(
+            os.environ.get(
+                "TOPOLOGY_SNAPSHOT_DETECT_INTERVAL_SEC",
+                policy_raw.get("topology_snapshot_detect_interval_sec", 300),
+            )
+        ),
+    )
+    policy_raw.setdefault(
+        "topology_snapshot_state_path",
+        os.environ.get("TOPOLOGY_SNAPSHOT_STATE_PATH", "/app/data/topology-snapshot-state.json"),
     )
 
     sighting_raw = expanded.get("sighting_report", {})

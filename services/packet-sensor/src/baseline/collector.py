@@ -15,10 +15,11 @@ from typing import Any
 
 from src.parser.l2.ethernet import parse_ethernet
 from src.parser.l3.ip import parse_ip
-from src.parser.l4.transport import parse_transport
+from src.parser.l4.transport import FlowTuple, parse_transport
 from src.parser.l7.iec61850.goose import parse_goose_packet
 from src.parser.l7.iec61850.mms import MMS_PORT, parse_mms_packet
 from src.parser.l7.modbus.tcp import MODBUS_PORT, parse_modbus_tcp
+from src.topology.protocol_hints import DNS_SERVER_MIN_CLIENTS, LDAP_SERVER_MIN_CLIENTS, hint_for_port
 
 GOOSE_DEFAULT_SILENCE_SEC = 30
 
@@ -59,7 +60,9 @@ class _ModbusObs:
 class BaselineCollector:
     """Reuse the live parsers to learn a candidate baseline."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, tenant_id: str = "", sensor_id: str = "") -> None:
+        self.tenant_id = tenant_id
+        self.sensor_id = sensor_id
         self.packets = 0
         self.parse_errors = 0
         self._goose: dict[str, _GooseObs] = {}
@@ -69,6 +72,9 @@ class BaselineCollector:
         self._ips: set[str] = set()
         self._mac_ip: dict[str, str] = {}
         self._comm_pairs: dict[tuple[str, str], float] = {}
+        self._ip_hints: dict[str, set[str]] = {}
+        self._ldap_clients: dict[str, dict[str, float]] = {}
+        self._dns_clients: dict[str, dict[str, float]] = {}
 
     # -- ingestion -----------------------------------------------------------
     def observe(self, packet) -> None:
@@ -95,6 +101,22 @@ class BaselineCollector:
         modbus = parse_modbus_tcp(packet)
         if modbus is not None:
             self.feed_modbus(modbus)
+
+        flow = parse_transport(packet)
+        if flow is not None:
+            self.feed_transport(flow)
+
+    def feed_transport(self, flow: FlowTuple) -> None:
+        hint = hint_for_port(flow.dst_port)
+        if not hint or not flow.src_ip or not flow.dst_ip:
+            return
+        now = time.monotonic()
+        self._ip_hints.setdefault(flow.dst_ip, set()).add(hint)
+        self._ip_hints.setdefault(flow.src_ip, set()).add(hint)
+        if hint == "ldap":
+            self._ldap_clients.setdefault(flow.dst_ip, {})[flow.src_ip] = now
+        if hint == "dns":
+            self._dns_clients.setdefault(flow.dst_ip, {})[flow.src_ip] = now
 
     # -- feed APIs (accept already-parsed objects; reused by the live pipeline)
     def feed_endpoints(self, src_mac: str | None, src_ip: str | None, dst_ip: str | None) -> None:
@@ -244,6 +266,30 @@ class BaselineCollector:
             "modbus_servers": len(modbus),
         }
 
+    def port_hint_index(self, cutoff: float | None = None) -> dict[str, dict[str, Any]]:
+        out: dict[str, dict[str, Any]] = {}
+        for ip, hints in self._ip_hints.items():
+            ldap_clients = {
+                cip
+                for cip, seen in (self._ldap_clients.get(ip) or {}).items()
+                if self._fresh(seen, cutoff)
+            }
+            dns_clients = {
+                cip
+                for cip, seen in (self._dns_clients.get(ip) or {}).items()
+                if self._fresh(seen, cutoff)
+            }
+            out[ip] = {
+                "hints": sorted(hints),
+                "ldap_clients": len(ldap_clients),
+                "dns_clients": len(dns_clients),
+                "ldap_client_ips": sorted(ldap_clients),
+                "dns_client_ips": sorted(dns_clients),
+                "ldap_server": len(ldap_clients) >= LDAP_SERVER_MIN_CLIENTS,
+                "dns_server": len(dns_clients) >= DNS_SERVER_MIN_CLIENTS,
+            }
+        return out
+
     def to_candidate(
         self,
         *,
@@ -262,6 +308,21 @@ class BaselineCollector:
         goose = self.goose_publishers(cutoff)
         mms = self.mms_ieds(cutoff)
         modbus = self.modbus_servers(cutoff)
+        observed = {
+            "iec61850": {"goose_publishers": goose, "mms_ieds": mms},
+            "modbus_servers": modbus,
+            "comm_pairs": [{"src": s, "dst": d} for s, d in self._comm_pairs_fresh(cutoff)],
+            "mac_ip": [{"mac": m, "ip": ip} for m, ip in sorted(self._mac_ip.items())],
+        }
+        if self.tenant_id and self.sensor_id:
+            from src.topology.purdue_classifier import build_observed_topology
+
+            observed["topology"] = build_observed_topology(
+                observed,
+                tenant_id=self.tenant_id,
+                sensor_id=self.sensor_id,
+                port_hints=self.port_hint_index(cutoff),
+            )
         return {
             "schema": "sensel.baseline/1",
             "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -269,10 +330,5 @@ class BaselineCollector:
             "source_ref": source_ref,
             "window_sec": window_sec,
             "stats": self.summary(cutoff, goose=goose, mms=mms, modbus=modbus),
-            "observed": {
-                "iec61850": {"goose_publishers": goose, "mms_ieds": mms},
-                "modbus_servers": modbus,
-                "comm_pairs": [{"src": s, "dst": d} for s, d in self._comm_pairs_fresh(cutoff)],
-                "mac_ip": [{"mac": m, "ip": ip} for m, ip in sorted(self._mac_ip.items())],
-            },
+            "observed": observed,
         }

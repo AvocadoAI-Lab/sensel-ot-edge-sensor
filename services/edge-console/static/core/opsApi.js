@@ -84,6 +84,7 @@ export async function getSystemStatus() {
     baseline: cards.baseline || {},
     sensel: cards.sensel || {},
     telemetry: tel,
+    operational_mode: status.operational_mode || {},
     vpn: vpn ? { connected: vpn.connected === true, profile: vpn.profile || vpn.active || null, detail: vpn.detail || "" } : null,
     raw: status,
   };

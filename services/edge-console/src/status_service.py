@@ -10,6 +10,7 @@ from typing import Any
 from src.agent_runtime import load_agent_runtime, northbound_mqtt_ok
 from src.config_store import ConfigStore, PlatformConfig
 from src.events_index import scan_events_stats
+from src.operational_mode_service import read_operational_mode
 from src.traffic_service import read_live_traffic
 
 _PING_CACHE_TTL_SEC = 30.0
@@ -134,12 +135,14 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
         or config.mqtt_tenant_id
         or str(runtime.get("tenant_id") or "")
     )
+    operational = read_operational_mode()
 
     return {
         "configured": config.configured,
         "sensor_id": config.sensor_id,
         "site_id": config.site_id,
         "tenant_id": tenant_id,
+        "operational_mode": operational,
         "cards": {
             "sensel": {
                 "label": "SenseL Platform",

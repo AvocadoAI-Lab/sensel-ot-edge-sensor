@@ -21,6 +21,8 @@
 #   ./scripts/deploy-ot-lab.sh --sprint4    # deploy all + Sprint4 gate (S5-G1)
 #   ./scripts/deploy-ot-lab.sh --verify-sprint4  # Sprint4 gate only (no deploy)
 #   ./scripts/deploy-ot-lab.sh --verify-cta    # CTA coverage gate only (no deploy)
+#   ./scripts/deploy-ot-lab.sh --verify-baseline-live-learning  # P4 baseline gate only
+#   ./scripts/deploy-ot-lab.sh --baseline-live-learning       # deploy all + P4 verify
 #
 set -euo pipefail
 
@@ -54,6 +56,8 @@ VERIFY_TRACK_B=0
 SPRINT4=0
 VERIFY_SPRINT4=0
 VERIFY_CTA=0
+VERIFY_BASELINE_LIVE_LEARNING=0
+VERIFY_TOPOLOGY_PRD11=0
 CTA_MODE=0
 EXPECT_LLM=0
 
@@ -66,6 +70,9 @@ for arg in "$@"; do
     --verify-track-b) VERIFY_ONLY=1; VERIFY_TRACK_B=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
     --verify-sprint4) VERIFY_ONLY=1; VERIFY_SPRINT4=1; SPRINT4=1; EXPECT_LLM=1 ;;
     --verify-cta) VERIFY_ONLY=1; VERIFY_CTA=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
+    --verify-baseline-live-learning) VERIFY_ONLY=1; VERIFY_BASELINE_LIVE_LEARNING=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
+    --verify-topology-prd11) VERIFY_ONLY=1; VERIFY_TOPOLOGY_PRD11=1; DEPLOY_108=0; DEPLOY_203=0; DEPLOY_PI=0 ;;
+    --baseline-live-learning) VERIFY_BASELINE_LIVE_LEARNING=1 ;;
     --track-b)  VERIFY_TRACK_B=1 ;;
     --sprint4)  SPRINT4=1; VERIFY_SPRINT4=1; EXPECT_LLM=1 ;;
     --cta)      CTA_MODE=1; VERIFY_CTA=1 ;;
@@ -112,6 +119,15 @@ set -euo pipefail
 cd "${SENSEL_REMOTE_DIR}"
 docker compose exec -T api bash -c 'cd sensel_control_plane && alembic upgrade head' || echo "WARN: alembic skipped (check sensel_control_plane path)"
 REMOTE
+  if [[ "${DEPLOY_WITH_EDR:-1}" == "1" ]]; then
+    echo "==> [108] Patch Wazuh indexer connector + optional M2 netplan"
+    chmod +x "$ROOT/scripts/lab-fix-wazuh-indexer-connector.sh" 2>/dev/null || true
+    "$ROOT/scripts/lab-fix-wazuh-indexer-connector.sh" || echo "WARN: wazuh indexer connector patch skipped"
+    if [[ "${LAB_M2_PERSIST_NETPLAN:-1}" == "1" ]]; then
+      chmod +x "$ROOT/scripts/lab-setup-m2-mirror-ip.sh" 2>/dev/null || true
+      M2_PERSIST_NETPLAN=1 "$ROOT/scripts/lab-setup-m2-mirror-ip.sh" || echo "WARN: M2 netplan setup skipped"
+    fi
+  fi
   echo "==> [108] SenseL API: ${CONTROL_PLANE_BASE_URL}/api/health"
 }
 
@@ -182,6 +198,22 @@ if [[ "$SPRINT4" == "1" ]]; then
   echo "==> Sprint 4 mode: OT_LLM_ENRICH=$OT_LLM_ENRICH OT_BEHAVIOR_AE_ENABLED=$OT_BEHAVIOR_AE_ENABLED EXPECT_LLM=$EXPECT_LLM"
 fi
 
+verify_topology_prd11_lab() {
+  echo "==> [PRD §11] OT Topology full acceptance gate"
+  chmod +x "$ROOT/scripts/verify-topology-full-gate-lab.sh" 2>/dev/null || true
+  export CONTROL_PLANE_BASE_URL TENANT_ID WORKSPACE_ID BASELINE_SENSOR_ID
+  export PORTAL_EMAIL PORTAL_PASSWORD PORTAL_BEARER_TOKEN OT_SECURITY_INGEST_SECRET
+  "$ROOT/scripts/verify-topology-full-gate-lab.sh" --prd-11
+}
+
+verify_baseline_live_learning_lab() {
+  echo "==> [P4] Baseline Live Learning lab acceptance"
+  chmod +x "$ROOT/scripts/verify-baseline-live-learning-lab.sh" 2>/dev/null || true
+  export CONTROL_PLANE_BASE_URL LAYERC_URL EDGE_CONSOLE_URL TENANT_ID WORKSPACE_ID
+  export PORTAL_EMAIL PORTAL_PASSWORD PORTAL_BEARER_TOKEN BASELINE_SENSOR_ID
+  "$ROOT/scripts/verify-baseline-live-learning-lab.sh" "$@"
+}
+
 verify_cta_lab() {
   echo "==> [CTA] Coverage lab acceptance gate"
   chmod +x "$ROOT/scripts/verify-cta-lab.sh" 2>/dev/null || true
@@ -199,6 +231,14 @@ verify_cta_lab() {
 if [[ "$VERIFY_ONLY" == "1" ]]; then
   if [[ "$VERIFY_CTA" == "1" ]]; then
     verify_cta_lab
+    exit $?
+  fi
+  if [[ "$VERIFY_BASELINE_LIVE_LEARNING" == "1" ]]; then
+    verify_baseline_live_learning_lab
+    exit $?
+  fi
+  if [[ "$VERIFY_TOPOLOGY_PRD11" == "1" ]]; then
+    verify_topology_prd11_lab
     exit $?
   fi
   if [[ "$VERIFY_SPRINT4" == "1" ]]; then
@@ -226,6 +266,8 @@ if [[ "$VERIFY_SPRINT4" == "1" ]]; then
   verify_sprint4_lab
 elif [[ "$VERIFY_CTA" == "1" ]]; then
   verify_cta_lab || true
+elif [[ "$VERIFY_BASELINE_LIVE_LEARNING" == "1" ]]; then
+  verify_baseline_live_learning_lab || true
 else
   verify_layerc
 fi
@@ -247,4 +289,5 @@ echo "  EMQX MQTT:      mqtt://192.168.1.203:1883"
 echo "  Pi Edge Console: http://192.168.1.124:8090"
 echo ""
 echo "CTA verify: ./scripts/verify-cta-lab.sh  (or ./scripts/deploy-ot-lab.sh --verify-cta)"
-echo "Verify Portal: 工控安全防護 → CTA 覆蓋率 / 事件 / 感測器 / 資產"
+echo "Baseline Live Learning: ./scripts/verify-baseline-live-learning-lab.sh  (see docs/runbook-baseline-live-learning-lab.md)"
+echo "Verify Portal: 工控安全防護 → CTA 覆蓋率 / 事件 / 感測器 / Baseline Profiles"

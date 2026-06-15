@@ -19,3 +19,11 @@ def telemetry_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
 
 def coverage_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
     return f"{topic_base(tenant_id, site_id, sensor_id)}/coverage/v1"
+
+
+def observe_tick_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return f"{topic_base(tenant_id, site_id, sensor_id)}/baseline/observe/v1"
+
+
+def topology_snapshot_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return f"{topic_base(tenant_id, site_id, sensor_id)}/topology/snapshot/v1"

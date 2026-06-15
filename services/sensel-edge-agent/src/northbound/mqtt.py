@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from src.config.settings import NorthboundMqttConfig, SensorIdentity
-from src.northbound.topics import coverage_topic, events_topic, state_topic
+from src.northbound.topics import coverage_topic, events_topic, observe_tick_topic, state_topic, topology_snapshot_topic
 from src.runtime.agent_snapshot import write_agent_runtime
 
 logger = logging.getLogger(__name__)
@@ -215,6 +215,30 @@ class NorthboundMqttClient:
             "coverage",
             coverage,
             observed_at=str(coverage.get("generated_at") or _utc_now_iso()),
+        )
+        return self.publish_json(topic, body, qos=1)
+
+    def publish_observe_tick(self, tick: dict[str, Any]) -> bool:
+        if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):
+            return False
+        tenant_id = str(tick.get("tenant_id") or self._cfg.tenant_id).strip()
+        topic = observe_tick_topic(tenant_id, self._sensor.site_id, self._sensor.id)
+        body = self._envelope(
+            "baseline_observe_tick",
+            tick,
+            observed_at=str(tick.get("observed_at") or _utc_now_iso()),
+        )
+        return self.publish_json(topic, body, qos=1)
+
+    def publish_topology_snapshot(self, payload: dict[str, Any]) -> bool:
+        if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):
+            return False
+        tenant_id = str(payload.get("tenant_id") or self._cfg.tenant_id).strip()
+        topic = topology_snapshot_topic(tenant_id, self._sensor.site_id, self._sensor.id)
+        body = self._envelope(
+            "ot_topology_snapshot",
+            payload,
+            observed_at=str(payload.get("observed_at") or _utc_now_iso()),
         )
         return self.publish_json(topic, body, qos=1)
 

@@ -2,6 +2,7 @@
 import { $, escapeHtml, toast } from "../../core/dom.js";
 import { fmtTime, relTime } from "../../core/format.js";
 import { signalBars } from "../../ui/components.js";
+import { updateOperationalModeBadge } from "../../core/shell.js";
 import { getSystemStatus, diagnoseNetwork, getWifiProfiles, getAuditLogs,
   testMqttConnection, testCapture } from "../../core/opsApi.js";
 
@@ -52,6 +53,13 @@ async function load(container, ctx) {
   if (!grid) return;
   if (!sys) { grid.innerHTML = `<div class="card-state is-error">無法取得狀態</div>`; return; }
 
+  updateOperationalModeBadge(sys.operational_mode || sys.raw?.operational_mode || {});
+
+  const op = sys.operational_mode || sys.raw?.operational_mode || {};
+  const opMode = String(op.operational_mode || "idle");
+  const OP_LABEL = { listen: "聆聽中", learning: "學習中", detect: "偵測中", idle: "空閒" };
+  const OP_STATE = { listen: "blue", learning: "yellow", detect: "green", idle: "gray" };
+
   const agentState = sys.agent.last_error ? "yellow" : sys.agent.registered ? "green" : "yellow";
   const captureState = sys.capture.ok ? "green" : "yellow";
   const mqttState = sys.mqtt.connected ? "green" : "red";
@@ -67,6 +75,16 @@ async function load(container, ctx) {
   const pinned = (wifi?.pinned || []).length;
 
   const cards = [
+    card({
+      key: "operational", icon: "◉", title: "運行模式", state: OP_STATE[opMode] || "gray",
+      metric: OP_LABEL[opMode] || opMode,
+      sub: [
+        op.capture_interface ? `iface ${op.capture_interface}` : "",
+        op.session_id ? `session ${String(op.session_id).slice(0, 8)}` : "",
+        (opMode === "learning" || opMode === "listen") ? "不產生告警" : "",
+      ].filter(Boolean).join(" · ") || "—",
+      actions: [{ act: "goto", arg: "packet", label: "Packet Sensor" }],
+    }),
     card({
       key: "agent", icon: "⬡", title: "Edge Agent", state: agentState,
       metric: agentState === "green" ? "running" : "degraded",

@@ -217,6 +217,9 @@ PYTHONPATH=. python3 scripts/e2e-ot-layerc-analyze.py --layerc-url http://192.16
 
 完整設計與驗證紀錄見 [`continuous-trust-assurance-poc.md`](continuous-trust-assurance-poc.md) §9.14。
 
+**Baseline Live Learning（P4）** 與 CTA 联调：listen/learning 期間 CTA `detected` 不得成長；detect 後才允許。  
+Runbook：[`runbook-baseline-live-learning-lab.md`](runbook-baseline-live-learning-lab.md)
+
 **禁止**僅 `docker cp` / 手動 rsync 單檔到 `.108`；應走各 repo 正式 deploy 腳本（含 SMB portal `npm run build`）。
 
 ### 一鍵（CTA lab）

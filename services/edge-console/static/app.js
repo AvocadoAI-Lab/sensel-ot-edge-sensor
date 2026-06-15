@@ -3,7 +3,7 @@ import { $, $$, toast } from "./core/dom.js";
 import { api } from "./core/api.js";
 import { startClock } from "./core/format.js";
 import { initComponents } from "./ui/components.js";
-import { setHeader } from "./core/shell.js";
+import { setHeader, updateOperationalModeBadge } from "./core/shell.js";
 
 import * as dashboard from "./pages/dashboard.js";
 import * as runtime from "./pages/runtime.js";
@@ -89,6 +89,10 @@ function wireShell() {
   renderNav();
   startClock();
   initComponents();
+  refreshOperationalModeBadge();
+  setInterval(() => {
+    if (!document.hidden) refreshOperationalModeBadge();
+  }, 30000);
 
   $("#loginBtn")?.addEventListener("click", async () => {
     try {
@@ -112,6 +116,13 @@ function wireShell() {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && currentPage?.onVisible) currentPage.onVisible();
   });
+}
+
+async function refreshOperationalModeBadge() {
+  try {
+    const status = await api("/api/status");
+    updateOperationalModeBadge(status.operational_mode || {});
+  } catch {}
 }
 
 wireShell();
