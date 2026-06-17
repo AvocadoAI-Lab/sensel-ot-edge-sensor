@@ -78,11 +78,15 @@ class BaselineCollector:
 
     # -- ingestion -----------------------------------------------------------
     def observe(self, packet) -> None:
-        self.packets += 1
+        self.note_packet()
         try:
             self._observe(packet)
         except Exception:  # parsing must never abort a learning run
             self.parse_errors += 1
+
+    def note_packet(self) -> None:
+        """Count one frame toward stats.packets (live pipeline calls this per capture)."""
+        self.packets += 1
 
     def _observe(self, packet) -> None:
         src_mac, _ = parse_ethernet(packet)

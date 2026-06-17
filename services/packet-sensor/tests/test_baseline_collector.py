@@ -65,6 +65,17 @@ def test_collector_learns_modbus_servers():
     assert set(servers[0]["function_codes"]) == {3, 6}
 
 
+def test_feed_path_counts_packets_via_note_packet():
+    c = BaselineCollector()
+    c.note_packet()
+    c.feed_endpoints("00:11:22:33:44:55", "192.168.10.10", "192.168.10.20")
+    c.note_packet()
+    c.feed_endpoints("00:11:22:33:44:55", "192.168.10.10", "192.168.10.21")
+    assert c.summary()["packets"] == 2
+    assert c.summary()["unique_ips"] == 3
+    assert c.summary()["comm_pairs"] == 2
+
+
 def test_candidate_schema_matches_detector_shape():
     c = BaselineCollector()
     c.observe(_goose_pkt("00:11:22:33:44:55", 1000, "IED1/LLN0.gcbEvents", 1))
