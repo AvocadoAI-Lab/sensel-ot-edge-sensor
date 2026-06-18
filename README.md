@@ -51,8 +51,9 @@ docker compose up -d
 |------|------|------|
 | MVP / Lab | Ubuntu Server 22.04/24.04 | 開發與 PoC 驗證 |
 | Field | Raspberry Pi 4 (8GB) | 客戶現場部署 |
+| NDR Edge | OpenWrt（x86_64 / ARM64） | 軟體 NDR sensor（FR-001） |
 
-Pi4 部署見 [docs/deployment-pi4.md](docs/deployment-pi4.md)。
+Pi4 部署見 [docs/deployment-pi4.md](docs/deployment-pi4.md)；OpenWrt 部署見 [docs/deployment-openwrt.md](docs/deployment-openwrt.md)。
 
 ## MVP 功能範圍
 
