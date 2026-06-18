@@ -3,16 +3,47 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 import psutil
 
 from src.config.settings import AppConfig
 
+# If the Snort events file has not been touched within this many seconds we
+# report the engine as "stale" rather than "running".
+_SNORT_STALE_AFTER_SEC = 300
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _probe_snort_engine(config: AppConfig) -> dict:
+    """Best-effort Snort 3 status from the shared snort-events.jsonl freshness.
+
+    The edge-agent cannot see the Snort process directly (separate container),
+    so it infers liveness from the bridge output file the agent already tails.
+    Returns name/status so the DMS dashboard can surface engine health.
+    """
+    watch_path = config.sensel.events.snort_watch_path
+    status = "absent"
+    last_event_age_sec: float | None = None
+    try:
+        path = Path(watch_path)
+        if path.is_file():
+            age = time.time() - path.stat().st_mtime
+            last_event_age_sec = round(age, 1)
+            status = "running" if age <= _SNORT_STALE_AFTER_SEC else "stale"
+    except Exception:
+        status = "unknown"
+    return {
+        "name": "snort",
+        "status": status,
+        "last_event_age_sec": last_event_age_sec,
+    }
 
 
 def _probe_edgex_core_data() -> str:
@@ -41,6 +72,7 @@ def collect_health(config: AppConfig) -> dict:
         "dropped_packets": 0,
         "edgex_status": _probe_edgex_core_data(),
         "agent_status": "running",
+        "engine": _probe_snort_engine(config),
         "policy_version": "",
         "timestamp": _utc_now_iso(),
     }

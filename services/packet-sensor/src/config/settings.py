@@ -81,6 +81,15 @@ class IocConfig(BaseModel):
     reload_check_sec: int = 5
 
 
+class SnortSourceConfig(BaseModel):
+    """External Snort 3 alert_json bridge (opt-in, off by default)."""
+
+    enabled: bool = False
+    alert_json_path: str = "/app/data/snort/alert_json.txt"
+    offset_path: str = "/app/data/assets/.snort-source.offset"
+    poll_interval_sec: int = 2
+
+
 class LoggingConfig(BaseModel):
     level: str = "info"
 
@@ -91,6 +100,7 @@ class AppConfig(BaseModel):
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     ioc: IocConfig = Field(default_factory=IocConfig)
+    snort_source: SnortSourceConfig = Field(default_factory=SnortSourceConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -218,11 +228,31 @@ def load_config(path: Path | None = None) -> AppConfig:
         int(os.environ.get("IOC_CACHE_RELOAD_SEC", ioc_raw.get("reload_check_sec", 5))),
     )
 
+    snort_raw = expanded.get("snort_source", {})
+    snort_enabled_env = os.environ.get("SNORT_SOURCE_ENABLED", "").lower()
+    if snort_enabled_env in ("1", "true", "yes"):
+        snort_raw["enabled"] = True
+    elif snort_enabled_env in ("0", "false", "no"):
+        snort_raw["enabled"] = False
+    snort_raw.setdefault(
+        "alert_json_path",
+        os.environ.get("SNORT_ALERT_JSON_PATH", "/app/data/snort/alert_json.txt"),
+    )
+    snort_raw.setdefault(
+        "offset_path",
+        os.environ.get("SNORT_SOURCE_OFFSET_PATH", "/app/data/assets/.snort-source.offset"),
+    )
+    snort_raw.setdefault(
+        "poll_interval_sec",
+        int(os.environ.get("SNORT_SOURCE_POLL_SEC", snort_raw.get("poll_interval_sec", 2))),
+    )
+
     return AppConfig(
         sensor=SensorIdentity(**sensor_raw),
         capture=CaptureConfig(**capture_raw),
         features=FeaturesConfig(**features_raw),
         detection=DetectionConfig(**detection_raw),
         ioc=IocConfig(**ioc_raw),
+        snort_source=SnortSourceConfig(**snort_raw),
         logging=LoggingConfig(**expanded.get("logging", {})),
     )

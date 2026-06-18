@@ -1,0 +1,60 @@
+# Snort 3 NDR engine overlay (v0.1 Open Release — opt-in).
+#
+# Adds a Snort 3 sidecar that captures mirror traffic and writes alert_json
+# (NDJSON) to a shared volume. The packet-sensor SnortAlertSource tails that
+# file, maps each alert to a SenseL SecurityEvent, and writes snort-events.jsonl
+# for the edge-agent to upload north — no changes to the MQTT / buffer / sighting
+# path.
+#
+# Usage:
+#   SNORT_INTERFACE=eth1 \
+#   docker compose -f docker-compose.yml -f docker-compose.snort.yml up -d
+#
+# Notes:
+# - Snort and packet-sensor both run on the host network so they can see the
+#   same SPAN/TAP mirror traffic.
+# - Snort's alert_json file lands at ./data/snort/alert_json.txt on the host.
+
+services:
+  snort:
+    image: ciscotalos/snort3:latest
+    container_name: sensel-snort
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./config/snort:/etc/snort:ro
+      - ./data/snort:/var/log/snort
+    command:
+      - snort
+      - -c
+      - /etc/snort/snort.lua
+      - -i
+      - ${SNORT_INTERFACE:-eth1}
+      - -l
+      - /var/log/snort
+      - -k
+      - none
+    depends_on:
+      - packet-sensor
+
+  # Enable the bridge inside the existing packet-sensor service and give it
+  # read access to Snort's alert_json output.
+  packet-sensor:
+    environment:
+      - SNORT_SOURCE_ENABLED=${SNORT_SOURCE_ENABLED:-true}
+      - SNORT_ALERT_JSON_PATH=/app/data/snort/alert_json.txt
+      - SNORT_SOURCE_POLL_SEC=${SNORT_SOURCE_POLL_SEC:-2}
+    volumes:
+      - ./data/snort:/app/data/snort:ro
+
+  # Optional: report CTI-origin Snort alerts as sightings. Off unless a CTI SID
+  # range is provided (SNORT_CTI_SID_MIN/MAX); a generic Snort hit is never a
+  # sighting. Requires SMB_INTEL_API_KEY for the sightings ingest endpoint.
+  sensel-edge-agent:
+    environment:
+      - SNORT_SIGHTING_ENABLED=${SNORT_SIGHTING_ENABLED:-false}
+      - SNORT_CTI_SID_MIN=${SNORT_CTI_SID_MIN:-0}
+      - SNORT_CTI_SID_MAX=${SNORT_CTI_SID_MAX:-0}
