@@ -42,6 +42,7 @@ def _probe_snort_engine(config: AppConfig) -> dict:
     return {
         "name": "snort",
         "status": status,
+        "rule_version": os.environ.get("SNORT_RULE_VERSION", "") or "unknown",
         "last_event_age_sec": last_event_age_sec,
     }
 
