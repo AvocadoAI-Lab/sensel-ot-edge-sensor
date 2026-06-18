@@ -16,6 +16,7 @@ from src.baseline.snapshot import write_live_observed
 from src.capture.interface import CaptureSession
 from src.config.settings import load_config
 from src.detection.external_engine.snort_source import SnortAlertSource
+from src.detection.external_engine.suricata_source import SuricataEveSource
 from src.live_stats import LiveStatsTracker, write_live_stats
 
 logging.basicConfig(
@@ -90,6 +91,25 @@ def main() -> int:
     snort_poll_interval = max(1, config.snort_source.poll_interval_sec)
     ticks_since_snort = 0
 
+    # Optional external Suricata EVE JSON bridge (same pattern as Snort).
+    suricata_source: SuricataEveSource | None = None
+    if config.suricata_source.enabled:
+        suricata_source = SuricataEveSource(
+            eve_json_path=config.suricata_source.eve_json_path,
+            output_dir=config.features.assets_dir,
+            offset_path=config.suricata_source.offset_path,
+            site_id=config.sensor.site_id,
+            sensor_id=config.sensor.id,
+        )
+        logger.info(
+            "Suricata source enabled — eve_json=%s output=%s poll=%ss",
+            config.suricata_source.eve_json_path,
+            suricata_source.output_path,
+            config.suricata_source.poll_interval_sec,
+        )
+    suricata_poll_interval = max(1, config.suricata_source.poll_interval_sec)
+    ticks_since_suricata = 0
+
     stats_interval = config.capture.stats_log_interval_sec
     live_interval = max(
         1,
@@ -136,6 +156,17 @@ def main() -> int:
                             logger.info("Snort source ingested %d alert(s)", written)
                     except Exception:
                         logger.debug("Snort source poll failed", exc_info=True)
+
+            if suricata_source is not None:
+                ticks_since_suricata += live_interval
+                if ticks_since_suricata >= suricata_poll_interval:
+                    ticks_since_suricata = 0
+                    try:
+                        written = suricata_source.poll_once()
+                        if written:
+                            logger.info("Suricata source ingested %d alert(s)", written)
+                    except Exception:
+                        logger.debug("Suricata source poll failed", exc_info=True)
 
             ticks_since_feature += live_interval
             if ticks_since_feature >= feature_interval:

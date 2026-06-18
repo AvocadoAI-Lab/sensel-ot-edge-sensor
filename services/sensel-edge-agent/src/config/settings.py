@@ -57,10 +57,12 @@ class BufferConfig(BaseModel):
 class EventsConfig(BaseModel):
     watch_path: str = "/app/data/assets/security-events.jsonl"
     offset_path: str = "/app/data/security-events.offset"
-    # Optional second source: external Snort 3 engine events (off unless the
-    # packet-sensor Snort bridge is enabled and writing this file).
+    # Optional extra sources: external engine events (off unless the matching
+    # packet-sensor bridge is enabled and writing these files).
     snort_watch_path: str = "/app/data/assets/snort-events.jsonl"
     snort_offset_path: str = "/app/data/snort-events.offset"
+    suricata_watch_path: str = "/app/data/assets/suricata-events.jsonl"
+    suricata_offset_path: str = "/app/data/suricata-events.offset"
 
 
 class NorthboundMqttConfig(BaseModel):
@@ -150,14 +152,17 @@ class SightingReportConfig(BaseModel):
     max_attempts: int = 10
     backoff_base_sec: int = 5
     backoff_max_sec: int = 300
-    # Snort CTI sighting bridge (opt-in). Snort events whose SID falls within the
-    # configured CTI range are treated as CTI-rule hits and reported as sightings.
-    # Disabled by default (max=0) so no Snort sightings are emitted unless a CTI
-    # SID range is configured.
+    # External-engine CTI sighting bridge (opt-in). Snort/Suricata alerts whose
+    # SID falls within the configured CTI range are treated as CTI-rule hits and
+    # reported as sightings. Disabled by default (max=0) so no external-engine
+    # sightings are emitted unless a CTI SID range is configured. The SID range
+    # is shared across engines.
     snort_sighting_enabled: bool = False
     snort_cti_sid_min: int = 0
     snort_cti_sid_max: int = 0
     snort_events_offset_path: str = "/app/data/sighting-snort-events.offset"
+    suricata_sighting_enabled: bool = False
+    suricata_events_offset_path: str = "/app/data/sighting-suricata-events.offset"
 
 
 class AppConfig(BaseModel):
@@ -212,6 +217,14 @@ def load_config(path: Path | None = None) -> AppConfig:
     events_raw.setdefault(
         "snort_offset_path",
         os.environ.get("SNORT_EVENTS_OFFSET", "/app/data/snort-events.offset"),
+    )
+    events_raw.setdefault(
+        "suricata_watch_path",
+        os.environ.get("SURICATA_EVENTS_PATH", "/app/data/assets/suricata-events.jsonl"),
+    )
+    events_raw.setdefault(
+        "suricata_offset_path",
+        os.environ.get("SURICATA_EVENTS_OFFSET", "/app/data/suricata-events.offset"),
     )
     sensel_raw["events"] = events_raw
     sensel_raw["health_interval_sec"] = int(
@@ -530,6 +543,17 @@ def load_config(path: Path | None = None) -> AppConfig:
     sighting_raw.setdefault(
         "snort_events_offset_path",
         os.environ.get("SNORT_SIGHTING_EVENTS_OFFSET", "/app/data/sighting-snort-events.offset"),
+    )
+    suricata_sighting_env = os.environ.get("SURICATA_SIGHTING_ENABLED", "").lower()
+    if suricata_sighting_env in ("1", "true", "yes"):
+        sighting_raw["suricata_sighting_enabled"] = True
+    elif suricata_sighting_env in ("0", "false", "no"):
+        sighting_raw["suricata_sighting_enabled"] = False
+    sighting_raw.setdefault(
+        "suricata_events_offset_path",
+        os.environ.get(
+            "SURICATA_SIGHTING_EVENTS_OFFSET", "/app/data/sighting-suricata-events.offset"
+        ),
     )
 
     config = AppConfig(

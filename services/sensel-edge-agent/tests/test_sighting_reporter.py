@@ -27,6 +27,7 @@ def _config(
     *,
     intel_key: str = "test-intel-key",
     snort_sighting_enabled: bool = False,
+    suricata_sighting_enabled: bool = False,
     snort_cti_sid_min: int = 0,
     snort_cti_sid_max: int = 0,
 ) -> AppConfig:
@@ -42,6 +43,8 @@ def _config(
                 "offset_path": str(tmp_path / "events.offset"),
                 "snort_watch_path": str(tmp_path / "snort-events.jsonl"),
                 "snort_offset_path": str(tmp_path / "snort-events.offset"),
+                "suricata_watch_path": str(tmp_path / "suricata-events.jsonl"),
+                "suricata_offset_path": str(tmp_path / "suricata-events.offset"),
             },
         ),
         northbound_mqtt=NorthboundMqttConfig(tenant_id="sensel-platform"),
@@ -59,6 +62,8 @@ def _config(
             snort_sighting_enabled=snort_sighting_enabled,
             snort_cti_sid_min=snort_cti_sid_min,
             snort_cti_sid_max=snort_cti_sid_max,
+            suricata_sighting_enabled=suricata_sighting_enabled,
+            suricata_events_offset_path=str(tmp_path / "sighting-suricata-events.offset"),
         ),
         logging=LoggingConfig(),
     )
@@ -270,7 +275,7 @@ def test_snort_cti_payload_built_when_enabled_and_in_range(tmp_path: Path) -> No
     assert raw["ioc_type"] == "ipv4"
     assert raw["ioc_value"] == "203.0.113.10"  # external dst_ip
     assert raw["matched_field"] == "dst_ip"
-    assert raw["snort_sid"] == 9000001
+    assert raw["sid"] == 9000001
     assert payload["defaults"]["source_event_type"] == "SNORT_CTI_OBSERVED"
     assert payload["defaults"]["confidence"] == 85
 
@@ -342,10 +347,97 @@ def test_reporter_processes_snort_cti_from_second_tailer(
     assert calls[0]["json"]["raw_event"]["event_type"] == "snort_cti_observed"
 
 
-def test_reporter_skips_snort_tailer_when_disabled(tmp_path: Path) -> None:
+def test_reporter_skips_external_tailers_when_disabled(tmp_path: Path) -> None:
     config = _config(tmp_path)  # disabled
     snort_path = Path(config.sensel.events.snort_watch_path)
     snort_path.write_text(json.dumps(_snort_cti_event()) + "\n", encoding="utf-8")
     reporter = SightingReporter(config)
-    assert reporter._snort_tailer is None
+    assert reporter._external_tailers == []
     assert reporter.process_new_events() == 0
+
+
+def _suricata_cti_event(event_id: str = "evt-20260618-suricata-00001", sid: int = 9000002) -> dict:
+    return {
+        "event_id": event_id,
+        "site_id": "factory-lab-001",
+        "sensor_id": "ot-edge-001",
+        "event_type": "SURICATA_ALERT",
+        "severity": "high",
+        "rule_id": f"suricata-1-{sid}",
+        "protocol": "tcp",
+        "description": "SENSEL CTI malware C2 (suricata)",
+        "timestamp": "2026-06-18T10:30:00+00:00",
+        "risk_score": 85,
+        "src_ip": "10.10.1.20",
+        "dst_ip": "198.51.100.7",
+        "dst_port": 8443,
+        "evidence": {
+            "engine": "suricata",
+            "sid": sid,
+            "gid": 1,
+            "category": "A Network Trojan was detected",
+            "app_proto": "tls",
+        },
+    }
+
+
+def test_suricata_cti_payload_built_when_enabled(tmp_path: Path) -> None:
+    config = _config(
+        tmp_path,
+        suricata_sighting_enabled=True,
+        snort_cti_sid_min=9000000,
+        snort_cti_sid_max=9999999,
+    )
+    payload = build_sighting_ingest_payload(_suricata_cti_event(), config)
+    assert payload is not None
+    raw = payload["raw_event"]
+    assert raw["event_type"] == "suricata_cti_observed"
+    assert raw["engine"] == "suricata"
+    assert raw["ioc_value"] == "198.51.100.7"
+    assert raw["sid"] == 9000002
+    assert payload["defaults"]["source_event_type"] == "SURICATA_CTI_OBSERVED"
+
+
+def test_suricata_cti_payload_disabled_by_default(tmp_path: Path) -> None:
+    config = _config(tmp_path)  # suricata sighting disabled
+    assert build_sighting_ingest_payload(_suricata_cti_event(), config) is None
+
+
+def test_reporter_processes_suricata_cti_from_tailer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(
+        tmp_path,
+        suricata_sighting_enabled=True,
+        snort_cti_sid_min=9000000,
+        snort_cti_sid_max=9999999,
+    )
+    suri_path = Path(config.sensel.events.suricata_watch_path)
+    suri_path.write_text(json.dumps(_suricata_cti_event()) + "\n", encoding="utf-8")
+
+    calls: list[dict] = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            calls.append({"json": json})
+            request = httpx.Request("POST", url)
+            return httpx.Response(
+                200,
+                json={"sighting": {"sighting_id": "sig-suri"}, "correlation": {"matched": True}},
+                request=request,
+            )
+
+    monkeypatch.setattr("src.sighting.reporter.httpx.Client", FakeClient)
+
+    reporter = SightingReporter(config)
+    assert reporter.process_new_events() == 1
+    assert calls[0]["json"]["raw_event"]["event_type"] == "suricata_cti_observed"

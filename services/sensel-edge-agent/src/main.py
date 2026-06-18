@@ -221,11 +221,15 @@ def main() -> int:
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
     )
-    # Second source: external Snort 3 engine events (same upload path, separate
-    # JSONL + offset to avoid write contention with the packet-sensor pipeline).
+    # Extra sources: external engine events (same upload path, separate JSONL +
+    # offset to avoid write contention with the packet-sensor pipeline).
     snort_tailer = SecurityEventTailer(
         config.sensel.events.snort_watch_path,
         config.sensel.events.snort_offset_path,
+    )
+    suricata_tailer = SecurityEventTailer(
+        config.sensel.events.suricata_watch_path,
+        config.sensel.events.suricata_offset_path,
     )
     coverage_path = Path(config.sensel.events.watch_path).parent / "coverage-counters.json"
     last_coverage_mtime = 0.0
@@ -372,6 +376,7 @@ def main() -> int:
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config)
             _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config)
+            _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config)
 
             if sighting_reporter.enabled:
                 sighting_reporter.run_cycle()

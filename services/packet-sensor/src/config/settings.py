@@ -90,6 +90,15 @@ class SnortSourceConfig(BaseModel):
     poll_interval_sec: int = 2
 
 
+class SuricataSourceConfig(BaseModel):
+    """External Suricata EVE JSON bridge (opt-in, off by default)."""
+
+    enabled: bool = False
+    eve_json_path: str = "/app/data/suricata/eve.json"
+    offset_path: str = "/app/data/assets/.suricata-source.offset"
+    poll_interval_sec: int = 2
+
+
 class LoggingConfig(BaseModel):
     level: str = "info"
 
@@ -101,6 +110,7 @@ class AppConfig(BaseModel):
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     ioc: IocConfig = Field(default_factory=IocConfig)
     snort_source: SnortSourceConfig = Field(default_factory=SnortSourceConfig)
+    suricata_source: SuricataSourceConfig = Field(default_factory=SuricataSourceConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -247,6 +257,25 @@ def load_config(path: Path | None = None) -> AppConfig:
         int(os.environ.get("SNORT_SOURCE_POLL_SEC", snort_raw.get("poll_interval_sec", 2))),
     )
 
+    suricata_raw = expanded.get("suricata_source", {})
+    suricata_enabled_env = os.environ.get("SURICATA_SOURCE_ENABLED", "").lower()
+    if suricata_enabled_env in ("1", "true", "yes"):
+        suricata_raw["enabled"] = True
+    elif suricata_enabled_env in ("0", "false", "no"):
+        suricata_raw["enabled"] = False
+    suricata_raw.setdefault(
+        "eve_json_path",
+        os.environ.get("SURICATA_EVE_JSON_PATH", "/app/data/suricata/eve.json"),
+    )
+    suricata_raw.setdefault(
+        "offset_path",
+        os.environ.get("SURICATA_SOURCE_OFFSET_PATH", "/app/data/assets/.suricata-source.offset"),
+    )
+    suricata_raw.setdefault(
+        "poll_interval_sec",
+        int(os.environ.get("SURICATA_SOURCE_POLL_SEC", suricata_raw.get("poll_interval_sec", 2))),
+    )
+
     return AppConfig(
         sensor=SensorIdentity(**sensor_raw),
         capture=CaptureConfig(**capture_raw),
@@ -254,5 +283,6 @@ def load_config(path: Path | None = None) -> AppConfig:
         detection=DetectionConfig(**detection_raw),
         ioc=IocConfig(**ioc_raw),
         snort_source=SnortSourceConfig(**snort_raw),
+        suricata_source=SuricataSourceConfig(**suricata_raw),
         logging=LoggingConfig(**expanded.get("logging", {})),
     )
