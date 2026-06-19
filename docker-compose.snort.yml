@@ -58,6 +58,10 @@ services:
       - SNORT_SIGHTING_ENABLED=${SNORT_SIGHTING_ENABLED:-false}
       - SNORT_CTI_SID_MIN=${SNORT_CTI_SID_MIN:-0}
       - SNORT_CTI_SID_MAX=${SNORT_CTI_SID_MAX:-0}
-      # Rule package version surfaced in DMS engine health (FR-008). Set by the
-      # Control Plane rule provisioning in v0.2; static label for v0.1 labs.
+      # Lets the agent report Snort as "configured" in engine health / the Edge
+      # Console even before the first alert is produced.
+      - SNORT_SOURCE_ENABLED=${SNORT_SOURCE_ENABLED:-true}
+      # Rule package version surfaced in DMS engine health (FR-008) and the Edge
+      # Console. Set by the Control Plane rule provisioning in v0.2; static label
+      # for v0.1 labs.
       - SNORT_RULE_VERSION=${SNORT_RULE_VERSION:-}

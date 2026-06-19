@@ -40,6 +40,26 @@ def load_persisted_credentials(path: Optional[Path] = None) -> Optional[dict[str
     return raw
 
 
+def credentials_status(path: Optional[Path] = None) -> dict[str, Any]:
+    """Return non-secret metadata about the persisted MQTT credentials.
+
+    Safe to surface in the Edge Console / runtime snapshot: the plaintext
+    password is **never** included — only whether Control-Plane credentials
+    have "landed" locally and their identifying fields.
+    """
+    raw = load_persisted_credentials(path)
+    if not raw:
+        return {"landed": False}
+    return {
+        "landed": True,
+        "username": str(raw.get("username") or ""),
+        "host": raw.get("host"),
+        "port": raw.get("port"),
+        "tenant_id": raw.get("tenant_id"),
+        "acl_version": raw.get("acl_version"),
+    }
+
+
 def persist_credentials(
     *,
     username: str,

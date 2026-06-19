@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 import stat
 
-from src.runtime.mqtt_credentials import load_persisted_credentials, persist_credentials
+from src.runtime.mqtt_credentials import (
+    credentials_status,
+    load_persisted_credentials,
+    persist_credentials,
+)
 
 
 def test_persist_then_load_roundtrip(tmp_path) -> None:
@@ -52,3 +56,29 @@ def test_load_ignores_invalid_or_empty(tmp_path) -> None:
     empty = tmp_path / "empty.json"
     empty.write_text(json.dumps({"username": ""}), encoding="utf-8")
     assert load_persisted_credentials(empty) is None
+
+
+def test_credentials_status_not_landed(tmp_path) -> None:
+    assert credentials_status(tmp_path / "absent.json") == {"landed": False}
+
+
+def test_credentials_status_omits_password(tmp_path) -> None:
+    path = tmp_path / "mqtt-credentials.json"
+    persist_credentials(
+        username="ndr-tenant-acme-ndr-x",
+        password="s3cret",
+        host="broker.example",
+        port=1883,
+        tenant_id="tenant-acme",
+        acl_version=3,
+        path=path,
+    )
+    status = credentials_status(path)
+    assert status["landed"] is True
+    assert status["username"] == "ndr-tenant-acme-ndr-x"
+    assert status["host"] == "broker.example"
+    assert status["port"] == 1883
+    assert status["tenant_id"] == "tenant-acme"
+    assert status["acl_version"] == 3
+    # The plaintext secret must never be surfaced.
+    assert "password" not in status

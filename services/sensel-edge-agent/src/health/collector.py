@@ -3,48 +3,33 @@
 from __future__ import annotations
 
 import os
-import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 import httpx
 import psutil
 
 from src.config.settings import AppConfig
-
-# If the Snort events file has not been touched within this many seconds we
-# report the engine as "stale" rather than "running".
-_SNORT_STALE_AFTER_SEC = 300
+from src.health.engines import probe_engines
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _probe_snort_engine(config: AppConfig) -> dict:
-    """Best-effort Snort 3 status from the shared snort-events.jsonl freshness.
+def _primary_engine(engines: list[dict]) -> dict:
+    """Pick the engine to report in the legacy ``engine`` health field.
 
-    The edge-agent cannot see the Snort process directly (separate container),
-    so it infers liveness from the bridge output file the agent already tails.
-    Returns name/status so the DMS dashboard can surface engine health.
+    Prefer an active engine (running/stale), else a configured one, else the
+    first probed engine. Kept for backward compatibility with the DMS health
+    schema which expects a single ``engine`` object (FR-008).
     """
-    watch_path = config.sensel.events.snort_watch_path
-    status = "absent"
-    last_event_age_sec: float | None = None
-    try:
-        path = Path(watch_path)
-        if path.is_file():
-            age = time.time() - path.stat().st_mtime
-            last_event_age_sec = round(age, 1)
-            status = "running" if age <= _SNORT_STALE_AFTER_SEC else "stale"
-    except Exception:
-        status = "unknown"
-    return {
-        "name": "snort",
-        "status": status,
-        "rule_version": os.environ.get("SNORT_RULE_VERSION", "") or "unknown",
-        "last_event_age_sec": last_event_age_sec,
-    }
+    for eng in engines:
+        if eng.get("active"):
+            return eng
+    for eng in engines:
+        if eng.get("configured"):
+            return eng
+    return engines[0] if engines else {"name": "snort", "status": "absent"}
 
 
 def _probe_edgex_core_data() -> str:
@@ -63,6 +48,8 @@ def collect_health(config: AppConfig) -> dict:
     mem = psutil.virtual_memory().percent
     disk = psutil.disk_usage("/").percent
 
+    engines = probe_engines(config)
+
     return {
         "sensor_id": config.sensor.id,
         "site_id": config.sensor.site_id,
@@ -73,7 +60,10 @@ def collect_health(config: AppConfig) -> dict:
         "dropped_packets": 0,
         "edgex_status": _probe_edgex_core_data(),
         "agent_status": "running",
-        "engine": _probe_snort_engine(config),
+        # Legacy single-engine field (DMS dashboard, FR-008).
+        "engine": _primary_engine(engines),
+        # Full per-engine status incl. Snort and Suricata.
+        "engines": engines,
         "policy_version": "",
         "timestamp": _utc_now_iso(),
     }

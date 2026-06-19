@@ -104,6 +104,43 @@ def _policy_gauge(
     }
 
 
+def _safe_mqtt_credentials(raw: Any) -> dict[str, Any]:
+    """Project the agent's MQTT credential status, never leaking a password."""
+    if not isinstance(raw, dict):
+        return {"landed": False}
+    return {
+        "landed": bool(raw.get("landed")),
+        "username": raw.get("username"),
+        "host": raw.get("host"),
+        "port": raw.get("port"),
+        "tenant_id": raw.get("tenant_id"),
+        "acl_version": raw.get("acl_version"),
+    }
+
+
+def _engines_view(raw: Any) -> list[dict[str, Any]]:
+    """Normalize the agent's engines summary list for the dashboard/wizard."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for eng in raw:
+        if not isinstance(eng, dict):
+            continue
+        out.append(
+            {
+                "name": eng.get("name"),
+                "configured": bool(eng.get("configured")),
+                "status": eng.get("status") or "unknown",
+                "active": bool(eng.get("active")),
+                "rule_version": eng.get("rule_version") or "unknown",
+                "rules_enabled_count": eng.get("rules_enabled_count"),
+                "rules_last_update": eng.get("rules_last_update"),
+                "last_event_age_sec": eng.get("last_event_age_sec"),
+            }
+        )
+    return out
+
+
 def build_status(store: ConfigStore) -> dict[str, Any]:
     config = store.load()
     assets_dir = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
@@ -183,6 +220,9 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
             "agent_updated_at": runtime.get("updated_at"),
             "registered": bool(runtime.get("registered")),
             "last_error": runtime.get("last_error"),
+            # Non-secret status of Control-Plane auto-provisioned MQTT
+            # credentials (whether they've landed on this appliance).
+            "mqtt_credentials": _safe_mqtt_credentials(runtime.get("mqtt_credentials")),
         },
         "metrics": {
             "events_24h": stats.events_24h,
@@ -201,6 +241,9 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
                 "goose_messages": tm.get("goose_messages", 0),
                 "ioc_entries": tm.get("ioc_entries", 0),
             },
+            # IDS engine (Snort/Suricata) liveness + rule package status,
+            # written by the edge-agent health loop into agent-runtime.json.
+            "engines": _engines_view(runtime.get("engines")),
         },
         "last_register_at": config.last_register_at or runtime.get("last_register_at"),
     }
