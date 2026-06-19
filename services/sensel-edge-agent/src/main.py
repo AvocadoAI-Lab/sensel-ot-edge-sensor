@@ -32,7 +32,9 @@ from src.policy.topology_override_sync import TopologyOverrideSync
 from src.policy.topology_override_mqtt_subscriber import TopologyOverrideMqttSubscriber
 from src.upload.event_context import enrich_security_event
 from src.runtime.agent_snapshot import write_agent_runtime
+from src.runtime.mqtt_credentials import credentials_status
 from src.runtime.registration import RegistrationState, attempt_registration
+from src.health.engines import engines_runtime_summary
 from src.sighting.reporter import SightingReporter
 from src.upload.buffer import UploadBuffer
 from src.upload.events import SecurityEventTailer
@@ -221,6 +223,16 @@ def main() -> int:
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
     )
+    # Extra sources: external engine events (same upload path, separate JSONL +
+    # offset to avoid write contention with the packet-sensor pipeline).
+    snort_tailer = SecurityEventTailer(
+        config.sensel.events.snort_watch_path,
+        config.sensel.events.snort_offset_path,
+    )
+    suricata_tailer = SecurityEventTailer(
+        config.sensel.events.suricata_watch_path,
+        config.sensel.events.suricata_offset_path,
+    )
     coverage_path = Path(config.sensel.events.watch_path).parent / "coverage-counters.json"
     last_coverage_mtime = 0.0
     policy_sync = PolicySync(config) if config.policy_sync.enabled else None
@@ -365,6 +377,8 @@ def main() -> int:
 
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config)
+            _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config)
+            _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config)
 
             if sighting_reporter.enabled:
                 sighting_reporter.run_cycle()
@@ -390,6 +404,12 @@ def main() -> int:
                 registered=registration.complete,
                 tenant_id=registration.tenant_id or config.northbound_mqtt.tenant_id,
                 mqtt_connected=mqtt.connected if mqtt.enabled else None,
+                # Surface IDS engine status + landed MQTT credentials so the
+                # Edge Console setup wizard can show field operators which engine
+                # is running, its rule version/freshness, and whether the
+                # Control-Plane MQTT credentials have landed locally.
+                engines=engines_runtime_summary(health.get("engines") or []),
+                mqtt_credentials=credentials_status(),
             )
 
             # Northbound MQTT heartbeat: publish_state lazily (re)connects, so a

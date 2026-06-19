@@ -45,3 +45,15 @@ def test_learning_mode_suppresses_events(tmp_path: Path):
 def test_detect_mode_allows_emit_path(tmp_path: Path):
     pipe = _pipeline(tmp_path, "detect")
     assert pipe._mode_store.alerts_enabled()
+
+
+def test_learning_mode_accumulates_baseline_packet_count(tmp_path: Path):
+    from scapy.layers.inet import IP, ICMP
+    from scapy.layers.l2 import Ether
+
+    pipe = _pipeline(tmp_path, "learning")
+    pkt = Ether() / IP(src="10.0.0.1", dst="10.0.0.2") / ICMP()
+    pipe.process(pkt)
+    snap = pipe.live_baseline_snapshot()
+    assert snap["stats"]["packets"] == 1
+    assert snap["stats"]["unique_ips"] >= 2

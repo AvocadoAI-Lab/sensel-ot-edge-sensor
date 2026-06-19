@@ -9,10 +9,27 @@ import httpx
 import psutil
 
 from src.config.settings import AppConfig
+from src.health.engines import probe_engines
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _primary_engine(engines: list[dict]) -> dict:
+    """Pick the engine to report in the legacy ``engine`` health field.
+
+    Prefer an active engine (running/stale), else a configured one, else the
+    first probed engine. Kept for backward compatibility with the DMS health
+    schema which expects a single ``engine`` object (FR-008).
+    """
+    for eng in engines:
+        if eng.get("active"):
+            return eng
+    for eng in engines:
+        if eng.get("configured"):
+            return eng
+    return engines[0] if engines else {"name": "snort", "status": "absent"}
 
 
 def _probe_edgex_core_data() -> str:
@@ -31,6 +48,8 @@ def collect_health(config: AppConfig) -> dict:
     mem = psutil.virtual_memory().percent
     disk = psutil.disk_usage("/").percent
 
+    engines = probe_engines(config)
+
     return {
         "sensor_id": config.sensor.id,
         "site_id": config.sensor.site_id,
@@ -41,6 +60,10 @@ def collect_health(config: AppConfig) -> dict:
         "dropped_packets": 0,
         "edgex_status": _probe_edgex_core_data(),
         "agent_status": "running",
+        # Legacy single-engine field (DMS dashboard, FR-008).
+        "engine": _primary_engine(engines),
+        # Full per-engine status incl. Snort and Suricata.
+        "engines": engines,
         "policy_version": "",
         "timestamp": _utc_now_iso(),
     }

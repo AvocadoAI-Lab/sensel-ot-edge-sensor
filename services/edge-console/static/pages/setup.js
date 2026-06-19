@@ -49,12 +49,21 @@ export function render(root) {
           <button type="button" class="btn btn-primary" id="saveAndRegisterBtn">儲存並註冊</button>
         </div>
         <pre id="registerResult" class="card" style="margin-top:1rem; white-space:pre-wrap; font-size:0.85rem;"></pre>
+        <div class="card" id="landingStatus" style="margin-top:1rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong>落地狀態</strong>
+            <button type="button" class="btn btn-ghost" id="refreshLandingBtn" style="font-size:0.8rem;">↻ 重新整理</button>
+          </div>
+          <p class="hint">註冊後，下發的 MQTT 憑證與 IDS 引擎狀態會顯示在這裡（每次健康回報後更新）。</p>
+          <div id="landingBody"><p class="hint">載入中…</p></div>
+        </div>
       </div>
     </section>`;
 
   $$("[data-next]").forEach((b) => b.addEventListener("click", () => setStep(parseInt(b.dataset.next, 10))));
   $("#pingSenselBtn").addEventListener("click", pingSensel);
   $("#saveAndRegisterBtn").addEventListener("click", saveAndRegister);
+  $("#refreshLandingBtn")?.addEventListener("click", () => loadLandingStatus().catch(() => {}));
   loadConfig().catch(() => {});
   step = 1;
 }
@@ -75,6 +84,73 @@ function setStep(n) {
       <div><strong>SenseL</strong> ${escapeHtml($("#wApiUrl").value)}</div>
       <div><strong>MQTT</strong> ${escapeHtml($("#wMqttHost").value)}:1883</div>
       <div><strong>邀請碼</strong> ${$("#wInvite").value ? "已填寫" : "未填寫"}</div>`;
+    loadLandingStatus().catch(() => {});
+  }
+}
+
+const ENGINE_STATUS = {
+  running: { label: "運行中", ok: true },
+  stale: { label: "停滯（無新事件）", ok: false },
+  absent: { label: "未啟用", ok: false },
+  unknown: { label: "未知", ok: false },
+};
+
+function fmtAge(sec) {
+  if (sec == null) return "";
+  if (sec < 90) return `${Math.round(sec)} 秒前`;
+  if (sec < 5400) return `${Math.round(sec / 60)} 分鐘前`;
+  return `${Math.round(sec / 3600)} 小時前`;
+}
+
+function renderCredential(cred) {
+  if (!cred || !cred.landed) {
+    return `<div class="kv"><span>MQTT 憑證</span><b>尚未下發</b></div>
+      <p class="hint">完成註冊且 Control Plane 啟用憑證自動下發後，這裡會顯示已落地的帳號。</p>`;
+  }
+  const rows = [
+    `<div class="kv"><span>MQTT 憑證</span><b style="color:var(--ok,#15803d)">✓ 已落地</b></div>`,
+    cred.username ? `<div class="kv"><span>帳號</span><b>${escapeHtml(cred.username)}</b></div>` : "",
+    cred.host ? `<div class="kv"><span>Broker</span><b>${escapeHtml(cred.host)}${cred.port ? ":" + cred.port : ""}</b></div>` : "",
+    cred.tenant_id ? `<div class="kv"><span>Tenant</span><b>${escapeHtml(cred.tenant_id)}</b></div>` : "",
+    cred.acl_version != null ? `<div class="kv"><span>ACL 版本</span><b>v${escapeHtml(String(cred.acl_version))}</b></div>` : "",
+  ];
+  return rows.join("");
+}
+
+function renderEngines(engines) {
+  if (!engines || !engines.length) {
+    return `<p class="hint">尚未偵測到 IDS 引擎。啟用 Snort 或 Suricata overlay 後會顯示。</p>`;
+  }
+  return engines
+    .map((e) => {
+      const st = ENGINE_STATUS[e.status] || ENGINE_STATUS.unknown;
+      const color = st.ok ? "var(--ok,#15803d)" : "var(--muted,#94a3b8)";
+      const upd = e.rules_last_update ? new Date(e.rules_last_update).toLocaleString() : "未知";
+      const age = e.last_event_age_sec != null ? ` · 最近事件 ${fmtAge(e.last_event_age_sec)}` : "";
+      return `<div class="card" style="margin-top:.5rem;">
+        <div class="kv"><span><strong>${escapeHtml((e.name || "").toUpperCase())}</strong></span>
+          <b style="color:${color}">${st.label}${age}</b></div>
+        <div class="kv"><span>規則版本</span><b>${escapeHtml(e.rule_version || "unknown")}</b></div>
+        <div class="kv"><span>啟用規則數</span><b>${e.rules_enabled_count != null ? e.rules_enabled_count : "—"}</b></div>
+        <div class="kv"><span>規則最後更新</span><b>${escapeHtml(upd)}</b></div>
+      </div>`;
+    })
+    .join("");
+}
+
+async function loadLandingStatus() {
+  const body = $("#landingBody");
+  if (!body) return;
+  try {
+    const s = await api("/api/status");
+    const cred = s?.northbound?.mqtt_credentials;
+    const engines = s?.metrics?.engines;
+    body.innerHTML = `
+      <div style="margin-top:.5rem;">${renderCredential(cred)}</div>
+      <div style="margin-top:.75rem;"><strong>IDS 引擎</strong></div>
+      ${renderEngines(engines)}`;
+  } catch (e) {
+    body.innerHTML = `<p class="hint">無法載入狀態：${escapeHtml(e.message || String(e))}</p>`;
   }
 }
 

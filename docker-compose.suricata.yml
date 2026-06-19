@@ -1,0 +1,67 @@
+# Suricata NDR engine overlay (v0.1 Open Release — opt-in).
+#
+# Adds a Suricata sidecar that captures mirror traffic and writes EVE JSON
+# (NDJSON) to a shared volume. The packet-sensor SuricataEveSource tails that
+# file, maps each ``alert`` record to a SenseL SecurityEvent, and writes
+# suricata-events.jsonl for the edge-agent to upload north — no changes to the
+# MQTT / buffer / sighting path.
+#
+# This overlay is an alternative to docker-compose.snort.yml; both engines can
+# also run together (each writes a separate *-events.jsonl with its own tailer).
+#
+# Usage:
+#   SURICATA_INTERFACE=eth1 \
+#   docker compose -f docker-compose.yml -f docker-compose.suricata.yml up -d
+#
+# Notes:
+# - Suricata and packet-sensor both run on the host network so they can see the
+#   same SPAN/TAP mirror traffic.
+# - Suricata's eve.json file lands at ./data/suricata/eve.json on the host.
+
+services:
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: sensel-suricata
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - ./config/suricata:/etc/suricata:ro
+      - ./data/suricata:/var/log/suricata
+    command:
+      - -c
+      - /etc/suricata/suricata.yaml
+      - -i
+      - ${SURICATA_INTERFACE:-eth1}
+    depends_on:
+      - packet-sensor
+
+  # Enable the bridge inside the existing packet-sensor service and give it
+  # read access to Suricata's eve.json output.
+  packet-sensor:
+    environment:
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      - SURICATA_EVE_JSON_PATH=/app/data/suricata/eve.json
+      - SURICATA_SOURCE_POLL_SEC=${SURICATA_SOURCE_POLL_SEC:-2}
+    volumes:
+      - ./data/suricata:/app/data/suricata:ro
+
+  # Optional: report CTI-origin Suricata alerts as sightings. Off unless a CTI
+  # SID range is provided (SNORT_CTI_SID_MIN/MAX — the range is shared across
+  # engines); a generic Suricata hit is never a sighting. Requires
+  # SMB_INTEL_API_KEY for the sightings ingest endpoint.
+  sensel-edge-agent:
+    environment:
+      - SURICATA_SIGHTING_ENABLED=${SURICATA_SIGHTING_ENABLED:-false}
+      - SNORT_CTI_SID_MIN=${SNORT_CTI_SID_MIN:-0}
+      - SNORT_CTI_SID_MAX=${SNORT_CTI_SID_MAX:-0}
+      # Lets the agent report Suricata as "configured" in engine health / the
+      # Edge Console even before the first alert is produced.
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      # Suricata rule package version surfaced in DMS engine health (FR-008) and
+      # the Edge Console. Set by the Control Plane rule provisioning in v0.2;
+      # static label for v0.1 labs.
+      - SURICATA_RULE_VERSION=${SURICATA_RULE_VERSION:-}

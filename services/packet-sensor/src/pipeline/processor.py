@@ -191,6 +191,7 @@ class PacketPipeline:
         src_ip, dst_ip, version = parse_ip(packet)
         record_l3(self.state.l3, src_ip, version)
         if accumulate_baseline:
+            self._baseline.note_packet()
             self._baseline.feed_endpoints(src_mac, src_ip, dst_ip)
 
         flow = parse_transport(packet)

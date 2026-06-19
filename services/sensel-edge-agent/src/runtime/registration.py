@@ -13,6 +13,7 @@ from src.config.settings import AppConfig
 from src.northbound.mqtt import NorthboundMqttClient
 from src.policy.mqtt_subscriber import PolicyMqttSubscriber
 from src.runtime.agent_snapshot import write_agent_runtime
+from src.runtime.mqtt_credentials import persist_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,8 @@ def attempt_registration(
     if tenant_id and mqtt.enabled:
         mqtt.update_tenant_id(tenant_id)
 
+    _apply_mqtt_credentials(config=config, mqtt=mqtt, reg=reg)
+
     if policy_mqtt:
         if policy_mqtt.enabled and not policy_mqtt.connected:
             policy_mqtt.start()
@@ -98,3 +101,52 @@ def attempt_registration(
     )
     logger.info("Registration succeeded (tenant=%s)", tenant_id or "(none)")
     return True
+
+
+def _apply_mqtt_credentials(
+    *,
+    config: AppConfig,
+    mqtt: NorthboundMqttClient,
+    reg: dict,
+) -> None:
+    """Auto-land Control-Plane-issued MQTT credentials from the register response.
+
+    Mutates the live config (read lazily by the policy subscribers on ``start``)
+    and the running northbound client, then persists the secret for the next
+    boot. No-ops when the Control Plane did not return credentials (provisioning
+    disabled / older Control Plane).
+    """
+    username = str(reg.get("mqtt_username") or "").strip()
+    password = str(reg.get("mqtt_password") or "")
+    if not username:
+        return
+
+    host = str(reg.get("mqtt_host") or "").strip()
+    try:
+        port = int(reg.get("mqtt_port")) if reg.get("mqtt_port") else None
+    except (TypeError, ValueError):
+        port = None
+
+    config.northbound_mqtt.username = username
+    config.northbound_mqtt.password = password
+    config.policy_sync.mqtt_username = username
+    config.policy_sync.mqtt_password = password
+
+    if mqtt.enabled:
+        mqtt.update_credentials(username, password)
+        if host:
+            mqtt.update_endpoint_if_unset(host, port)
+
+    persisted = persist_credentials(
+        username=username,
+        password=password,
+        host=host or None,
+        port=port,
+        tenant_id=str(reg.get("tenant_id") or reg.get("mqtt_tenant_id") or "").strip() or None,
+        acl_version=reg.get("mqtt_acl_version"),
+    )
+    logger.info(
+        "Applied Control-Plane MQTT credentials (user=%s persisted=%s)",
+        username,
+        persisted,
+    )

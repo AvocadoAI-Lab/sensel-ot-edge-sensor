@@ -57,6 +57,12 @@ class BufferConfig(BaseModel):
 class EventsConfig(BaseModel):
     watch_path: str = "/app/data/assets/security-events.jsonl"
     offset_path: str = "/app/data/security-events.offset"
+    # Optional extra sources: external engine events (off unless the matching
+    # packet-sensor bridge is enabled and writing these files).
+    snort_watch_path: str = "/app/data/assets/snort-events.jsonl"
+    snort_offset_path: str = "/app/data/snort-events.offset"
+    suricata_watch_path: str = "/app/data/assets/suricata-events.jsonl"
+    suricata_offset_path: str = "/app/data/suricata-events.offset"
 
 
 class NorthboundMqttConfig(BaseModel):
@@ -146,6 +152,17 @@ class SightingReportConfig(BaseModel):
     max_attempts: int = 10
     backoff_base_sec: int = 5
     backoff_max_sec: int = 300
+    # External-engine CTI sighting bridge (opt-in). Snort/Suricata alerts whose
+    # SID falls within the configured CTI range are treated as CTI-rule hits and
+    # reported as sightings. Disabled by default (max=0) so no external-engine
+    # sightings are emitted unless a CTI SID range is configured. The SID range
+    # is shared across engines.
+    snort_sighting_enabled: bool = False
+    snort_cti_sid_min: int = 0
+    snort_cti_sid_max: int = 0
+    snort_events_offset_path: str = "/app/data/sighting-snort-events.offset"
+    suricata_sighting_enabled: bool = False
+    suricata_events_offset_path: str = "/app/data/sighting-suricata-events.offset"
 
 
 class AppConfig(BaseModel):
@@ -192,6 +209,22 @@ def load_config(path: Path | None = None) -> AppConfig:
     events_raw.setdefault(
         "offset_path",
         os.environ.get("SECURITY_EVENTS_OFFSET", "/app/data/security-events.offset"),
+    )
+    events_raw.setdefault(
+        "snort_watch_path",
+        os.environ.get("SNORT_EVENTS_PATH", "/app/data/assets/snort-events.jsonl"),
+    )
+    events_raw.setdefault(
+        "snort_offset_path",
+        os.environ.get("SNORT_EVENTS_OFFSET", "/app/data/snort-events.offset"),
+    )
+    events_raw.setdefault(
+        "suricata_watch_path",
+        os.environ.get("SURICATA_EVENTS_PATH", "/app/data/assets/suricata-events.jsonl"),
+    )
+    events_raw.setdefault(
+        "suricata_offset_path",
+        os.environ.get("SURICATA_EVENTS_OFFSET", "/app/data/suricata-events.offset"),
     )
     sensel_raw["events"] = events_raw
     sensel_raw["health_interval_sec"] = int(
@@ -315,6 +348,27 @@ def load_config(path: Path | None = None) -> AppConfig:
             os.environ.get("CONTROL_PLANE_MQTT_PASSWORD", ""),
         ),
     )
+
+    # Control-Plane-issued credentials persisted from a prior registration take
+    # precedence for provisioned sensors, so the bus stays authenticated across
+    # restarts even before the next registration completes.
+    from src.runtime.mqtt_credentials import load_persisted_credentials
+
+    persisted = load_persisted_credentials()
+    if persisted:
+        nb_raw["username"] = persisted["username"]
+        nb_raw["password"] = persisted.get("password", "")
+        policy_raw["mqtt_username"] = persisted["username"]
+        policy_raw["mqtt_password"] = persisted.get("password", "")
+        if not nb_raw.get("host") and persisted.get("host"):
+            nb_raw["host"] = persisted["host"]
+            nb_raw["enabled"] = True
+            if persisted.get("port"):
+                nb_raw["port"] = int(persisted["port"])
+        if not policy_raw.get("mqtt_host") and persisted.get("host"):
+            policy_raw["mqtt_host"] = persisted["host"]
+            if persisted.get("port"):
+                policy_raw["mqtt_port"] = int(persisted["port"])
     det_enabled_env = os.environ.get("DETECTION_POLICY_ENABLED", "").lower()
     if det_enabled_env in ("0", "false", "no"):
         policy_raw["detection_policy_enabled"] = False
@@ -493,6 +547,34 @@ def load_config(path: Path | None = None) -> AppConfig:
     sighting_raw.setdefault(
         "max_attempts",
         int(os.environ.get("SIGHTING_MAX_ATTEMPTS", sighting_raw.get("max_attempts", 10))),
+    )
+    snort_sighting_env = os.environ.get("SNORT_SIGHTING_ENABLED", "").lower()
+    if snort_sighting_env in ("1", "true", "yes"):
+        sighting_raw["snort_sighting_enabled"] = True
+    elif snort_sighting_env in ("0", "false", "no"):
+        sighting_raw["snort_sighting_enabled"] = False
+    sighting_raw.setdefault(
+        "snort_cti_sid_min",
+        int(os.environ.get("SNORT_CTI_SID_MIN", sighting_raw.get("snort_cti_sid_min", 0))),
+    )
+    sighting_raw.setdefault(
+        "snort_cti_sid_max",
+        int(os.environ.get("SNORT_CTI_SID_MAX", sighting_raw.get("snort_cti_sid_max", 0))),
+    )
+    sighting_raw.setdefault(
+        "snort_events_offset_path",
+        os.environ.get("SNORT_SIGHTING_EVENTS_OFFSET", "/app/data/sighting-snort-events.offset"),
+    )
+    suricata_sighting_env = os.environ.get("SURICATA_SIGHTING_ENABLED", "").lower()
+    if suricata_sighting_env in ("1", "true", "yes"):
+        sighting_raw["suricata_sighting_enabled"] = True
+    elif suricata_sighting_env in ("0", "false", "no"):
+        sighting_raw["suricata_sighting_enabled"] = False
+    sighting_raw.setdefault(
+        "suricata_events_offset_path",
+        os.environ.get(
+            "SURICATA_SIGHTING_EVENTS_OFFSET", "/app/data/sighting-suricata-events.offset"
+        ),
     )
 
     config = AppConfig(

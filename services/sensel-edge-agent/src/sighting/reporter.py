@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 CTI_EVENT_TYPE = "CTI_IOC_OBSERVED"
 CTI_RULE_ID = "OT-019"
+SNORT_EVENT_TYPE = "SNORT_ALERT"
+SURICATA_EVENT_TYPE = "SURICATA_ALERT"
+# Map external-engine event types to the engine label used in sighting output.
+EXTERNAL_ENGINE_EVENT_TYPES = {
+    SNORT_EVENT_TYPE: "snort",
+    SURICATA_EVENT_TYPE: "suricata",
+}
 
 
 @dataclass(frozen=True)
@@ -30,10 +37,32 @@ class SightingIngestResult:
     error: str | None = None
 
 
+def _as_confidence(value: Any, fallback: int = 80) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def build_sighting_ingest_payload(event: dict[str, Any], config: AppConfig) -> dict[str, Any] | None:
+    """Map a security event to an SMB sightings ingest body.
+
+    Handles three CTI sources:
+    - OT-019 passive IoC matches from the packet-sensor (``CTI_IOC_OBSERVED``).
+    - Snort 3 / Suricata alerts whose SID falls in the configured CTI rule range
+      (``SNORT_ALERT`` / ``SURICATA_ALERT`` + the matching engine's sighting flag).
+    Returns ``None`` for everything else.
+    """
+    event_type = str(event.get("event_type") or "")
+    if event_type == CTI_EVENT_TYPE:
+        return _build_ot019_payload(event, config)
+    if event_type in EXTERNAL_ENGINE_EVENT_TYPES:
+        return _build_external_cti_payload(event, config, EXTERNAL_ENGINE_EVENT_TYPES[event_type])
+    return None
+
+
+def _build_ot019_payload(event: dict[str, Any], config: AppConfig) -> dict[str, Any] | None:
     """Map OT-019 security event to SMB sightings ingest body."""
-    if str(event.get("event_type") or "") != CTI_EVENT_TYPE:
-        return None
     if str(event.get("rule_id") or "") != CTI_RULE_ID:
         return None
 
@@ -88,6 +117,76 @@ def build_sighting_ingest_payload(event: dict[str, Any], config: AppConfig) -> d
     }
 
 
+def _build_external_cti_payload(
+    event: dict[str, Any], config: AppConfig, engine: str
+) -> dict[str, Any] | None:
+    """Map a CTI-origin Snort/Suricata alert to an SMB sightings ingest body.
+
+    Only alerts whose SID falls in the configured CTI range are treated as
+    sightings (a generic engine detection is not a CTI hit). The observed
+    external IP becomes the IoC value. The CTI SID range is shared across
+    engines; each engine has its own enable flag.
+    """
+    sr = config.sighting_report
+    engine_enabled = {
+        "snort": sr.snort_sighting_enabled,
+        "suricata": sr.suricata_sighting_enabled,
+    }.get(engine, False)
+    if not engine_enabled or sr.snort_cti_sid_max <= 0:
+        return None
+
+    evidence = event.get("evidence") if isinstance(event.get("evidence"), dict) else {}
+    try:
+        sid = int(evidence.get("sid"))
+    except (TypeError, ValueError):
+        return None
+    if not (sr.snort_cti_sid_min <= sid <= sr.snort_cti_sid_max):
+        return None
+
+    dst_ip = str(event.get("dst_ip") or "").strip()
+    src_ip = str(event.get("src_ip") or "").strip()
+    if dst_ip:
+        ioc_value, matched_field = dst_ip, "dst_ip"
+    elif src_ip:
+        ioc_value, matched_field = src_ip, "src_ip"
+    else:
+        return None
+
+    confidence_int = _as_confidence(event.get("risk_score"), 80)
+
+    raw_event = {
+        "event_id": str(event.get("event_id") or ""),
+        "event_type": f"{engine}_cti_observed",
+        "timestamp": event.get("timestamp"),
+        "sensor_id": config.sensor.id,
+        "site_id": config.sensor.site_id,
+        "ioc_type": "ipv4",
+        "ioc_value": ioc_value,
+        "matched_field": matched_field,
+        "engine": engine,
+        "rule_id": event.get("rule_id"),
+        "sid": sid,
+        "gid": evidence.get("gid"),
+        "classtype": evidence.get("classtype") or evidence.get("category"),
+        "description": event.get("description") or f"SenseL NDR Edge {engine} CTI rule hit",
+        "src_ip": src_ip or None,
+        "dst_ip": dst_ip or None,
+        "dst_port": event.get("dst_port"),
+        "protocol": event.get("protocol"),
+        "asset_name": config.sensor.id,
+    }
+
+    return {
+        "source_system": config.sighting_report.source_system,
+        "raw_event": raw_event,
+        "defaults": {
+            "source_event_type": f"{engine.upper()}_CTI_OBSERVED",
+            "confidence": max(0, min(100, confidence_int)),
+            "severity": max(0, min(100, confidence_int)),
+        },
+    }
+
+
 class SightingReporter:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
@@ -99,6 +198,22 @@ class SightingReporter:
             config.sensel.events.watch_path,
             config.sighting_report.events_offset_path,
         )
+        # Extra sources: CTI-origin external-engine alerts (only when enabled).
+        self._external_tailers: list[SecurityEventTailer] = []
+        if config.sighting_report.snort_sighting_enabled:
+            self._external_tailers.append(
+                SecurityEventTailer(
+                    config.sensel.events.snort_watch_path,
+                    config.sighting_report.snort_events_offset_path,
+                )
+            )
+        if config.sighting_report.suricata_sighting_enabled:
+            self._external_tailers.append(
+                SecurityEventTailer(
+                    config.sensel.events.suricata_watch_path,
+                    config.sighting_report.suricata_events_offset_path,
+                )
+            )
         self._last_flush_monotonic = 0.0
 
     @property
@@ -239,15 +354,17 @@ class SightingReporter:
             return 0
 
         submitted = 0
-        for event in self._tailer.pending_events():
-            payload = build_sighting_ingest_payload(event, self._config)
-            if payload is None:
-                continue
-            event_id = str(event.get("event_id") or payload["raw_event"].get("event_id") or "")
-            if not event_id:
-                continue
-            if self._submit(payload, event_id=event_id):
-                submitted += 1
+        tailers = [self._tailer, *self._external_tailers]
+        for tailer in tailers:
+            for event in tailer.pending_events():
+                payload = build_sighting_ingest_payload(event, self._config)
+                if payload is None:
+                    continue
+                event_id = str(event.get("event_id") or payload["raw_event"].get("event_id") or "")
+                if not event_id:
+                    continue
+                if self._submit(payload, event_id=event_id):
+                    submitted += 1
         return submitted
 
     def flush_queue(self) -> int:
