@@ -1,19 +1,22 @@
 """Best-effort hardware / platform detection for the edge sensor.
 
 The platform shows a short label under each registered sensor (e.g. "pi4",
-"ubuntu", "ubuntu-docker", "ubuntu-docker-win"). Historically this value was a
-static string ("ubuntu" by default), so the column was inaccurate whenever the
-operator forgot to set it. This module derives an accurate label at runtime.
+"ubuntu", "windows-docker"). Historically this value was a static string
+("ubuntu" by default), so the column was inaccurate whenever the operator
+forgot to set it. This module derives an accurate label at runtime.
 
-All probes are best-effort and never raise; on any failure we fall back to a
-generic label so registration is never blocked.
+IMPORTANT: the agent normally runs inside a container, so the *container* base
+image (e.g. debian for python:slim) is NOT a reliable signal for the host.
+We therefore probe host-visible sources first:
 
-Examples produced:
-  - Raspberry Pi 4 (bare metal)           -> "pi4"
-  - Generic Ubuntu host (bare metal)      -> "ubuntu"
-  - Linux container on a Linux host       -> "ubuntu-docker"
-  - Linux container on Docker Desktop/WSL -> "ubuntu-docker-win"
-  - Windows host (native)                 -> "windows"
+  - Raspberry Pi model via device-tree/cpuinfo (host hardware)  -> "pi4"/"pi5"
+  - host distro from /proc/version (the host kernel build string) -> "ubuntu"
+  - Docker Desktop on Windows (WSL2 kernel marker)               -> "windows-docker"
+
+Only as a last resort do we fall back to the container's /etc/os-release.
+
+All probes are best-effort and never raise; on any failure we return a generic
+label so registration is never blocked.
 """
 
 from __future__ import annotations
@@ -22,6 +25,9 @@ import platform
 import re
 from functools import lru_cache
 from pathlib import Path
+
+# Distro tokens recognised inside the host kernel build string (/proc/version).
+_KNOWN_DISTROS = ("ubuntu", "debian", "alpine", "fedora", "centos", "arch", "raspbian", "gentoo")
 
 
 def _read_text(path: str) -> str:
@@ -32,7 +38,11 @@ def _read_text(path: str) -> str:
 
 
 def _raspberry_pi_model() -> str | None:
-    """Return "pi4"/"pi5"/… when running on a Raspberry Pi, else None."""
+    """Return "pi4"/"pi5"/… when running on a Raspberry Pi, else None.
+
+    /sys/firmware/devicetree is bind-mounted from the host into containers, so
+    this works even when the agent is containerised on a Pi.
+    """
     for candidate in ("/proc/device-tree/model", "/sys/firmware/devicetree/base/model"):
         text = _read_text(candidate).replace("\x00", "")
         if "raspberry pi" in text.lower():
@@ -45,8 +55,26 @@ def _raspberry_pi_model() -> str | None:
     return None
 
 
+def _host_os_from_kernel() -> str | None:
+    """Infer the host OS from the kernel build string (host-owned, not the container).
+
+    /proc/version reflects the *host* kernel even inside a container, e.g.
+    "... (Ubuntu 15.2.0-...)" on an Ubuntu host, or "...microsoft-standard-WSL2..."
+    under Docker Desktop on Windows.
+    """
+    marker = (_read_text("/proc/version") + " " + platform.release()).lower()
+    if not marker.strip():
+        return None
+    if "microsoft" in marker or "wsl" in marker:
+        return "windows-docker"
+    for distro in _KNOWN_DISTROS:
+        if distro in marker:
+            return distro
+    return None
+
+
 def _os_release_id() -> str | None:
-    """Return the distro ID from /etc/os-release (e.g. "ubuntu", "debian")."""
+    """Return the distro ID from /etc/os-release (container's, used as fallback)."""
     text = _read_text("/etc/os-release")
     for line in text.splitlines():
         key, sep, value = line.partition("=")
@@ -57,27 +85,9 @@ def _os_release_id() -> str | None:
     return None
 
 
-def _in_container() -> bool:
-    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
-        return True
-    cgroup = _read_text("/proc/1/cgroup") + _read_text("/proc/self/cgroup")
-    return any(tok in cgroup for tok in ("docker", "containerd", "kubepods", "/lxc"))
-
-
-def _windows_host_under_linux_container() -> bool:
-    """Detect Docker Desktop on Windows (WSL2 backend) from inside a container.
-
-    Docker Desktop runs Linux containers on a WSL2 kernel whose version string
-    contains "microsoft"/"WSL", which lets us flag the host as Windows even
-    though the container itself is Linux.
-    """
-    marker = (_read_text("/proc/version") + " " + platform.release()).lower()
-    return "microsoft" in marker or "wsl" in marker
-
-
 @lru_cache(maxsize=1)
 def detect_hardware() -> str:
-    """Return a concise, accurate platform label. Never raises."""
+    """Return a concise, accurate host-platform label. Never raises."""
     try:
         system = platform.system()
         if system == "Windows":
@@ -85,11 +95,13 @@ def detect_hardware() -> str:
         if system == "Darwin":
             return "macos"
 
-        # Linux (bare metal or container)
+        # Linux: prefer host-visible signals over the container base image.
         pi = _raspberry_pi_model()
-        base = pi or _os_release_id() or "linux"
-        if _in_container():
-            return f"{base}-docker-win" if _windows_host_under_linux_container() else f"{base}-docker"
-        return base
+        if pi:
+            return pi
+        host = _host_os_from_kernel()
+        if host:
+            return host
+        return _os_release_id() or "linux"
     except Exception:
         return "unknown"
