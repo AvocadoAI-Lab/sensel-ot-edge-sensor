@@ -245,6 +245,17 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     sensor_raw.setdefault("id", os.environ.get("SENSOR_ID", "ot-edge-001"))
     sensor_raw.setdefault("site_id", os.environ.get("SITE_ID", "factory-lab-001"))
+    # Resolve hardware label: explicit yaml/env wins; otherwise auto-detect the
+    # real platform (pi4 / ubuntu / ubuntu-docker / …) so the platform sensor
+    # table is accurate instead of the static "ubuntu" default.
+    if not sensor_raw.get("hardware"):
+        env_hardware = (os.environ.get("SENSOR_HARDWARE") or "").strip()
+        if env_hardware:
+            sensor_raw["hardware"] = env_hardware
+        else:
+            from src.config.platform_detect import detect_hardware
+
+            sensor_raw["hardware"] = detect_hardware()
 
     nb_raw = expanded.get("northbound_mqtt", {})
     if os.environ.get("CONTROL_PLANE_MQTT_HOST"):
