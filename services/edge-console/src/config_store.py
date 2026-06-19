@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from src.platform_detect import detect_hardware
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -20,7 +22,9 @@ class PlatformConfig(BaseModel):
     sensor_id: str = "ot-edge-001"
     site_id: str = "factory-lab-001"
     sensor_type: str = "ot-edge-sensor"
-    hardware: str = "pi4"
+    # Auto-detect the host platform (pi4 / ubuntu / windows-docker …) instead of
+    # a hardcoded default so the sensor table is accurate out of the box.
+    hardware: str = Field(default_factory=detect_hardware)
     sensel_api_url: str = "http://192.168.1.108:8081"
     sensel_api_key: str = ""
     smb_intel_api_key: str = ""
