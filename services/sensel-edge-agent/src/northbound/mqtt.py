@@ -7,7 +7,7 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from src.config.settings import NorthboundMqttConfig, SensorIdentity
 from src.northbound.topics import coverage_topic, events_topic, observe_tick_topic, state_topic, topology_snapshot_topic
@@ -44,6 +44,38 @@ class NorthboundMqttClient:
         if tid:
             self._cfg.tenant_id = tid
             logger.info("Northbound MQTT tenant_id updated to %s", tid)
+
+    def update_credentials(self, username: str, password: str) -> bool:
+        """Apply Control-Plane-issued credentials, reconnecting if they changed.
+
+        Tearing down the client forces ``_ensure_client`` to rebuild it with the
+        new ``username_pw_set`` on the next publish (paho cannot swap creds on a
+        live connection). Returns True when a change was applied.
+        """
+        user = (username or "").strip()
+        if not user:
+            return False
+        if user == self._cfg.username and (password or "") == (self._cfg.password or ""):
+            return False
+        self._cfg.username = user
+        self._cfg.password = password or ""
+        logger.info("Northbound MQTT credentials updated (user=%s); reconnecting", user)
+        with self._lock:
+            self._disconnect_locked()
+        return True
+
+    def update_endpoint_if_unset(self, host: str, port: Optional[int] = None) -> bool:
+        """Bootstrap host/port from the Control Plane only when not configured."""
+        host = (host or "").strip()
+        if not host or self._cfg.host:
+            return False
+        self._cfg.host = host
+        if port:
+            self._cfg.port = int(port)
+        logger.info("Northbound MQTT endpoint bootstrapped to %s:%s", self._cfg.host, self._cfg.port)
+        with self._lock:
+            self._disconnect_locked()
+        return True
 
     def _on_connect(
         self,

@@ -348,6 +348,27 @@ def load_config(path: Path | None = None) -> AppConfig:
             os.environ.get("CONTROL_PLANE_MQTT_PASSWORD", ""),
         ),
     )
+
+    # Control-Plane-issued credentials persisted from a prior registration take
+    # precedence for provisioned sensors, so the bus stays authenticated across
+    # restarts even before the next registration completes.
+    from src.runtime.mqtt_credentials import load_persisted_credentials
+
+    persisted = load_persisted_credentials()
+    if persisted:
+        nb_raw["username"] = persisted["username"]
+        nb_raw["password"] = persisted.get("password", "")
+        policy_raw["mqtt_username"] = persisted["username"]
+        policy_raw["mqtt_password"] = persisted.get("password", "")
+        if not nb_raw.get("host") and persisted.get("host"):
+            nb_raw["host"] = persisted["host"]
+            nb_raw["enabled"] = True
+            if persisted.get("port"):
+                nb_raw["port"] = int(persisted["port"])
+        if not policy_raw.get("mqtt_host") and persisted.get("host"):
+            policy_raw["mqtt_host"] = persisted["host"]
+            if persisted.get("port"):
+                policy_raw["mqtt_port"] = int(persisted["port"])
     det_enabled_env = os.environ.get("DETECTION_POLICY_ENABLED", "").lower()
     if det_enabled_env in ("0", "false", "no"):
         policy_raw["detection_policy_enabled"] = False

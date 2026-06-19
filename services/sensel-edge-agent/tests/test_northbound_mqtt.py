@@ -114,3 +114,42 @@ def test_on_disconnect_marks_down_but_keeps_client() -> None:
         assert nb.connected is False
         # Client survives the disconnect so the background loop can reconnect.
         assert nb._client is mock_instance
+
+
+def test_update_credentials_tears_down_for_reconnect() -> None:
+    cfg, sensor = _client_cfg()
+    nb = NorthboundMqttClient(cfg, sensor)
+
+    mock_instance = MagicMock()
+    with patch("paho.mqtt.client.Client", return_value=mock_instance), patch(
+        "src.northbound.mqtt.write_agent_runtime"
+    ):
+        nb._ensure_client()
+        assert nb._client is mock_instance
+
+        # New creds -> apply + tear down so _ensure_client rebuilds with them.
+        assert nb.update_credentials("ndr-tenant-x", "s3cret") is True
+        assert cfg.username == "ndr-tenant-x"
+        assert cfg.password == "s3cret"
+        assert nb._client is None
+
+        # Idempotent: identical creds do not churn the connection.
+        nb._ensure_client()
+        assert nb.update_credentials("ndr-tenant-x", "s3cret") is False
+        assert nb._client is mock_instance
+
+        # Empty username is ignored.
+        assert nb.update_credentials("", "x") is False
+
+
+def test_update_endpoint_only_bootstraps_when_unset() -> None:
+    cfg = NorthboundMqttConfig(enabled=True, host="", port=1883, tenant_id="t")
+    sensor = SensorIdentity(id="ot-edge-001", site_id="site-a")
+    nb = NorthboundMqttClient(cfg, sensor)
+
+    assert nb.update_endpoint_if_unset("broker.example", 8883) is True
+    assert cfg.host == "broker.example"
+    assert cfg.port == 8883
+    # Already set -> no override.
+    assert nb.update_endpoint_if_unset("other.example", 1883) is False
+    assert cfg.host == "broker.example"
