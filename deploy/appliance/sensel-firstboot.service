@@ -1,0 +1,18 @@
+# SenseL appliance first-boot provisioning (runs ONCE on the first boot of a
+# freshly-cloned/downloaded image). Regenerates per-device identity and sets up
+# mDNS so the box is reachable at http://sensel.local:8090. Self-disables via a
+# done-marker so it never runs again.
+[Unit]
+Description=SenseL appliance first-boot provisioning
+After=network-online.target docker.service
+Wants=network-online.target
+Before=sensel-edge.service
+ConditionPathExists=!/var/lib/sensel/firstboot.done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/sensel/sensel-ot-edge-sensor/deploy/appliance/firstboot.sh
+
+[Install]
+WantedBy=multi-user.target

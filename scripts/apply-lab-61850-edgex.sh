@@ -15,6 +15,11 @@ COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose
 if [[ -f "$ROOT/docker-compose.pi-lab.yml" ]]; then
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-lab.yml"
 fi
+# pi4.yml carries a suricata resource-limit override (no image), so the
+# suricata overlay that defines the image must be included alongside it.
+if [[ -f "$ROOT/docker-compose.suricata.yml" ]]; then
+  COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.suricata.yml"
+fi
 
 run_remote() {
   local host="$1"
@@ -27,6 +32,8 @@ set -euo pipefail
 cd "${REMOTE_DIR}"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.pi4.yml -f docker-compose.lab-61850.yml"
 [[ -f docker-compose.pi-lab.yml ]] && COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-lab.yml"
+# pi4.yml overrides the suricata service (no image) — pair it with the overlay.
+[[ -f docker-compose.suricata.yml ]] && COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.suricata.yml"
 
 META="http://127.0.0.1:59881"
 for name in relay-01 s7-plc-01 opcua-demo-01; do

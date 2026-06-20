@@ -6,8 +6,13 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from typing import TYPE_CHECKING
+
 from src.detection.models import SecurityEvent, utc_now_iso
 from src.policy.ioc_cache import IocCacheStore, IocEntry
+
+if TYPE_CHECKING:
+    from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
 
 
 RULE_ID = "OT-019"
@@ -22,6 +27,7 @@ class IocMatcher:
     sensor_id: str
     cache: IocCacheStore
     policy: dict
+    listfile_enforcer: "ManagedListfileEnforcer | None" = None
     rules_enabled: set[str] = field(default_factory=set)
     cooldown_sec: int = 300
     _event_seq: int = 0
@@ -104,6 +110,8 @@ class IocMatcher:
 
         for direction, ip in (("src", src_ip), ("dst", dst_ip)):
             if not ip or ip in allowlist:
+                continue
+            if self.listfile_enforcer is not None and self.listfile_enforcer.is_ip_whitelisted(ip):
                 continue
             entry = self.cache.lookup_ipv4(ip)
             if entry is None:

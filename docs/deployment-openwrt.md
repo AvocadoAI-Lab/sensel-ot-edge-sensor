@@ -120,12 +120,17 @@ docker compose -f docker-compose.openwrt.yml ps
 
 自建 OT 規則（OT-001~019）在 Tier 1 即可運作。Snort/Suricata 為重量級 sidecar，**只在 x86 ≥ 4 GB RAM** 開啟：
 
+> ⚠️ **架構限制**：Snort 鏡像 `ciscotalos/snort3:latest` **只有 amd64**，無法在 ARM
+> 裝置（如 NanoPi R4S/R5S、RPi）原生執行。**ARM 平台請改用 Suricata**
+> （`jasonish/suricata:latest` 為 multi-arch，含 arm64），或維持內建 OT 偵測。
+
 ```sh
-# Snort
+# Snort（僅 x86_64）
 SNORT_INTERFACE=eth1 \
 docker compose -f docker-compose.openwrt.yml -f docker-compose.snort.yml up -d
 
-# 或 Suricata
+# Suricata（x86_64 或 ARM）
+# SURICATA_INTERFACE 必須等於 CAPTURE_INTERFACE（此處 mirror 埠為 eth1）
 SURICATA_INTERFACE=eth1 \
 docker compose -f docker-compose.openwrt.yml -f docker-compose.suricata.yml up -d
 ```

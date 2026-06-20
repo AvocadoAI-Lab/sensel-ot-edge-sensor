@@ -20,6 +20,8 @@ const BASELINE_UI = {
 export function render(root) {
   root.innerHTML = `
     <section class="page">
+      <div class="card-ot onboard-card" id="onboardCard" hidden></div>
+
       <div class="grid-dash-top">
         <div class="card-ot readiness-card" id="readinessCard">${stateBlock("loading")}</div>
         <div class="card-ot" id="policyCard">${stateBlock("loading")}</div>
@@ -80,6 +82,7 @@ async function load() {
   const status = readiness.status || {};
   if (status.sensor_id) setSensorMeta(status.sensor_id, status.site_id);
 
+  renderOnboarding(readiness, status);
   renderReadiness(readiness);
   renderPolicy(status.metrics?.policy_gauge || {});
   renderOperationalMode(status.operational_mode || {});
@@ -89,6 +92,70 @@ async function load() {
   renderEvents(evts);
   updateShield(baseline.state === "active" ? "green" : baseline.state === "not_loaded" ? "red" : "yellow");
   updateOperationalModeBadge(status.operational_mode || {});
+}
+
+function renderOnboarding(readiness, status) {
+  const card = $("#onboardCard");
+  if (!card) return;
+  const fm = Object.fromEntries((readiness.factors || []).map((x) => [x.key, x]));
+  const registered = fm.registration?.state === "green" || !!status.metrics?.last_register_at;
+  const nbOk = fm.mqtt?.state === "green";
+  const eventsSeen = (status.metrics?.events_24h || 0) > 0;
+
+  let icon = "🚀";
+  let title = "歡迎！跟著三步完成接入";
+  let desc = "第一次使用？建議先看操作手冊，再到接入精靈完成平台連線。";
+  let primary = `<button type="button" class="btn btn-primary" id="onbSetup">前往接入精靈</button>`;
+
+  if (registered && nbOk) {
+    icon = eventsSeen ? "✅" : "🟢";
+    title = eventsSeen ? "感測器運作中" : "已連線！送一筆測試事件確認";
+    desc = eventsSeen
+      ? "北向已連線且已有事件上傳。可隨時送出測試事件再次驗證 SenseL 端可見性。"
+      : "北向 MQTT 已連線。按「送出測試事件」，數秒後即可在 SenseL 平台看到它。";
+    primary = `<button type="button" class="btn btn-primary" id="onbTestEvent">送出測試事件</button>`;
+  } else if (registered && !nbOk) {
+    icon = "⚠️";
+    title = "已註冊，但北向尚未連線";
+    desc = "請到「系統維運 → 北向連線」測試 MQTT，或確認控制平面憑證已落地。";
+    primary = `<button type="button" class="btn btn-primary" id="onbNorthbound">檢查北向連線</button>`;
+  }
+
+  card.hidden = false;
+  card.innerHTML = `
+    <div class="onboard-row">
+      <span class="onboard-icon">${icon}</span>
+      <div class="onboard-text">
+        <div class="onboard-title">${title}</div>
+        <div class="onboard-desc">${escapeHtml(desc)}</div>
+      </div>
+      <div class="onboard-actions">
+        ${primary}
+        <button type="button" class="btn btn-ghost" id="onbGuide">📖 操作手冊</button>
+      </div>
+    </div>`;
+
+  $("#onbGuide")?.addEventListener("click", () => navigate("guide"));
+  $("#onbSetup")?.addEventListener("click", () => navigate("setup"));
+  $("#onbNorthbound")?.addEventListener("click", () => navigate("ops"));
+  $("#onbTestEvent")?.addEventListener("click", sendTestEvent);
+}
+
+async function sendTestEvent(ev) {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = "送出中…";
+  try {
+    const r = await api("/api/test-event", { method: "POST" });
+    toast(r.message || "測試事件已送出", !!r.ok);
+    setTimeout(() => load().catch(() => {}), 1500);
+  } catch (e) {
+    toast(e.message || "送出失敗", false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 const OP_MODE_UI = {

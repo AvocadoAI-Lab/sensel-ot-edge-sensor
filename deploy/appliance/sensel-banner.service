@@ -1,0 +1,14 @@
+# Render the console login banner with the live device IP + Edge Console URL on
+# every boot, so an operator at the VM console knows where to point a browser.
+[Unit]
+Description=SenseL console access banner (/etc/issue + /etc/motd)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/sensel/sensel-ot-edge-sensor/deploy/appliance/gen-banner.sh
+
+[Install]
+WantedBy=multi-user.target

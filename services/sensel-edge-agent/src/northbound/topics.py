@@ -27,3 +27,8 @@ def observe_tick_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
 
 def topology_snapshot_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
     return f"{topic_base(tenant_id, site_id, sensor_id)}/topology/snapshot/v1"
+
+
+def policy_ack_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    """ACK/NACK for applied policy artifacts (IDS rules, managed listfiles)."""
+    return f"{topic_base(tenant_id, site_id, sensor_id)}/policy/ack/v1"

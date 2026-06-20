@@ -73,7 +73,10 @@ services:
       - LEARNING_SESSION_PATH=/data/agent/learning-session.json
     volumes:
       - ./data/agent:/data/agent
-      - ./data/assets:/data/assets:ro
+      # Writable so the Console can append a synthetic "test event" into the
+      # real security-events.jsonl pipeline (POST /api/test-event). packet-sensor
+      # also appends here; POSIX O_APPEND keeps concurrent writes safe.
+      - ./data/assets:/data/assets
       - ./config/edgex:/config/edgex
       - ./:/project:ro
       - /var/run/docker.sock:/var/run/docker.sock

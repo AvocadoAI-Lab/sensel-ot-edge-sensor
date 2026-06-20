@@ -1,0 +1,16 @@
+# Enable promiscuous mode on the capture NIC on every boot so passive mirror/SPAN
+# traffic is visible to packet-sensor. Reads CAPTURE_INTERFACE from the app .env;
+# falls back to the primary non-loopback interface.
+[Unit]
+Description=SenseL capture NIC promiscuous mode
+After=network-online.target
+Wants=network-online.target
+Before=sensel-edge.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/sensel/sensel-ot-edge-sensor/deploy/appliance/set-promisc.sh
+
+[Install]
+WantedBy=multi-user.target

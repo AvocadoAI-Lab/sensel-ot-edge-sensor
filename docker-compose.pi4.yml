@@ -61,5 +61,19 @@ services:
           memory: 128M
           cpus: "0.25"
 
+  # IDS engine on ARM/Pi4: use SURICATA (multi-arch image incl. arm64). The
+  # Snort image (ciscotalos/snort3) is amd64-only and will NOT run natively on
+  # Pi4 — use Suricata or stick to the built-in OT rules instead.
+  # This limit only applies when the suricata overlay is also included, e.g.:
+  #   SURICATA_INTERFACE=eth1 \
+  #   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
+  #     -f docker-compose.suricata.yml up -d
+  suricata:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.5"
+
   # Pi4: reduce EdgeX footprint in lab — enable full stack when hardware verified
   # See deploy/pi4/setup.sh for memory tuning

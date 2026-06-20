@@ -89,6 +89,43 @@ def test_ioc_matcher_emits_ot_019_event(tmp_path: Path) -> None:
     assert event.evidence["direction"] == "src"
 
 
+def test_ioc_matcher_whitelist_suppresses_ot019(tmp_path: Path) -> None:
+    _, _, IocMatcher, IocCacheStore = _import_modules()
+    from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
+
+    cache_path, stamp_path = _write_cache(tmp_path, ["203.0.113.99"])
+    listfile_cache = tmp_path / "managed-listfiles.json"
+    listfile_stamp = tmp_path / "managed-listfiles.stamp"
+    listfile_cache.write_text(
+        json.dumps(
+            {
+                "allow": {"ip": ["203.0.113.99"], "cidr": [], "domain": [], "hash": []},
+                "deny": {"ip": [], "cidr": [], "domain": [], "hash": []},
+            }
+        ),
+        encoding="utf-8",
+    )
+    listfile_stamp.write_text("stamp\n", encoding="utf-8")
+    store = IocCacheStore(cache_path=cache_path, stamp_path=stamp_path, reload_check_sec=0)
+    enforcer = ManagedListfileEnforcer(listfile_cache, listfile_stamp, reload_check_sec=0)
+    enforcer.maybe_reload(force=True)
+    matcher = IocMatcher(
+        site_id="factory-lab-001",
+        sensor_id="ot-edge-001",
+        cache=store,
+        policy={"global_allowlists": {"ip": []}},
+        listfile_enforcer=enforcer,
+        cooldown_sec=300,
+    )
+    events = matcher.evaluate(
+        src_ip="203.0.113.99",
+        dst_ip="192.168.10.50",
+        dst_port=102,
+        protocol="tcp",
+    )
+    assert events == []
+
+
 def test_ioc_matcher_respects_cooldown(tmp_path: Path) -> None:
     _, _, IocMatcher, IocCacheStore = _import_modules()
     cache_path, stamp_path = _write_cache(tmp_path, ["203.0.113.99"])

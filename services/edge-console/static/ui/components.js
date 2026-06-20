@@ -98,11 +98,17 @@ export function pipeline(nodes) {
   }).join("")}</div>`;
 }
 
-// Fixed-layout dependency graph for the 6 EdgeX nodes.
+// Fixed-layout dependency graph: SenseL NDR pipeline (left) → EdgeX core +
+// egress (right). Nodes without a position here are skipped.
 const GRAPH_POS = {
-  "core-keeper": [60, 105], "mqtt-broker": [60, 185],
-  "core-metadata": [185, 50], "core-data": [185, 130],
-  "device-mqtt": [320, 60], "northbound-mqtt": [320, 165],
+  // SenseL NDR capture/processing (left column).
+  "suricata": [80, 55], "packet-sensor": [80, 150], "local-mqtt": [80, 250],
+  // SenseL agent (mid-left).
+  "edge-agent": [225, 100], "device-mqtt": [225, 210],
+  // EdgeX core (mid-right column).
+  "core-metadata": [370, 55], "core-data": [370, 150], "core-keeper": [370, 250],
+  // Egress (right column).
+  "northbound-mqtt": [515, 100], "mqtt-broker": [515, 210],
 };
 export function depGraph(graph) {
   const idMap = Object.fromEntries((graph.nodes || []).map((n) => [n.id, n]));
@@ -120,7 +126,7 @@ export function depGraph(graph) {
       <text x="26" y="20" class="dep-text">${escapeHtml(n.label || n.id)}</text>
     </g>`;
   }).join("");
-  return `<svg viewBox="0 0 400 220" class="dep-graph" role="img" aria-label="服務依賴圖">${edges}${nodes}</svg>`;
+  return `<svg viewBox="0 0 580 300" class="dep-graph" role="img" aria-label="服務依賴圖">${edges}${nodes}</svg>`;
 }
 
 export function signalBars(sig) {

@@ -84,3 +84,47 @@ def test_restart_edgex_container_not_whitelisted(monkeypatch):
     ok, msg = svc.restart_edgex_container("malicious-container")
     assert ok is False
     assert "not allowed" in msg.lower()
+
+
+def test_container_allowed_scope():
+    assert svc._container_allowed("sensel-suricata") is True
+    assert svc._container_allowed("sensel-snort") is True
+    assert svc._container_allowed("edgex-core-data") is True
+    assert svc._container_allowed("malicious-container") is False
+
+
+def test_is_sensel_container():
+    assert svc._is_sensel_container("sensel-suricata") is True
+    assert svc._is_sensel_container("suricata") is True
+    assert svc._is_sensel_container("edgex-core-data") is False
+
+
+def test_service_row_for_discovered_sensel(monkeypatch):
+    monkeypatch.setattr(
+        svc, "_docker_status",
+        lambda _c: {"container": _c, "status": "running", "running": True, "started_at": "2026-06-19T10:00:00Z", "image": "jasonish/suricata:latest"},
+    )
+    spec = {"id": "sensel-suricata", "label": "Suricata IDS", "container": "sensel-suricata", "port": None, "optional": True, "group": "sensel"}
+    row, docker = svc._service_row(spec, {"sensel-suricata": {"cpu_pct": 1.2, "mem_mb": 80.0}})
+    assert row["group"] == "sensel"
+    assert row["api"] is None  # no HTTP ping for IDS sidecars
+    assert row["ok"] is True
+    assert row["cpu_pct"] == 1.2 and row["mem_mb"] == 80.0
+    assert docker["running"] is True
+
+
+def test_build_platform_includes_discovered(monkeypatch):
+    monkeypatch.setattr(svc, "_docker_stats_all", lambda: {})
+    monkeypatch.setattr(svc, "_docker_status", lambda c: {"container": c, "status": "running", "running": True})
+    monkeypatch.setattr(svc, "_ping_service", lambda *a, **k: {"ok": True, "status_code": 200, "latency_ms": 1, "url": "x"})
+    monkeypatch.setattr(svc, "_service_version", lambda *a, **k: None)
+    monkeypatch.setattr(
+        svc, "_discover_extra_containers",
+        lambda exclude: [{"id": "sensel-suricata", "label": "Suricata IDS", "container": "sensel-suricata", "port": None, "optional": True, "group": "sensel"}],
+    )
+    platform = svc.build_platform()
+    by_container = {s["container"]: s for s in platform["services"]}
+    assert "sensel-suricata" in by_container
+    assert by_container["sensel-suricata"]["group"] == "sensel"
+    # Curated EdgeX rows still present.
+    assert "edgex-core-data" in by_container

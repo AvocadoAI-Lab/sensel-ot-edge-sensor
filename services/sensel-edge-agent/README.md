@@ -79,3 +79,50 @@ Header：`X-API-Key: {SMB_INTEL_API_KEY}`（與 B-S1 相同，與 ingest secret 
 環境變數：`POLICY_SYNC_MQTT_ENABLED=true`、`POLICY_SYNC_MQTT_HOST`（預設 `CONTROL_PLANE_MQTT_HOST`）、`POLICY_SYNC_MQTT_TOPIC`。
 
 Lab 驗證：`./scripts/publish-track-b-lab-blacklist-mqtt.sh`（需 108 feed 或 inline payload + EMQX 203）。
+
+## OT 防護管理中心：IDS 規則派送（EPIC B 邊緣端）
+
+接收工控安全防護管理中心下派的 **自訂 Snort/Suricata 規則檔**，採 MQTT manifest 通知 + HTTP 拉檔（大檔走 HTTP），套用前驗 HMAC 簽章、套用後 reload 健檢、失敗自動回滾（PRD D4 第 2 段）。
+
+- MQTT：`sensel/{tenant_id}/policy/ids-rules-+`（由 topic 後綴解析 engine 觸發拉取）
+- HTTP：`GET {SENSEL_API_URL}/api/v1/feed/{tenant_id}/ot-rules.rules?engine={engine}`（`X-API-Key` + `If-None-Match`/304）
+- 簽章：驗 `X-Signature`（HMAC，金鑰由 `SENSEL_API_KEY` 派生，與平台共用），失敗即拒絕套用
+
+| 項目 | 說明 |
+|------|------|
+| 寫入 | `{IDS_RULE_TARGET_DIR}/{engine}.rules`（原子寫入，先備份 `.bak`） |
+| 健檢 | `IDS_RULE_RELOAD_CMD`（可選 no-op）→ **`IDS_RULE_HEALTHCHECK_CMD`（必填**，如 `suricata -T -S {path}`；`{engine}`/`{path}` 可代入） |
+| 回滾 | reload 或健檢失敗時還原前一版並重載，狀態標記 `rolled_back` |
+| 狀態 | `/app/data/ids-rule-status.json`（逐 engine 的 version/etag/ok/rolled_back/rejected_version） |
+| 備援 | 每 `IDS_RULE_INTERVAL_SEC`（預設 300s）HTTP 重拉（etag 去重） |
+
+環境變數：`IDS_RULE_ENABLED`（預設 true）、`IDS_RULE_ENGINES`（逗號分隔，預設 `suricata`）、`IDS_RULE_RELOAD_CMD`、`IDS_RULE_HEALTHCHECK_CMD`、`IDS_RULE_TARGET_DIR`、`IDS_RULE_CMD_TIMEOUT_SEC`、`OT_FEED_SIGNING_SECRET`（預設取 `SENSEL_API_KEY`）。
+
+> reload 容器化範例：將 `config/suricata/rules` 掛入本容器並設 `IDS_RULE_TARGET_DIR=/etc/suricata/rules`、`IDS_RULE_RELOAD_CMD="suricatasc -c reload-rules"`、`IDS_RULE_HEALTHCHECK_CMD="suricata -T -c /etc/suricata/suricata.yaml"`。**未設 `IDS_RULE_HEALTHCHECK_CMD` 時套用會拒絕並 NACK**（G15）；`IDS_RULE_RELOAD_CMD` 可留空（no-op）。
+
+### ACK/NACK 北向回報（閉合 D4 迴圈）
+
+每次規則／名單套用後，將結果回報至北向 topic `ot-edge/{tenant}/{site}/{sensor}/policy/ack/v1`（QoS 1）：
+
+| outcome | 觸發 |
+|---------|------|
+| `ack` / `applied` | 套用成功（reload + 健檢通過） |
+| `nack` / `rolled_back` | reload 或健檢失敗，已還原前一版 |
+| `nack` / `rejected` | 無前一版可還原，或 **簽章驗證失敗** |
+
+冪等（304／內容未變）不回報。Control Plane 可據此把派送紀錄由「已送出」更新為「已套用／已回滾」。
+
+**HTTP fallback**：MQTT 北向不可用（或停用）時，`PolicyAckReporter` 會直接 `POST {SENSEL_API_URL}{POLICY_ACK_INGEST_PATH}`（預設 `/api/v1/internal/ot-security/policy-ack`），帶 `X-Ot-Security-Ingest-Secret`，確保派送紀錄仍能收斂。MQTT 可用時優先走匯流排。
+
+環境變數：`POLICY_ACK_HTTP_FALLBACK_ENABLED`（預設 true）、`POLICY_ACK_INGEST_PATH`、`OT_SECURITY_INGEST_SECRET`（未設時回退 `OT_EDGE_SENSOR_API_KEY` / `SENSEL_API_KEY`）。
+
+## OT 防護管理中心：管理黑白名單派送（EPIC C 邊緣端）
+
+接收後台管理的黑/白名單（`blacklist`=偵測、`whitelist`=排除），與 CTI `blacklist.json`（IoC）分開。
+
+- MQTT：`sensel/{tenant_id}/policy/listfiles`
+- HTTP：`GET {SENSEL_API_URL}/api/v1/feed/{tenant_id}/listfiles.json`（驗 `X-Signature`）
+- 輸出：`/app/data/managed-listfiles.json`（`deny`/`allow` × ip/cidr/domain/hash）+ `.stamp`
+- **消費端**：`ManagedListfileEnforcer` 在 packet-sensor 偵測（OT-019/MVP）與 edge-agent 北向上傳前排除白名單命中（G6）
+
+環境變數：`LISTFILE_ENABLED`（預設 true）、`LISTFILE_INTERVAL_SEC`、`LISTFILE_CACHE_PATH`、`LISTFILE_MQTT_ENABLED`。

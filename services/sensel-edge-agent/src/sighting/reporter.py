@@ -7,13 +7,16 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from src.config.settings import AppConfig
 from src.sighting.queue import QueuedSighting, SightingQueue
 from src.upload.events import SecurityEventTailer
+
+if TYPE_CHECKING:
+    from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
 
 logger = logging.getLogger(__name__)
 
@@ -188,8 +191,13 @@ def _build_external_cti_payload(
 
 
 class SightingReporter:
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        listfile_enforcer: "ManagedListfileEnforcer | None" = None,
+    ) -> None:
         self._config = config
+        self._listfile = listfile_enforcer
         self._base = config.sensel.api_url.rstrip("/")
         self._ingest_path = config.sighting_report.ingest_path
         self._api_key = (config.sighting_report.smb_intel_api_key or "").strip()
@@ -355,8 +363,12 @@ class SightingReporter:
 
         submitted = 0
         tailers = [self._tailer, *self._external_tailers]
+        if self._listfile is not None:
+            self._listfile.maybe_reload()
         for tailer in tailers:
             for event in tailer.pending_events():
+                if self._listfile is not None and self._listfile.is_event_whitelisted(event):
+                    continue
                 payload = build_sighting_ingest_payload(event, self._config)
                 if payload is None:
                     continue
