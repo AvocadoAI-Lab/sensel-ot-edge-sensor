@@ -1,0 +1,28 @@
+{
+  "schema_version": "ndr_event.normalized.v1",
+  "event_id": "ndr-edge-001:suricata:evt-20260619-suricata-00001",
+  "tenant_id": "lab-tenant",
+  "workspace_id": "ws-lab-1",
+  "site_id": "lab-ot-site",
+  "sensor_id": "ndr-edge-001",
+  "engine": "suricata",
+  "event_type": "SURICATA_ALERT",
+  "rule_id": "suricata-1-2100498",
+  "severity": "high",
+  "risk_score": 85,
+  "source_ip": "192.168.80.131",
+  "source_port": 55321,
+  "destination_ip": "192.168.80.130",
+  "destination_port": 80,
+  "target_ip": "192.168.80.130",
+  "protocol": "http",
+  "observed_at": "2026-06-19T03:30:00+00:00",
+  "raw_ref": "suricata:eve:flow_id=99",
+  "evidence": {
+    "engine": "suricata",
+    "sid": 2100498,
+    "gid": 1,
+    "category": "Web Application Attack",
+    "app_proto": "http"
+  }
+}

@@ -27,6 +27,11 @@ class SecurityEvent:
     risk_score: int = 70
     evidence: dict = field(default_factory=dict)
     evidence_ref: str = ""
+    # NDR/OT normalized correlation fields (PRD EDGE-1.4). ``target_ip`` is the
+    # correlation-normalized target (usually the destination / protected OT
+    # asset); ``raw_ref`` points at the source record (PCAP / EVE offset / index).
+    target_ip: str = ""
+    raw_ref: str = ""
     timestamp: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> dict:
@@ -53,4 +58,8 @@ class SecurityEvent:
             payload["dst_port"] = self.dst_port
         if self.evidence_ref:
             payload["evidence_ref"] = self.evidence_ref
+        if self.target_ip:
+            payload["target_ip"] = self.target_ip
+        if self.raw_ref:
+            payload["raw_ref"] = self.raw_ref
         return payload

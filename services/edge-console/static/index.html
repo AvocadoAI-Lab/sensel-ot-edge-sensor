@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -68,3 +69,75 @@
   <script type="module" src="/assets/app.js?v=21"></script>
 </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SenseL OT Edge Console</title>
+  <link rel="icon" href="/assets/brand/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/assets/brand/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/tokens.css?v=18" />
+  <link rel="stylesheet" href="/style.css?v=18" />
+</head>
+<body>
+  <div id="loginView" class="login-wrap hidden">
+    <div class="login-card panel">
+      <img src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="login-logo" width="340" height="auto" />
+      <p class="login-tagline">
+        OT Edge Runtime · Telemetry Pipeline · Security Validation
+      </p>
+      <label>管理密碼
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入 Console 密碼" />
+      </label>
+      <div class="actions">
+        <button class="btn btn-primary" id="loginBtn" type="button">進入控制台</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appView" class="app-layout hidden">
+    <aside class="sidebar" id="sidebar" aria-label="主導覽">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-logo-wrap">
+          <img src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="sidebar-logo-horizontal" width="200" height="auto" />
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav"></nav>
+      <div class="sidebar-footer">
+        <button type="button" class="nav-item nav-logout" id="logoutBtn" title="登出">
+          <span class="nav-icon" aria-hidden="true">⎋</span>
+          <span class="nav-label">登出</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <header class="app-header">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="收合側欄">☰</button>
+        <div class="page-title-wrap">
+          <h1 id="pageTitle">總覽</h1>
+          <p class="page-sub" id="pageSubtitle">OT 邊緣感測與安全狀態</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="btn btn-primary btn-sm header-add-device hidden" id="headerAddDeviceBtn">＋ 新增設備</button>
+          <span id="headerClock" class="header-clock mono" title="系統時間 (GMT+8 · Asia/Taipei)">—</span>
+          <span id="headerModeBadge" class="header-mode-badge idle" title="運行模式">空閒</span>
+          <span id="headerShield" class="header-shield ok" title="Policy / Baseline">🛡</span>
+          <span id="headerAvatar" class="avatar" title="感測器">SE</span>
+        </div>
+      </header>
+
+      <main class="content" id="viewRoot"></main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="/assets/app.js?v=21"></script>
+</body>
+</html>
+>>>>>>> Stashed changes

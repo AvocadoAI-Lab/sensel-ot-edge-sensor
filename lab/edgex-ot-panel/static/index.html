@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EdgeX OT Panel</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">EdgeX Core Data</p>
+          <h1>OT Relay Panel</h1>
+        </div>
+        <div class="status">
+          <span id="state-dot" class="dot"></span>
+          <span id="state-text">Connecting</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="gauge">
+          <div class="dial" id="rpm-dial">
+            <div class="needle" id="rpm-needle"></div>
+            <div class="hub"></div>
+          </div>
+          <div class="metric">
+            <span>Fan RPM</span>
+            <strong id="fan-rpm">0</strong>
+          </div>
+        </article>
+
+        <article class="meter">
+          <div class="bar">
+            <span id="voltage-bar"></span>
+          </div>
+          <div class="metric">
+            <span>Voltage</span>
+            <strong><span id="voltage">0</span> V</strong>
+          </div>
+        </article>
+
+        <article class="tile">
+          <span>Breaker</span>
+          <strong id="breaker">open</strong>
+        </article>
+
+        <article class="tile">
+          <span>Alarm</span>
+          <strong id="alarm">0</strong>
+        </article>
+      </section>
+
+      <section class="footer">
+        <span id="device">device: -</span>
+        <span id="profile">profile: -</span>
+        <span id="updated">updated: -</span>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

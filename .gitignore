@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # Environment
 .env
 .env.local
@@ -48,3 +49,55 @@ Thumbs.db
 
 # Docker volumes (local dev)
 docker-volumes/
+=======
+# Environment
+.env
+.env.local
+.env.lab
+*.local
+
+# Secrets
+config/sensor.yaml
+config/policy/*.json
+!config/policy/*.example.json
+secrets/
+
+# Runtime data
+data/
+var/
+logs/
+*.pcap
+*.pcapng
+
+# EdgeX runtime
+edgex/kuiper/data/
+edgex/redis-data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Go
+bin/
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (local dev)
+docker-volumes/
+>>>>>>> Stashed changes

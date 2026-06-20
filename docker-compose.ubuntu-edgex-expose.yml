@@ -1,0 +1,23 @@
+# Ubuntu EdgeX lab override.
+# Use only on the Ubuntu VM that hosts EdgeX for the local Windows sensor bridge.
+
+services:
+  core-data:
+    ports: !override
+      - "0.0.0.0:59880:59880"
+
+  core-metadata:
+    ports: !override []
+
+  core-keeper:
+    ports: !override []
+
+  device-modbus:
+    ports: !override []
+
+  device-mqtt:
+    ports: !override []
+
+  ui:
+    ports: !override
+      - "0.0.0.0:4000:4000"

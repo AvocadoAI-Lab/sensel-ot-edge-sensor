@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.ai/schemas/ndr-event.normalized.v1.schema.json",
+  "title": "Normalized NDR Event v1",
+  "description": "Canonical northbound NDR event contract shared by edge sensor, guacamole-ai and the correlation plane (PRD section 6.1).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "event_id",
+    "tenant_id",
+    "workspace_id",
+    "site_id",
+    "sensor_id",
+    "engine",
+    "event_type",
+    "severity",
+    "risk_score",
+    "target_ip",
+    "observed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "ndr_event.normalized.v1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Globally unique; recommended sensor_id + engine + source_event_id."
+    },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "site_id": { "type": "string", "minLength": 1, "description": "Correlation key." },
+    "sensor_id": { "type": "string", "minLength": 1 },
+    "engine": {
+      "type": "string",
+      "enum": ["suricata", "snort", "wazuh", "syslog"]
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "e.g. SURICATA_ALERT, SNORT_ALERT, WAZUH_ALERT, NDR_HTTP_OBSERVED."
+    },
+    "rule_id": {
+      "type": ["string", "null"],
+      "description": "suricata-{gid}-{sid}, snort-{gid}-{sid}, or Wazuh rule id."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "info"]
+    },
+    "risk_score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "source_ip": { "type": ["string", "null"] },
+    "source_port": { "type": ["integer", "null"], "minimum": 0, "maximum": 65535 },
+    "destination_ip": { "type": ["string", "null"] },
+    "destination_port": { "type": ["integer", "null"], "minimum": 0, "maximum": 65535 },
+    "target_ip": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Normalized correlation target; usually destination or protected OT asset."
+    },
+    "protocol": {
+      "type": ["string", "null"],
+      "description": "Canonical protocol family e.g. http, tcp, modbus-tcp, edgex."
+    },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "raw_ref": {
+      "type": ["string", "null"],
+      "description": "Wazuh/OpenSearch index/id, local file offset, or PCAP ref."
+    },
+    "evidence": { "type": "object", "description": "Engine-specific raw fields." }
+  }
+}

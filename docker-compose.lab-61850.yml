@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # IEC 61850 lab overlay — GOOSE/MMS publishers + EdgeX mqtt-feature only
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d
@@ -109,3 +110,116 @@ services:
             s.sendall(payload)
             s.close()
             time.sleep(2)
+=======
+# IEC 61850 lab overlay — GOOSE/MMS publishers + EdgeX mqtt-feature only
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d
+#   CAPTURE_INTERFACE=eth0 make verify-61850
+#
+# EdgeX: device-modbus / modbus-simulator / phase2 (opc-ua, s7) are OFF unless
+#   docker compose --profile modbus-lab up -d
+#   docker compose --profile phase2 up -d device-opc-ua device-s7
+
+services:
+  device-modbus:
+    profiles: [modbus-lab]
+
+  modbus-simulator:
+    profiles: [modbus-lab]
+
+  device-mqtt:
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/lab-61850/devices:/custom-config/devices:ro
+      - ./config/edgex/lab-61850/profiles:/custom-config/profiles:ro
+
+  edge-console:
+    environment:
+      - EDGEX_DEVICES_DIR=/config/edgex/lab-61850/devices
+      - EDGEX_PROFILES_DIR=/config/edgex/lab-61850/profiles
+
+  goose-publisher:
+    build:
+      context: .
+      dockerfile: lab/61850/goose-publisher/Dockerfile
+    container_name: sensel-goose-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      GOOSE_INTERFACE: ${GOOSE_INTERFACE:-eth0}
+      GOOSE_APPID: "1000"
+      GOOSE_GOCB_REF: simpleIOGenericIO/LLN0.gcbEvents
+      GOOSE_TEST: ${GOOSE_TEST:-false}
+
+  mms-publisher:
+    build:
+      context: .
+      dockerfile: lab/61850/mms-publisher/Dockerfile
+    container_name: sensel-mms-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      MMS_INTERFACE: ${MMS_INTERFACE:-eth0}
+      MMS_SRC_IP: ${MMS_SRC_IP:-192.168.10.88}
+      MMS_DST_IP: ${MMS_DST_IP:-192.168.10.50}
+      MMS_INTERVAL_SEC: ${MMS_INTERVAL_SEC:-2}
+
+  it-traffic-publisher:
+    build:
+      context: .
+      dockerfile: lab/it-traffic/Dockerfile
+    container_name: sensel-it-traffic-publisher
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      IT_INTERFACE: ${IT_INTERFACE:-eth0}
+      IT_SRC_IP: ${IT_SRC_IP:-192.168.10.88}
+      IT_DNS_IP: ${IT_DNS_IP:-192.168.10.10}
+      IT_LDAP_IP: ${IT_LDAP_IP:-192.168.10.10}
+      IT_EXTERNAL_DNS_IP: ${IT_EXTERNAL_DNS_IP:-8.8.8.8}
+      IT_INTERVAL_SEC: ${IT_INTERVAL_SEC:-3}
+
+  61850-sim-mms:
+    profiles: [lab-mms-amd64]
+    image: stinging/61850-sim:latest
+    container_name: sensel-61850-sim-mms
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:102:102"
+    environment:
+      IED_NAME: IED-LAB
+      MMS_PORT: "102"
+      SIMULATION_FREQUENCY: "2"
+    networks:
+      - sensel-edge
+
+  mms-probe:
+    profiles: [lab-mms-probe]
+    image: python:3.11-slim-bookworm
+    container_name: sensel-mms-probe
+    restart: "no"
+    networks:
+      - sensel-edge
+    depends_on:
+      - 61850-sim-mms
+    command:
+      - python
+      - -c
+      - |
+        import socket, time
+        payload = b"\x03\x00\x00\x2a\x02\xf0\x80confirmedRequest write service"
+        for i in range(5):
+            s = socket.create_connection(("61850-sim-mms", 102), timeout=3)
+            s.sendall(payload)
+            s.close()
+            time.sleep(2)
+>>>>>>> Stashed changes

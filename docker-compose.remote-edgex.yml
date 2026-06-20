@@ -1,0 +1,60 @@
+# Run SenseL OT Edge Sensor against an EdgeX stack hosted on another machine.
+# This profile does not start local EdgeX and does not require a local edgex Docker network.
+#
+# Expected lab values:
+#   EDGEX_CORE_DATA_URL=http://192.168.80.130:59880
+#   SENSEL_API_URL=http://host.docker.internal:8081
+#   CONTROL_PLANE_MQTT_HOST=emqx
+
+name: sensel-ot-edge-sensor
+
+services:
+  edgex-event-bridge:
+    build:
+      context: ./services/edgex-event-bridge
+      dockerfile: Dockerfile
+    container_name: sensel-edgex-event-bridge
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - EDGEX_CORE_DATA_URL=${EDGEX_CORE_DATA_URL:-http://192.168.80.130:59880}
+      - EDGEX_SOURCE_HOST=${EDGEX_SOURCE_HOST:-192.168.80.130}
+      - SECURITY_EVENTS_PATH=/app/data/assets/security-events.jsonl
+      - EDGEX_BRIDGE_STATE_PATH=/app/data/edgex-event-bridge-state.json
+      - EDGEX_BRIDGE_POLL_INTERVAL_SEC=${EDGEX_BRIDGE_POLL_INTERVAL_SEC:-5}
+      - EDGEX_BRIDGE_EVENT_LIMIT=${EDGEX_BRIDGE_EVENT_LIMIT:-20}
+    volumes:
+      - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets
+
+  sensel-edge-agent:
+    build:
+      context: ./services/sensel-edge-agent
+      dockerfile: Dockerfile
+    container_name: sensel-edge-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - SENSOR_CONFIG_PATH=/app/config/sensor.yaml.example
+      - EDGEX_CORE_DATA_URL=${EDGEX_CORE_DATA_URL:-http://192.168.80.130:59880}
+      - SECURITY_EVENTS_PATH=/app/data/assets/security-events.jsonl
+      - SECURITY_EVENTS_OFFSET=/app/data/security-events.offset
+      - SENSEL_VERIFY_TLS=false
+      - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-true}
+      - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-emqx}
+      - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - controlplane_net
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets
+    depends_on:
+      - edgex-event-bridge
+
+networks:
+  controlplane_net:
+    external: true

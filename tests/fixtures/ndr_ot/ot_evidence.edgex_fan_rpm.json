@@ -1,0 +1,29 @@
+{
+  "schema_version": "ot_evidence.normalized.v1",
+  "event_id": "edgex-evt-fan-001",
+  "tenant_id": "lab-tenant",
+  "workspace_id": "ws-lab-1",
+  "site_id": "lab-ot-site",
+  "sensor_id": "ot-edge-001",
+  "device_id": "ot-fan-relay",
+  "source_name": "FanRPM",
+  "reading_name": "FanRPM",
+  "value": "1450",
+  "unit": "rpm",
+  "event_type": "OT_READING_OBSERVED",
+  "protocol": "edgex",
+  "target_ip": "192.168.80.130",
+  "purdue_level": "L1",
+  "severity": "medium",
+  "risk_score": 75,
+  "observed_at": "2026-06-19T03:30:30+00:00",
+  "raw_payload": {
+    "source": "ubuntu-edgex",
+    "source_host": "192.168.80.130",
+    "device_name": "ot-fan-relay",
+    "profile_name": "modbus-relay",
+    "readings": [
+      { "resourceName": "FanRPM", "value": "1450", "units": "rpm" }
+    ]
+  }
+}

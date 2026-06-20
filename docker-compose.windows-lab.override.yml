@@ -1,0 +1,57 @@
+# Windows local lab override for running EdgeX dashboards alongside coreAPP.
+#
+# It only changes host port bindings and Linux-host-only mounts. Container-to-
+# container ports remain unchanged, so EdgeX, Edge Console, and lab UIs still
+# talk through their normal service names.
+
+services:
+  database:
+    ports: !override
+      - "127.0.0.1:15432:5432"
+
+  mqtt-broker:
+    ports: !override
+      - "127.0.0.1:11883:1883"
+
+  edge-console:
+    ports: !override
+      - "8090:8090"
+      - "18443:8443"
+    environment:
+      - EDGE_CONSOLE_DOCKER_RESTART=false
+      - EDGE_CONSOLE_NET_ADMIN=false
+      - EDGE_CONSOLE_WIFI_ADMIN=false
+      - EDGE_CONSOLE_VPN_ADMIN=false
+      - EDGEX_UI_URL=http://127.0.0.1:4000
+    volumes: !override
+      - ./data/agent:/data/agent
+      - ./data/assets:/data/assets:ro
+      - ./config/edgex:/config/edgex
+      - ./:/project:ro
+
+  events-viewer:
+    ports: !override
+      - "18080:8080"
+
+  local-mqtt:
+    networks: !override
+      - sensel-edge
+      - edgex-network
+
+  device-modbus:
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/devices/modbus-relay.example.yaml:/custom-config/devices/modbus-relay.example.yaml:ro
+      - ./config/edgex/profiles/modbus-relay.yaml:/custom-config/profiles/modbus-relay.yaml:ro
+
+  device-mqtt:
+    networks: !override
+      - edgex-network
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/devices/mqtt-feature-summary.yaml:/custom-config/devices/mqtt-feature-summary.yaml:ro
+      - ./config/edgex/profiles/mqtt-feature-summary.yaml:/custom-config/profiles/mqtt-feature-summary.yaml:ro
+
+  ui:
+    ports: !override
+      - "4000:4000"

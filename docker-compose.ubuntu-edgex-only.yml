@@ -1,0 +1,213 @@
+# Standalone Ubuntu EdgeX lab stack.
+# Runs EdgeX on the Ubuntu VM and exposes only Core Data to the Windows sensor bridge.
+
+name: sensel-ot-edge-sensor
+
+x-edgex-defaults: &edgex-defaults
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  user: "2002:2001"
+  networks:
+    - edgex-network
+  volumes:
+    - /etc/localtime:/etc/localtime:ro
+
+x-edgex-depends-core: &edgex-depends-core
+  core-common-config-bootstrapper:
+    condition: service_started
+  core-keeper:
+    condition: service_started
+  core-metadata:
+    condition: service_started
+
+services:
+  database:
+    <<: *edgex-defaults
+    container_name: edgex-postgres
+    image: postgres:16.3-alpine3.20
+    hostname: edgex-postgres
+    user: postgres
+    read_only: false
+    environment:
+      POSTGRES_DB: edgex_db
+      POSTGRES_PASSWORD: postgres
+    tmpfs:
+      - /run
+      - /var/run/postgresql
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - edgex-db:/var/lib/postgresql/data
+
+  mqtt-broker:
+    <<: *edgex-defaults
+    container_name: edgex-mqtt-broker
+    image: eclipse-mosquitto:2.0.21
+    hostname: edgex-mqtt-broker
+    command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto-no-auth.conf"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./edgex/mqtt-broker/mosquitto-no-auth.conf:/mosquitto/config/mosquitto-no-auth.conf:ro
+    networks:
+      - edgex-network
+      - sensel-edge
+
+  local-mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sensel-local-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./services/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - sensel-edge
+
+  core-keeper:
+    <<: *edgex-defaults
+    container_name: edgex-core-keeper
+    image: edgexfoundry/core-keeper:4.0.0
+    hostname: edgex-core-keeper
+    depends_on:
+      database:
+        condition: service_started
+      mqtt-broker:
+        condition: service_started
+    environment:
+      DATABASE_HOST: edgex-postgres
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      MESSAGEBUS_AUTHMODE: none
+      MESSAGEBUS_HOST: edgex-mqtt-broker
+      MESSAGEBUS_PORT: "1883"
+      MESSAGEBUS_PROTOCOL: tcp
+      MESSAGEBUS_SECRETNAME: ""
+      MESSAGEBUS_TYPE: mqtt
+      SERVICE_HOST: edgex-core-keeper
+
+  core-common-config-bootstrapper:
+    <<: *edgex-defaults
+    container_name: edgex-core-common-config-bootstrapper
+    image: edgexfoundry/core-common-config-bootstrapper:4.0.0
+    hostname: edgex-core-common-config-bootstrapper
+    depends_on:
+      core-keeper:
+        condition: service_started
+    command:
+      - /core-common-config-bootstrapper
+      - --registry
+      - -cp=keeper.http://edgex-core-keeper:59890
+    environment:
+      ALL_SERVICES_DATABASE_HOST: edgex-postgres
+      ALL_SERVICES_MESSAGEBUS_HOST: edgex-mqtt-broker
+      ALL_SERVICES_REGISTRY_HOST: edgex-core-keeper
+      APP_SERVICES_CLIENTS_CORE_METADATA_HOST: edgex-core-metadata
+      DEVICE_SERVICES_CLIENTS_CORE_METADATA_HOST: edgex-core-metadata
+      EDGEX_SECURITY_SECRET_STORE: "false"
+    restart: "no"
+
+  core-metadata:
+    <<: *edgex-defaults
+    container_name: edgex-core-metadata
+    image: edgexfoundry/core-metadata:4.0.0
+    hostname: edgex-core-metadata
+    depends_on:
+      core-keeper:
+        condition: service_started
+      database:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      SERVICE_HOST: edgex-core-metadata
+
+  core-data:
+    <<: *edgex-defaults
+    container_name: edgex-core-data
+    image: edgexfoundry/core-data:4.0.0
+    hostname: edgex-core-data
+    depends_on:
+      <<: *edgex-depends-core
+      database:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      SERVICE_HOST: edgex-core-data
+    ports:
+      - "0.0.0.0:59880:59880"
+
+  modbus-simulator:
+    container_name: edgex-modbus-simulator
+    image: iotechsys/modbus-sim:1.1.0
+    hostname: modbus-simulator
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - edgex-network
+    ports:
+      - "0.0.0.0:1502:1502"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+  device-modbus:
+    <<: *edgex-defaults
+    container_name: edgex-device-modbus
+    image: edgexfoundry/device-modbus:4.0.0
+    hostname: edgex-device-modbus
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+      modbus-simulator:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./edgex/common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-modbus
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/devices:/custom-config/devices:ro
+      - ./config/edgex/profiles:/custom-config/profiles:ro
+
+  device-mqtt:
+    <<: *edgex-defaults
+    container_name: edgex-device-mqtt
+    image: edgexfoundry/device-mqtt:4.0.0
+    hostname: edgex-device-mqtt
+    depends_on:
+      <<: *edgex-depends-core
+      core-data:
+        condition: service_started
+      mqtt-broker:
+        condition: service_started
+      local-mqtt:
+        condition: service_started
+    command: ["--registry", "-cp=keeper.http://edgex-core-keeper:59890"]
+    env_file:
+      - ./edgex/common-non-security.env
+    environment:
+      SERVICE_HOST: edgex-device-mqtt
+      MQTTBROKERINFO_HOST: local-mqtt
+      MQTTBROKERINFO_PORT: "1883"
+      DEVICE_DEVICESDIR: /custom-config/devices
+      DEVICE_PROFILESDIR: /custom-config/profiles
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/edgex/devices:/custom-config/devices:ro
+      - ./config/edgex/profiles:/custom-config/profiles:ro
+    networks:
+      - edgex-network
+      - sensel-edge
+
+networks:
+  sensel-edge:
+    driver: bridge
+  edgex-network:
+    driver: bridge
+
+volumes:
+  edgex-db:

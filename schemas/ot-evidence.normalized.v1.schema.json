@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.ai/schemas/ot-evidence.normalized.v1.schema.json",
+  "title": "Normalized OT Evidence v1",
+  "description": "Canonical northbound OT evidence contract shared by edge sensor, guacamole-ai and the correlation plane (PRD section 6.2).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "event_id",
+    "tenant_id",
+    "workspace_id",
+    "site_id",
+    "sensor_id",
+    "device_id",
+    "event_type",
+    "observed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "ot_evidence.normalized.v1"
+    },
+    "event_id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "site_id": { "type": "string", "minLength": 1, "description": "Same-site correlation key." },
+    "sensor_id": { "type": "string", "minLength": 1 },
+    "device_id": { "type": "string", "minLength": 1, "description": "EdgeX device / OT asset id." },
+    "source_name": {
+      "type": ["string", "null"],
+      "description": "EdgeX reading source name, e.g. fan rpm."
+    },
+    "reading_name": {
+      "type": ["string", "null"],
+      "description": "fan speed, temperature, coil status."
+    },
+    "value": { "type": ["string", "number", "boolean", "null"] },
+    "unit": { "type": ["string", "null"] },
+    "event_type": {
+      "type": "string",
+      "enum": ["OT_READING_OBSERVED", "OT_RULE_ALERT", "EDGEX_EVENT"]
+    },
+    "protocol": {
+      "type": ["string", "null"],
+      "description": "edgex, modbus-tcp, opcua."
+    },
+    "target_ip": {
+      "type": ["string", "null"],
+      "description": "OT gateway / device IP for cross-domain correlation."
+    },
+    "purdue_level": {
+      "type": ["string", "null"],
+      "description": "L0-L3."
+    },
+    "severity": {
+      "type": ["string", "null"],
+      "enum": ["critical", "high", "medium", "low", "info", null]
+    },
+    "risk_score": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "raw_payload": { "type": "object", "description": "EdgeX event/readings raw payload." }
+  }
+}
