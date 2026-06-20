@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -763,6 +765,60 @@ def recent_events(limit: int = 50, _: None = Depends(require_session)) -> dict[s
     ip_map = build_ip_device_map(device_payload.get("devices") or [])
     enriched = enrich_events(events, ip_map)
     return {"count": len(enriched), "events": enriched}
+
+
+@app.post("/api/test-event")
+def emit_test_event(_: None = Depends(require_session)) -> dict[str, Any]:
+    """Emit a synthetic OT security event into the REAL upload pipeline so the
+    operator can confirm end-to-end northbound delivery (edge → SenseL).
+
+    The event is appended to the same ``security-events.jsonl`` the edge-agent
+    tails, so it travels the exact same HTTP + northbound-MQTT path as a genuine
+    detection. It is flagged ``synthetic`` so the platform can tell it apart
+    from real findings.
+    """
+    config = store.load()
+    assets = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
+    events_file = assets / "security-events.jsonl"
+    now = datetime.now(timezone.utc).isoformat()
+    event = {
+        "event_id": f"test-{uuid.uuid4().hex[:12]}",
+        "site_id": config.site_id,
+        "sensor_id": config.sensor_id,
+        "asset_id": "console-test",
+        "event_type": "console_test_event",
+        "severity": "high",
+        "risk_score": 75,
+        "protocol": "synthetic",
+        "src_ip": "203.0.113.10",
+        "dst_ip": "203.0.113.20",
+        "dst_port": 502,
+        "rule_id": "OT-TEST-000",
+        "description": "Edge Console 測試事件（synthetic）— 驗證北向上傳鏈路",
+        "evidence": {"synthetic": True, "source": "edge-console", "note": "manual connectivity test"},
+        "synthetic": True,
+        "timestamp": now,
+    }
+    try:
+        events_file.parent.mkdir(parents=True, exist_ok=True)
+        with events_file.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"無法寫入事件檔（請確認 data/assets 為可寫掛載）：{exc}",
+        ) from exc
+    log_audit("test_event.emit", {"event_id": event["event_id"], "rule_id": event["rule_id"]})
+    northbound_ready = bool(config.mqtt_enabled and config.last_register_ok)
+    message = "測試事件已寫入，Edge Agent 會在數秒內上傳至 SenseL。"
+    if not northbound_ready:
+        message += "（注意：北向尚未啟用或感測器未註冊，事件目前僅在本機可見）"
+    return {
+        "ok": True,
+        "event": event,
+        "northbound_ready": northbound_ready,
+        "message": message,
+    }
 
 
 @app.get("/api/coverage")

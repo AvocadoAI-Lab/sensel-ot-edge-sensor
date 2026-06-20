@@ -62,6 +62,12 @@ export function augmentService(svc) {
 // Static EdgeX dependency topology (overlaid with live state in dataSource).
 export const SERVICE_TOPOLOGY = {
   nodes: [
+    // SenseL NDR pipeline (capture → detect → forward).
+    { id: "suricata", label: "Suricata IDS" },
+    { id: "packet-sensor", label: "Packet Sensor" },
+    { id: "edge-agent", label: "Edge Agent" },
+    { id: "local-mqtt", label: "Local MQTT" },
+    // EdgeX Foundry core + egress.
     { id: "core-keeper", label: "Core Keeper" },
     { id: "core-metadata", label: "Core Metadata" },
     { id: "core-data", label: "Core Data" },
@@ -78,6 +84,12 @@ export const SERVICE_TOPOLOGY = {
     { from: "device-mqtt", to: "mqtt-broker" },
     { from: "northbound-mqtt", to: "core-data" },
     { from: "northbound-mqtt", to: "mqtt-broker" },
+    // SenseL NDR data path.
+    { from: "packet-sensor", to: "suricata" },
+    { from: "packet-sensor", to: "local-mqtt" },
+    { from: "device-mqtt", to: "local-mqtt" },
+    { from: "edge-agent", to: "packet-sensor" },
+    { from: "edge-agent", to: "northbound-mqtt" },
   ],
 };
 

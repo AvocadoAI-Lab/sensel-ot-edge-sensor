@@ -85,6 +85,7 @@ export async function getRuntime() {
       : "—";
     return {
       name: s.label, container: s.container, port: s.port, state,
+      group: s.group || "edgex",
       version: s.version || "—",
       cpu_pct: s.cpu_pct ?? null,
       mem_mb: s.mem_mb ?? null,
@@ -115,6 +116,12 @@ function depsFor(container) {
     "edgex-device-mqtt": ["Core Metadata", "Core Data", "MQTT Broker"],
     "edgex-device-opc-ua": ["Core Metadata", "Core Data"],
     "edgex-device-s7": ["Core Metadata", "Core Data"],
+    // SenseL edge stack / NDR engines.
+    "sensel-packet-sensor": ["Suricata IDS", "Local MQTT Bus"],
+    "sensel-edge-agent": ["Packet Sensor"],
+    "sensel-suricata": ["Packet Sensor"],
+    "sensel-snort": ["Packet Sensor"],
+    "sensel-events-viewer": ["Edge Agent"],
   };
   return map[container] || [];
 }
@@ -131,6 +138,11 @@ function nodeStateMap(platform) {
     "device-mqtt": byContainer["edgex-device-mqtt"] || "gray",
     "mqtt-broker": byContainer["edgex-mqtt-broker"] || byContainer["mqtt-broker"] || "gray",
     "northbound-mqtt": platform.message_bus?.local_features ? "green" : "gray",
+    // SenseL NDR pipeline (live container state from build_platform).
+    "suricata": byContainer["sensel-suricata"] || "gray",
+    "packet-sensor": byContainer["sensel-packet-sensor"] || "gray",
+    "edge-agent": byContainer["sensel-edge-agent"] || "gray",
+    "local-mqtt": byContainer["sensel-local-mqtt"] || "gray",
   };
 }
 

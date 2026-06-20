@@ -30,6 +30,13 @@ from src.policy.baseline_profile_sync import BaselineProfileSync
 from src.policy.baseline_profile_mqtt_subscriber import BaselineProfileMqttSubscriber
 from src.policy.topology_override_sync import TopologyOverrideSync
 from src.policy.topology_override_mqtt_subscriber import TopologyOverrideMqttSubscriber
+from src.policy.ids_rule_sync import IdsRuleSync
+from src.policy.ids_rule_mqtt_subscriber import IdsRuleMqttSubscriber
+from src.policy.listfile_sync import ListfileSync
+from src.policy.listfile_mqtt_subscriber import ListfileMqttSubscriber
+from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
+from src.policy.policy_ack import PolicyAckReporter, autoupdate_report_payload
+from src.policy.suricata_update import SuricataUpdateRunner
 from src.upload.event_context import enrich_security_event
 from src.runtime.agent_snapshot import write_agent_runtime
 from src.runtime.mqtt_credentials import credentials_status
@@ -82,10 +89,15 @@ def _maybe_publish_coverage(
     return last_mtime
 
 
-def _flush_buffer(client: SenseLClient, buffer: UploadBuffer, mqtt: NorthboundMqttClient | None, config=None) -> None:
+def _flush_buffer(client: SenseLClient, buffer: UploadBuffer, mqtt: NorthboundMqttClient | None, config=None, listfile_enforcer: ManagedListfileEnforcer | None = None) -> None:
     op_path, pol_path, prof_path = _event_context_paths(config) if config else ("", "", "")
+    if listfile_enforcer is not None:
+        listfile_enforcer.maybe_reload()
     for entry_id, kind, payload in buffer.pending():
         try:
+            if kind == "event" and listfile_enforcer is not None and listfile_enforcer.is_event_whitelisted(payload):
+                buffer.remove(entry_id)
+                continue
             if kind == "event" and mqtt and mqtt.enabled:
                 enriched = (
                     enrich_security_event(payload, operational_mode_path=op_path, detection_policy_path=pol_path, baseline_profile_path=prof_path)
@@ -117,9 +129,19 @@ def _upload_pending_events(
     tailer: SecurityEventTailer,
     mqtt: NorthboundMqttClient | None,
     config=None,
+    listfile_enforcer: ManagedListfileEnforcer | None = None,
 ) -> None:
     op_path, pol_path, prof_path = _event_context_paths(config) if config else ("", "", "")
+    if listfile_enforcer is not None:
+        listfile_enforcer.maybe_reload()
     for event in tailer.pending_events():
+        if listfile_enforcer is not None and listfile_enforcer.is_event_whitelisted(event):
+            logger.debug(
+                "Suppressed whitelisted security event rule=%s type=%s",
+                event.get("rule_id"),
+                event.get("event_type"),
+            )
+            continue
         enriched = (
             enrich_security_event(event, operational_mode_path=op_path, detection_policy_path=pol_path, baseline_profile_path=prof_path)
             if config
@@ -277,9 +299,44 @@ def main() -> int:
         if topology_override_sync.enabled and config.policy_sync.mqtt_enabled
         else None
     )
-    sighting_reporter = SightingReporter(config)
+    ack_reporter = PolicyAckReporter(config, mqtt)
+
+    def _publish_policy_ack(ack: dict) -> None:
+        ack_reporter.report(ack)
+
+    ids_rule_sync = IdsRuleSync(config, ack_callback=_publish_policy_ack)
+    ids_rule_mqtt = (
+        IdsRuleMqttSubscriber(config, ids_rule_sync)
+        if ids_rule_sync.enabled and config.policy_sync.mqtt_enabled
+        else None
+    )
+    listfile_sync = ListfileSync(config, ack_callback=_publish_policy_ack)
+    listfile_enforcer = (
+        ManagedListfileEnforcer(
+            cache_path=config.policy_sync.listfile_cache_path,
+            stamp_path=config.policy_sync.listfile_stamp_path,
+        )
+        if listfile_sync.enabled
+        else None
+    )
+    if listfile_enforcer is not None:
+        listfile_enforcer.maybe_reload(force=True)
+    listfile_mqtt = (
+        ListfileMqttSubscriber(config, listfile_sync)
+        if listfile_sync.enabled and config.policy_sync.mqtt_enabled
+        else None
+    )
+    sighting_reporter = SightingReporter(config, listfile_enforcer=listfile_enforcer)
+
+    def _report_autoupdate(result) -> None:
+        ack_reporter.report_autoupdate(autoupdate_report_payload(result))
+
+    suricata_update_runner = SuricataUpdateRunner(config, report_callback=_report_autoupdate)
     registration = RegistrationState()
     last_policy_sync = 0.0
+    last_ids_rule_sync = 0.0
+    last_listfile_sync = 0.0
+    last_suricata_update = 0.0
 
     if policy_mqtt and policy_mqtt.enabled:
         logger.info(
@@ -311,6 +368,19 @@ def main() -> int:
             config.policy_sync.mqtt_host,
             config.policy_sync.topology_override_mqtt_topic_template,
         )
+    if ids_rule_mqtt and ids_rule_mqtt.enabled:
+        logger.info(
+            "IDS rule MQTT enabled host=%s topic_tpl=%s engines=%s",
+            config.policy_sync.mqtt_host,
+            config.policy_sync.ids_rule_mqtt_topic_template,
+            ",".join(ids_rule_sync.engines),
+        )
+    if listfile_mqtt and listfile_mqtt.enabled:
+        logger.info(
+            "Listfile MQTT enabled host=%s topic_tpl=%s",
+            config.policy_sync.mqtt_host,
+            config.policy_sync.listfile_mqtt_topic_template,
+        )
 
     operational_mode_sync.ensure_defaults()
 
@@ -334,6 +404,10 @@ def main() -> int:
             baseline_profile_mqtt.start()
         if topology_override_mqtt and topology_override_mqtt.enabled:
             topology_override_mqtt.start()
+        if ids_rule_mqtt and ids_rule_mqtt.enabled:
+            ids_rule_mqtt.start()
+        if listfile_mqtt and listfile_mqtt.enabled:
+            listfile_mqtt.start()
 
         if policy_sync:
             initial = policy_sync.pull_http_feed(force=True)
@@ -347,6 +421,28 @@ def main() -> int:
             else:
                 logger.warning("Policy sync initial failed: %s", initial.error)
             last_policy_sync = time.monotonic()
+
+        if ids_rule_sync.enabled:
+            for res in ids_rule_sync.sync_all(force=True):
+                if res.changed:
+                    logger.info(
+                        "IDS rules initial engine=%s version=%s rules=%s",
+                        res.engine, res.version, res.rule_count,
+                    )
+                elif not res.ok and res.error and res.status_code not in (404, 0):
+                    logger.warning("IDS rules initial failed engine=%s: %s", res.engine, res.error)
+            last_ids_rule_sync = time.monotonic()
+
+        if listfile_sync.enabled:
+            lf_initial = listfile_sync.pull_http_feed(force=True)
+            if lf_initial.changed:
+                logger.info(
+                    "Listfile sync initial tenant=%s version=%s items=%s",
+                    lf_initial.tenant_id, lf_initial.artifact_version, lf_initial.item_count,
+                )
+            elif not lf_initial.ok and lf_initial.error:
+                logger.warning("Listfile sync initial failed: %s", lf_initial.error)
+            last_listfile_sync = time.monotonic()
 
         if sighting_reporter.enabled:
             sighting_reporter.run_cycle(force_flush=True)
@@ -374,11 +470,15 @@ def main() -> int:
                 baseline_profile_mqtt.ensure_connected()
             if topology_override_mqtt and topology_override_mqtt.enabled:
                 topology_override_mqtt.ensure_connected()
+            if ids_rule_mqtt and ids_rule_mqtt.enabled:
+                ids_rule_mqtt.ensure_connected()
+            if listfile_mqtt and listfile_mqtt.enabled:
+                listfile_mqtt.ensure_connected()
 
-            _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config)
-            _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config)
-            _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config)
-            _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config)
+            _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
+            _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
+            _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
+            _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
 
             if sighting_reporter.enabled:
                 sighting_reporter.run_cycle()
@@ -397,6 +497,44 @@ def main() -> int:
                     elif not result.ok and result.error:
                         logger.warning("Policy sync failed: %s", result.error)
                     last_policy_sync = time.monotonic()
+
+            if ids_rule_sync.enabled:
+                if time.monotonic() - last_ids_rule_sync >= config.policy_sync.ids_rule_interval_sec:
+                    for res in ids_rule_sync.sync_all():
+                        if res.changed:
+                            logger.info(
+                                "IDS rules updated engine=%s version=%s rules=%s",
+                                res.engine, res.version, res.rule_count,
+                            )
+                        elif not res.ok and res.error and res.status_code not in (404, 0):
+                            logger.warning(
+                                "IDS rules sync failed engine=%s rolled_back=%s: %s",
+                                res.engine, res.rolled_back, res.error,
+                            )
+                    last_ids_rule_sync = time.monotonic()
+
+            if suricata_update_runner.enabled:
+                if time.monotonic() - last_suricata_update >= config.policy_sync.suricata_update_interval_sec:
+                    res = suricata_update_runner.run()
+                    if res.ok:
+                        logger.info("suricata-update ok rules=%s version=%s", res.rule_count, res.version)
+                    else:
+                        logger.warning("suricata-update failed: %s", res.error)
+                    last_suricata_update = time.monotonic()
+
+            if listfile_sync.enabled:
+                if time.monotonic() - last_listfile_sync >= config.policy_sync.listfile_interval_sec:
+                    lf_result = listfile_sync.pull_http_feed()
+                    if lf_result.changed:
+                        logger.info(
+                            "Listfile sync updated tenant=%s version=%s items=%s",
+                            lf_result.tenant_id, lf_result.artifact_version, lf_result.item_count,
+                        )
+                        if listfile_enforcer is not None:
+                            listfile_enforcer.maybe_reload(force=True)
+                    elif not lf_result.ok and lf_result.error:
+                        logger.warning("Listfile sync failed: %s", lf_result.error)
+                    last_listfile_sync = time.monotonic()
 
             health = collect_health(config)
 
@@ -462,6 +600,10 @@ def main() -> int:
             baseline_profile_mqtt.stop()
         if topology_override_mqtt:
             topology_override_mqtt.stop()
+        if ids_rule_mqtt:
+            ids_rule_mqtt.stop()
+        if listfile_mqtt:
+            listfile_mqtt.stop()
         if detection_policy_mqtt:
             detection_policy_mqtt.stop()
         if policy_mqtt:

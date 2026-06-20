@@ -38,6 +38,9 @@ if [[ "${PROFILE}" == "lab" ]]; then
 else
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-production.yml"
 fi
+# Suricata NDR engine is part of the edge runtime; include the overlay so the
+# full deploy never orphans/removes sensel-suricata.
+COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.suricata.yml"
 
 SSH_CMD=(ssh)
 if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
@@ -46,13 +49,21 @@ if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
 fi
 
 echo "==> Syncing repo to ${TARGET}:${REMOTE_DIR} (profile=${PROFILE})"
-rsync -avz --delete \
+# config/suricata is a container-managed rw mount: the jasonish/suricata
+# entrypoint seeds root-owned files (classification.config, …) there, which the
+# deploy user cannot delete/overwrite — so exclude it (and runtime backups).
+rsync -avz --delete --omit-dir-times \
   --exclude .git \
   --exclude data/ \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
   --exclude .venv \
   --exclude node_modules \
+  --exclude 'config/suricata' \
+  --exclude '*.bak' \
+  --exclude '*.bak.*' \
+  --exclude 'src.bak.*' \
+  --exclude '/.env' \
   "${ROOT}/" "${TARGET}:${REMOTE_DIR}/"
 
 echo "==> Stopping old stacks and starting full SenseL stack"
@@ -74,6 +85,9 @@ if [[ "${DEPLOY_PROFILE}" == "production" ]]; then
 else
   COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.pi-lab.yml"
 fi
+# Suricata NDR engine overlay — keep it in the canonical deploy so the stack
+# rebuild never drops sensel-suricata as an orphan.
+COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.suricata.yml"
 mkdir -p data/agent data/pcap data/assets config/policy
 chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
 

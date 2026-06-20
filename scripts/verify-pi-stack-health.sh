@@ -20,6 +20,8 @@ else
     -f docker-compose.pi-lab.yml
     -f docker-compose.pi-reliability.yml
   )
+  # pi4.yml overrides the suricata service (no image) — include the overlay.
+  [[ -f docker-compose.suricata.yml ]] && COMPOSE_ARGS+=(-f docker-compose.suricata.yml)
 fi
 
 pass() { echo "PASS  $*"; }

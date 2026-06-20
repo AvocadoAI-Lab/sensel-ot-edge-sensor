@@ -6,6 +6,7 @@ import { initComponents } from "./ui/components.js";
 import { setHeader, updateOperationalModeBadge } from "./core/shell.js";
 
 import * as dashboard from "./pages/dashboard.js";
+import * as guide from "./pages/guide.js";
 import * as runtime from "./pages/runtime.js";
 import * as assets from "./pages/assets.js";
 import * as setup from "./pages/setup.js";
@@ -15,10 +16,11 @@ import * as traffic from "./pages/traffic.js";
 import * as ops from "./pages/ops.js";
 import * as vpn from "./pages/vpn.js";
 
-const PAGES = { dashboard, runtime, assets, setup, events, policy, traffic, ops, vpn };
+const PAGES = { dashboard, guide, runtime, assets, setup, events, policy, traffic, ops, vpn };
 
 const NAV = [
   { id: "dashboard", icon: "◉", label: "總覽" },
+  { id: "guide", icon: "📖", label: "操作手冊" },
   { id: "runtime", icon: "⬡", label: "Edge Runtime" },
   { id: "assets", icon: "🏭", label: "資產與協定" },
   { id: "setup", icon: "✦", label: "接入精靈" },

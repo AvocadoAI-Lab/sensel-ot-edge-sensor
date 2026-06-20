@@ -22,6 +22,7 @@ from src.parser.l7.iec61850.mms import MmsStats, parse_mms_packet, record_mms
 from src.parser.l7.modbus.tcp import parse_modbus_tcp
 from src.policy.loader import load_policy
 from src.policy.detection_policy_store import DetectionPolicyStore
+from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
 from src.policy.operational_mode_store import OperationalModeStore
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,9 @@ class PacketPipeline:
         operational_mode_reload_sec: int = 5,
         baseline_profile_path: str = "/app/data/agent/baseline-profile.json",
         baseline_profile_stamp_path: str = "/app/data/agent/baseline-profile.stamp",
+        managed_listfile_cache_path: str = "/app/data/managed-listfiles.json",
+        managed_listfile_stamp_path: str = "/app/data/managed-listfiles.stamp",
+        managed_listfile_reload_sec: float = 5.0,
         coverage_enabled: bool = True,
     ) -> None:
         self.state = PipelineState()
@@ -84,10 +88,17 @@ class PacketPipeline:
         )
         policy = self._policy_store.policy()
         enabled = self._policy_store.rules_enabled() or set(rules_enabled or [])
+        self._listfile = ManagedListfileEnforcer(
+            cache_path=managed_listfile_cache_path,
+            stamp_path=managed_listfile_stamp_path,
+            reload_check_sec=managed_listfile_reload_sec,
+        )
+        self._listfile.maybe_reload(force=True)
         self._mvp = MvpDetector(
             site_id=site_id,
             sensor_id=sensor_id,
             policy=policy,
+            listfile_enforcer=self._listfile,
             rules_enabled=enabled,
         )
         self._detector = Iec61850Detector(
@@ -109,6 +120,7 @@ class PacketPipeline:
                     reload_check_sec=float(ioc_reload_check_sec),
                 ),
                 policy=policy,
+                listfile_enforcer=self._listfile,
                 rules_enabled=enabled,
                 cooldown_sec=ioc_cooldown_sec,
             )
@@ -135,6 +147,7 @@ class PacketPipeline:
         )
 
     def reload_detection_policy(self) -> bool:
+        self._listfile.maybe_reload()
         if not self._policy_store.maybe_reload():
             return False
         policy = self._policy_store.policy()
@@ -178,6 +191,7 @@ class PacketPipeline:
     def process(self, packet) -> None:
         self.reload_detection_policy()
         self.reload_operational_mode()
+        self._listfile.maybe_reload()
         accumulate_baseline = self._mode_store.baseline_accumulation_enabled()
         try:
             packet_bytes = bytes(packet)

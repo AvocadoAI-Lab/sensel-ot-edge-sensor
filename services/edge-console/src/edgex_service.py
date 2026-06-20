@@ -36,6 +36,40 @@ _RESTARTABLE = {
     "edgex-core-metadata",
 }
 
+# SenseL edge-stack / NDR containers are not part of the curated EdgeX list;
+# they are discovered live (see _discover_extra_containers) so any enabled
+# overlay (Suricata, Snort, lab publishers, …) shows up in Edge Runtime. This
+# map only supplies friendly labels — unknown containers fall back to the name.
+_SENSEL_LABELS: dict[str, str] = {
+    "sensel-edge-agent": "SenseL Edge Agent",
+    "sensel-packet-sensor": "Packet Sensor",
+    "sensel-edge-console": "Edge Console",
+    "sensel-events-viewer": "Events Viewer",
+    "sensel-suricata": "Suricata IDS",
+    "sensel-snort": "Snort IDS",
+    "sensel-local-mqtt": "Local MQTT Bus",
+    "sensel-vpn-client": "VPN Client",
+    "sensel-mock-api": "Mock SenseL API (Lab)",
+    "sensel-goose-publisher": "GOOSE Publisher (Lab)",
+    "sensel-mms-publisher": "MMS Publisher (Lab)",
+    "sensel-it-traffic-publisher": "IT Traffic Publisher (Lab)",
+    "sensel-scenario-runner": "Scenario Runner (Lab)",
+}
+
+# A discovered container is included when its name matches one of these — keeps
+# the view scoped to this edge stack (won't pull in unrelated host containers).
+def _is_sensel_container(name: str) -> bool:
+    n = name or ""
+    return n.startswith("sensel-") or "suricata" in n or "snort" in n
+
+
+# Any EdgeX/SenseL edge-stack container may be inspected for logs/restart.
+_CONTROLLABLE_RE = re.compile(r"^(edgex-|sensel-)|suricata|snort")
+
+
+def _container_allowed(container: str) -> bool:
+    return bool(_CONTROLLABLE_RE.search(container or ""))
+
 _PROTOCOL_MATRIX: list[dict[str, Any]] = [
     {"id": "modbus", "label": "Modbus TCP", "driver": "device-modbus", "phase": 1},
     {"id": "mqtt", "label": "MQTT", "driver": "device-mqtt", "phase": 1},
@@ -214,6 +248,81 @@ def _service_ping_url(spec: dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _service_row(spec: dict[str, Any], stats: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build one Edge Runtime row (docker state + optional HTTP ping + stats)."""
+    container = spec["container"]
+    docker = _docker_status(container)
+    row: dict[str, Any] = {
+        "id": spec["id"],
+        "label": spec["label"],
+        "container": container,
+        "port": spec.get("port"),
+        "optional": bool(spec.get("optional")),
+        "group": spec.get("group", "edgex"),
+        "docker": docker,
+    }
+    ping_url = _service_ping_url(spec)
+    if ping_url and spec.get("ping_path"):
+        row["api"] = _ping_service(ping_url, spec["ping_path"])
+    elif ping_url and spec["id"] in ("core-data", "core-metadata"):
+        row["api"] = _ping_service(ping_url)
+    else:
+        row["api"] = None
+
+    st = stats.get(container, {})
+    row["cpu_pct"] = st.get("cpu_pct")
+    row["mem_mb"] = st.get("mem_mb")
+    row["started_at"] = docker.get("started_at")
+    row["health"] = docker.get("health")
+    # Only query version over HTTP for services that actually answered.
+    ver_url = ping_url if (row["api"] and row["api"].get("ok")) else None
+    row["version"] = _service_version(ver_url, docker.get("image"))
+
+    row["ok"] = bool(docker.get("running")) and (
+        row["api"] is None or row["api"].get("ok") is not False
+    )
+    if docker.get("status") == "missing" and spec.get("optional"):
+        row["ok"] = None
+    return row, docker
+
+
+def _discover_extra_containers(exclude: set[str]) -> list[dict[str, Any]]:
+    """List running SenseL/IDS containers not in the curated EdgeX list.
+
+    Uses a live ``docker ps`` so any enabled overlay (Suricata, Snort, lab
+    publishers, …) surfaces in Edge Runtime without a code change.
+    """
+    if not Path("/var/run/docker.sock").exists():
+        return []
+    try:
+        proc = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except Exception:
+        return []
+    if proc.returncode != 0:
+        return []
+    out: list[dict[str, Any]] = []
+    for line in proc.stdout.splitlines():
+        name = line.strip()
+        if not name or name in exclude or not _is_sensel_container(name):
+            continue
+        out.append(
+            {
+                "id": name,
+                "label": _SENSEL_LABELS.get(name, name),
+                "container": name,
+                "port": None,
+                "optional": True,
+                "group": "sensel",
+            }
+        )
+    return sorted(out, key=lambda s: s["label"])
+
+
 def build_platform() -> dict[str, Any]:
     services_out: list[dict[str, Any]] = []
     cores_ok = 0
@@ -221,46 +330,18 @@ def build_platform() -> dict[str, Any]:
     stats = _docker_stats_all()
 
     for spec in _EDGEX_SERVICES:
-        container = spec["container"]
-        docker = _docker_status(container)
-        row: dict[str, Any] = {
-            "id": spec["id"],
-            "label": spec["label"],
-            "container": container,
-            "port": spec.get("port"),
-            "optional": bool(spec.get("optional")),
-            "docker": docker,
-        }
-        ping_url = _service_ping_url(spec)
-        if ping_url and spec.get("ping_path"):
-            row["api"] = _ping_service(ping_url, spec["ping_path"])
-        elif ping_url and spec["id"] in ("core-data", "core-metadata"):
-            row["api"] = _ping_service(ping_url)
-        else:
-            row["api"] = None
-
-        # Real resource usage + version (Phase 2).
-        st = stats.get(container, {})
-        row["cpu_pct"] = st.get("cpu_pct")
-        row["mem_mb"] = st.get("mem_mb")
-        row["started_at"] = docker.get("started_at")
-        row["health"] = docker.get("health")
-        # Only query version over HTTP for services that actually answered.
-        ver_url = ping_url if (row["api"] and row["api"].get("ok")) else None
-        row["version"] = _service_version(ver_url, docker.get("image"))
-
+        row, docker = _service_row(spec, stats)
         if spec["id"] in ("core-data", "core-metadata"):
             cores_total += 1
-            api_ok = row.get("api") and row["api"].get("ok")
-            docker_ok = docker.get("running")
-            if api_ok and docker_ok:
+            if (row.get("api") and row["api"].get("ok")) and docker.get("running"):
                 cores_ok += 1
+        services_out.append(row)
 
-        row["ok"] = bool(docker.get("running")) and (
-            row["api"] is None or row["api"].get("ok") is not False
-        )
-        if docker.get("status") == "missing" and spec.get("optional"):
-            row["ok"] = None
+    # SenseL edge-stack / NDR engines (Suricata, Snort, packet-sensor, …),
+    # discovered live so the runtime view reflects every enabled container.
+    curated = {spec["container"] for spec in _EDGEX_SERVICES}
+    for spec in _discover_extra_containers(curated):
+        row, _docker = _service_row(spec, stats)
         services_out.append(row)
 
     meta_ping = _ping_service(_metadata_url())
@@ -518,7 +599,10 @@ def build_protocol_matrix() -> dict[str, Any]:
 
 
 def restart_edgex_container(container: str) -> tuple[bool, str]:
-    if container not in _RESTARTABLE:
+    # Restarting the console itself would kill the request mid-flight.
+    if container == "sensel-edge-console":
+        return False, "Refusing to restart the Edge Console itself"
+    if container not in _RESTARTABLE and not _container_allowed(container):
         return False, f"Container not allowed: {container}"
     if os.environ.get("EDGE_CONSOLE_DOCKER_RESTART", "").lower() not in ("1", "true", "yes"):
         return False, f"Docker restart disabled; restart {container} manually"
@@ -540,7 +624,7 @@ def restart_edgex_container(container: str) -> tuple[bool, str]:
 
 
 def start_edgex_container(container: str) -> tuple[bool, str]:
-    if container not in _RESTARTABLE:
+    if container not in _RESTARTABLE and not _container_allowed(container):
         return False, f"Container not allowed: {container}"
     if os.environ.get("EDGE_CONSOLE_DOCKER_RESTART", "").lower() not in ("1", "true", "yes"):
         return False, f"Docker control disabled; start {container} manually"
@@ -561,12 +645,13 @@ def start_edgex_container(container: str) -> tuple[bool, str]:
         return False, "docker CLI not available"
 
 
-# Logs are read-only, so allow any known EdgeX/lab container (no restart gate).
+# Logs are read-only, so allow any EdgeX/SenseL edge-stack container (no
+# restart gate). Curated EdgeX names plus the discovered-container safelist.
 _LOGGABLE = {spec["container"] for spec in _EDGEX_SERVICES}
 
 
 def container_logs(container: str, tail: int = 200) -> tuple[bool, str]:
-    if container not in _LOGGABLE:
+    if container not in _LOGGABLE and not _container_allowed(container):
         return False, f"Container not allowed: {container}"
     if not Path("/var/run/docker.sock").exists():
         return False, "Docker socket not mounted"

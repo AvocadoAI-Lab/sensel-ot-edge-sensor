@@ -130,6 +130,7 @@ SNORT_INTERFACE=eth1 \
 docker compose -f docker-compose.openwrt.yml -f docker-compose.snort.yml up -d
 
 # Suricata（x86_64 或 ARM）
+# SURICATA_INTERFACE 必須等於 CAPTURE_INTERFACE（此處 mirror 埠為 eth1）
 SURICATA_INTERFACE=eth1 \
 docker compose -f docker-compose.openwrt.yml -f docker-compose.suricata.yml up -d
 ```

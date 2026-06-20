@@ -48,3 +48,18 @@ app-layer:
       enabled: yes
     http:
       enabled: yes
+
+# Multi-interface capture (optional).
+# By default the overlay launches Suricata with a single "-i $SURICATA_INTERFACE".
+# To watch several links at once (e.g. IT traffic on eth0 + OT container traffic
+# on a docker bridge br-xxxx), DROP the "-i" flag from docker-compose.suricata.yml
+# and uncomment the af-packet block below — Suricata then reads interfaces here.
+# Find the OT bridge name with: docker network inspect <net> + `ip -o link`.
+#
+# af-packet:
+#   - interface: eth0
+#     cluster-id: 98
+#     cluster-type: cluster_flow
+#   - interface: br-75a5cad1560a
+#     cluster-id: 99
+#     cluster-type: cluster_flow

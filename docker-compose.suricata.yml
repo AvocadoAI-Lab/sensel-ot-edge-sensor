@@ -10,12 +10,18 @@
 # also run together (each writes a separate *-events.jsonl with its own tailer).
 #
 # Usage:
-#   SURICATA_INTERFACE=eth1 \
+#   SURICATA_INTERFACE=eth0 \
 #   docker compose -f docker-compose.yml -f docker-compose.suricata.yml up -d
 #
 # Notes:
 # - Suricata and packet-sensor both run on the host network so they can see the
 #   same SPAN/TAP mirror traffic.
+# - SURICATA_INTERFACE MUST match packet-sensor's CAPTURE_INTERFACE (the iface
+#   that actually carries OT traffic); otherwise Suricata watches an empty link
+#   and never alerts. Default is eth0 to match the common single-NIC setup.
+# - For OT traffic on a docker bridge (container-to-container), list multiple
+#   interfaces in config/suricata/suricata.yaml's af-packet section instead of
+#   the single -i flag below. See docs/deployment-pi4.md.
 # - Suricata's eve.json file lands at ./data/suricata/eve.json on the host.
 
 services:
@@ -29,13 +35,16 @@ services:
       - NET_RAW
       - SYS_NICE
     volumes:
-      - ./config/suricata:/etc/suricata:ro
+      # rw: the jasonish/suricata entrypoint seeds default config files
+      # (classification.config, reference.config, threshold.config) into
+      # /etc/suricata on startup; a read-only mount makes it crash-loop.
+      - ./config/suricata:/etc/suricata
       - ./data/suricata:/var/log/suricata
     command:
       - -c
       - /etc/suricata/suricata.yaml
       - -i
-      - ${SURICATA_INTERFACE:-eth1}
+      - ${SURICATA_INTERFACE:-eth0}
     depends_on:
       - packet-sensor
 

@@ -1,0 +1,23 @@
+# SenseL OT Edge Sensor — appliance auto-start (minimal EdgeX stack).
+# Installed to /etc/systemd/system/ by deploy/appliance/install-appliance.sh.
+#
+# Brings the whole stack up on boot for the productized VM image. Images are
+# pre-built into the golden image, so ExecStart does NOT --build (fast boot).
+[Unit]
+Description=SenseL OT Edge Sensor (minimal EdgeX stack)
+After=docker.service network-online.target sensel-firstboot.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=sensel
+Group=docker
+WorkingDirectory=/home/sensel/sensel-ot-edge-sensor
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.minimal-edgex.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.minimal-edgex.yml down
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

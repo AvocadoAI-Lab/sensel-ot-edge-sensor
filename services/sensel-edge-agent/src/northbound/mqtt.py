@@ -10,7 +10,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from src.config.settings import NorthboundMqttConfig, SensorIdentity
-from src.northbound.topics import coverage_topic, events_topic, observe_tick_topic, state_topic, topology_snapshot_topic
+from src.northbound.topics import (
+    coverage_topic,
+    events_topic,
+    observe_tick_topic,
+    policy_ack_topic,
+    state_topic,
+    topology_snapshot_topic,
+)
 from src.runtime.agent_snapshot import write_agent_runtime
 
 logger = logging.getLogger(__name__)
@@ -272,6 +279,20 @@ class NorthboundMqttClient:
             payload,
             observed_at=str(payload.get("observed_at") or _utc_now_iso()),
         )
+        return self.publish_json(topic, body, qos=1)
+
+    def publish_policy_ack(self, ack: dict[str, Any]) -> bool:
+        """Report a policy artifact apply outcome (ACK/NACK) northbound.
+
+        Used by the IDS-rule / managed-listfile sync paths so the Control Plane
+        distribution log can record edge-side apply success, rollbacks and
+        rejections (signature failures, reload/health-check failures).
+        """
+        if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):
+            return False
+        tenant_id = str(ack.get("tenant_id") or self._cfg.tenant_id).strip()
+        topic = policy_ack_topic(tenant_id, self._sensor.site_id, self._sensor.id)
+        body = self._envelope("ot_policy_ack", ack)
         return self.publish_json(topic, body, qos=1)
 
     def close(self) -> None:

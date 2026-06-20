@@ -6,9 +6,14 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from typing import TYPE_CHECKING
+
 from src.assets.inventory import AssetInventory, InventoryObservation
 from src.detection.models import SecurityEvent, utc_now_iso
 from src.parser.l7.modbus.tcp import ModbusFrame
+
+if TYPE_CHECKING:
+    from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
 
 RULE_META = {
     "OT-001": ("NEW_MAC_DETECTED", "medium", "New MAC address observed on mirror port"),
@@ -29,6 +34,7 @@ class MvpDetector:
     site_id: str
     sensor_id: str
     policy: dict
+    listfile_enforcer: "ManagedListfileEnforcer | None" = None
     rules_enabled: set[str] = field(default_factory=set)
     inventory: AssetInventory = field(default_factory=AssetInventory)
     alerted_offline: set[str] = field(default_factory=set)
@@ -62,6 +68,16 @@ class MvpDetector:
             return False
         ephemeral_min = int(self._threshold("ot005_ephemeral_dst_min", 32768))
         return ephemeral_min > 0 and int(dst_port) >= ephemeral_min
+
+    def _ip_whitelisted(self, ip: str | None) -> bool:
+        if not ip:
+            return False
+        if ip.lower() in self._global_allowlist("ip"):
+            return True
+        return bool(
+            self.listfile_enforcer is not None
+            and self.listfile_enforcer.is_ip_whitelisted(ip)
+        )
 
     def _assets(self) -> list[dict]:
         return self.policy.get("assets", [])
@@ -97,7 +113,7 @@ class MvpDetector:
         if src_ip and self._enabled("OT-002"):
             if src_ip not in self.inventory.known_ips:
                 self.inventory.known_ips.add(src_ip)
-                if src_ip.lower() not in self._global_allowlist("ip"):
+                if not self._ip_whitelisted(src_ip):
                     events.append(self._event("OT-002", src_ip=src_ip))
 
         if mac and src_ip and self._enabled("OT-003"):

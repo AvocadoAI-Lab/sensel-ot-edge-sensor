@@ -11,7 +11,9 @@ const PHASE2_CONTAINERS = ["edgex-device-opc-ua", "edgex-device-s7"];
 const STATE_RANK = { green: 0, yellow: 1, blue: 2, red: 3, gray: 4 };
 function stateRank(state) { return STATE_RANK[state] ?? 5; }
 
-export const meta = { title: "Edge Runtime", sub: "EdgeX Foundry 4.0 · 服務健康 · 依賴拓撲" };
+export const meta = { title: "Edge Runtime", sub: "EdgeX + SenseL 全棧容器 · 服務健康 · 依賴拓撲" };
+
+const GROUP_LABEL = { edgex: "EdgeX", sensel: "SenseL" };
 
 let timer = null;
 
@@ -97,8 +99,11 @@ function rowHtml(s) {
   const actions = (s.actions || []).map((a) =>
     `<button type="button" class="btn btn-ghost btn-xs" data-action="${a}" data-container="${escapeHtml(s.container || "")}">${a}</button>`
   ).join(" ");
+  const groupTag = s.group && GROUP_LABEL[s.group]
+    ? `<span class="dep-chip" style="margin-left:.4rem">${GROUP_LABEL[s.group]}</span>`
+    : "";
   return `<tr>
-    <td>${escapeHtml(s.name)}<div class="sub mono">${copyField(s.container, { max: 22 })}</div></td>
+    <td>${escapeHtml(s.name)}${groupTag}<div class="sub mono">${copyField(s.container, { max: 22 })}</div></td>
     <td class="mono">${escapeHtml(s.version || "—")}</td>
     <td class="mono">${hb}</td>
     <td class="mono">${cpu}</td>

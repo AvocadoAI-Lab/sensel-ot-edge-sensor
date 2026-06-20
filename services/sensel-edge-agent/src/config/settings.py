@@ -139,6 +139,43 @@ class PolicySyncConfig(BaseModel):
     topology_snapshot_interval_sec: int = 120
     topology_snapshot_detect_interval_sec: int = 300
     topology_snapshot_state_path: str = "/app/data/topology-snapshot-state.json"
+    # OT protection-center IDS rule bundles (P2/EPIC B edge apply): pull signed
+    # snort/suricata rules, reload-healthcheck, rollback on failure.
+    ids_rule_enabled: bool = True
+    ids_rule_interval_sec: int = 300
+    ids_rule_engines: list[str] = Field(default_factory=lambda: ["suricata"])
+    ids_rule_feed_path_template: str = "/api/v1/feed/{tenant_id}/ot-rules.rules"
+    ids_rule_target_dir: str = "/app/data/ids-rules"
+    ids_rule_status_path: str = "/app/data/ids-rule-status.json"
+    ids_rule_signing_secret: str = ""
+    ids_rule_reload_cmd: str = ""
+    ids_rule_healthcheck_cmd: str = ""
+    ids_rule_cmd_timeout_sec: int = 30
+    ids_rule_mqtt_enabled: bool = True
+    ids_rule_mqtt_topic_template: str = "sensel/{tenant_id}/policy/ids-rules-+"
+    # OT protection-center managed black/white lists (P1/EPIC C edge apply).
+    listfile_enabled: bool = True
+    listfile_interval_sec: int = 300
+    listfile_feed_path_template: str = "/api/v1/feed/{tenant_id}/listfiles.json"
+    listfile_cache_path: str = "/app/data/managed-listfiles.json"
+    listfile_stamp_path: str = "/app/data/managed-listfiles.stamp"
+    listfile_mqtt_enabled: bool = True
+    listfile_mqtt_topic_template: str = "sensel/{tenant_id}/policy/listfiles"
+    # Policy apply ACK/NACK northbound report: MQTT primary, HTTP fallback when
+    # the bus is down so the Control Plane distribution log still converges.
+    policy_ack_http_fallback_enabled: bool = True
+    policy_ack_ingest_path: str = "/api/v1/internal/ot-security/policy-ack"
+    policy_ack_ingest_secret: str = ""
+    # Edge-side suricata-update execution + northbound report (G10). Disabled by
+    # default; when enabled the agent periodically runs `suricata-update`, applies
+    # the refreshed ruleset (reusing the IDS reload/health-check), and reports the
+    # outcome to the Control Plane autoupdate-report ingest endpoint.
+    suricata_update_enabled: bool = False
+    suricata_update_interval_sec: int = 86400
+    suricata_update_cmd: str = "suricata-update"
+    suricata_update_status_path: str = "/app/data/suricata-update-status.json"
+    suricata_update_cmd_timeout_sec: int = 300
+    autoupdate_report_ingest_path: str = "/api/v1/internal/ot-security/autoupdate-report"
 
 
 class SightingReportConfig(BaseModel):
@@ -523,6 +560,122 @@ def load_config(path: Path | None = None) -> AppConfig:
     policy_raw.setdefault(
         "topology_snapshot_state_path",
         os.environ.get("TOPOLOGY_SNAPSHOT_STATE_PATH", "/app/data/topology-snapshot-state.json"),
+    )
+
+    ids_rule_env = os.environ.get("IDS_RULE_ENABLED", "").lower()
+    if ids_rule_env in ("0", "false", "no"):
+        policy_raw["ids_rule_enabled"] = False
+    elif ids_rule_env in ("1", "true", "yes"):
+        policy_raw["ids_rule_enabled"] = True
+    policy_raw.setdefault(
+        "ids_rule_interval_sec",
+        int(os.environ.get("IDS_RULE_INTERVAL_SEC", policy_raw.get("ids_rule_interval_sec", 300))),
+    )
+    engines_env = (os.environ.get("IDS_RULE_ENGINES", "") or "").strip()
+    if engines_env:
+        policy_raw["ids_rule_engines"] = [e.strip() for e in engines_env.split(",") if e.strip()]
+    policy_raw.setdefault(
+        "ids_rule_feed_path_template",
+        os.environ.get("IDS_RULE_FEED_PATH_TEMPLATE", "/api/v1/feed/{tenant_id}/ot-rules.rules"),
+    )
+    policy_raw.setdefault(
+        "ids_rule_target_dir",
+        os.environ.get("IDS_RULE_TARGET_DIR", "/app/data/ids-rules"),
+    )
+    policy_raw.setdefault(
+        "ids_rule_status_path",
+        os.environ.get("IDS_RULE_STATUS_PATH", "/app/data/ids-rule-status.json"),
+    )
+    policy_raw.setdefault(
+        "ids_rule_signing_secret",
+        os.environ.get("OT_FEED_SIGNING_SECRET", os.environ.get("OT_EDGE_SENSOR_API_KEY", "")),
+    )
+    policy_raw.setdefault("ids_rule_reload_cmd", os.environ.get("IDS_RULE_RELOAD_CMD", ""))
+    policy_raw.setdefault("ids_rule_healthcheck_cmd", os.environ.get("IDS_RULE_HEALTHCHECK_CMD", ""))
+    policy_raw.setdefault(
+        "ids_rule_cmd_timeout_sec",
+        int(os.environ.get("IDS_RULE_CMD_TIMEOUT_SEC", policy_raw.get("ids_rule_cmd_timeout_sec", 30))),
+    )
+    ids_rule_mqtt_env = os.environ.get("IDS_RULE_MQTT_ENABLED", "").lower()
+    if ids_rule_mqtt_env in ("0", "false", "no"):
+        policy_raw["ids_rule_mqtt_enabled"] = False
+    elif ids_rule_mqtt_env in ("1", "true", "yes"):
+        policy_raw["ids_rule_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "ids_rule_mqtt_topic_template",
+        os.environ.get("IDS_RULE_MQTT_TOPIC", "sensel/{tenant_id}/policy/ids-rules-+"),
+    )
+
+    listfile_env = os.environ.get("LISTFILE_ENABLED", "").lower()
+    if listfile_env in ("0", "false", "no"):
+        policy_raw["listfile_enabled"] = False
+    elif listfile_env in ("1", "true", "yes"):
+        policy_raw["listfile_enabled"] = True
+    policy_raw.setdefault(
+        "listfile_interval_sec",
+        int(os.environ.get("LISTFILE_INTERVAL_SEC", policy_raw.get("listfile_interval_sec", 300))),
+    )
+    policy_raw.setdefault(
+        "listfile_feed_path_template",
+        os.environ.get("LISTFILE_FEED_PATH_TEMPLATE", "/api/v1/feed/{tenant_id}/listfiles.json"),
+    )
+    policy_raw.setdefault(
+        "listfile_cache_path",
+        os.environ.get("LISTFILE_CACHE_PATH", "/app/data/managed-listfiles.json"),
+    )
+    policy_raw.setdefault(
+        "listfile_stamp_path",
+        os.environ.get("LISTFILE_STAMP_PATH", "/app/data/managed-listfiles.stamp"),
+    )
+    listfile_mqtt_env = os.environ.get("LISTFILE_MQTT_ENABLED", "").lower()
+    if listfile_mqtt_env in ("0", "false", "no"):
+        policy_raw["listfile_mqtt_enabled"] = False
+    elif listfile_mqtt_env in ("1", "true", "yes"):
+        policy_raw["listfile_mqtt_enabled"] = True
+    policy_raw.setdefault(
+        "listfile_mqtt_topic_template",
+        os.environ.get("LISTFILE_MQTT_TOPIC", "sensel/{tenant_id}/policy/listfiles"),
+    )
+    ack_http_env = os.environ.get("POLICY_ACK_HTTP_FALLBACK_ENABLED", "").lower()
+    if ack_http_env in ("0", "false", "no"):
+        policy_raw["policy_ack_http_fallback_enabled"] = False
+    elif ack_http_env in ("1", "true", "yes"):
+        policy_raw["policy_ack_http_fallback_enabled"] = True
+    policy_raw.setdefault(
+        "policy_ack_ingest_path",
+        os.environ.get("POLICY_ACK_INGEST_PATH", "/api/v1/internal/ot-security/policy-ack"),
+    )
+    policy_raw.setdefault(
+        "policy_ack_ingest_secret",
+        os.environ.get(
+            "OT_SECURITY_INGEST_SECRET",
+            os.environ.get("OT_EDGE_SENSOR_API_KEY", sensel_raw.get("api_key", "")),
+        ),
+    )
+    suricata_update_env = os.environ.get("SURICATA_UPDATE_ENABLED", "").lower()
+    if suricata_update_env in ("0", "false", "no"):
+        policy_raw["suricata_update_enabled"] = False
+    elif suricata_update_env in ("1", "true", "yes"):
+        policy_raw["suricata_update_enabled"] = True
+    policy_raw.setdefault(
+        "suricata_update_interval_sec",
+        int(os.environ.get("SURICATA_UPDATE_INTERVAL_SEC", policy_raw.get("suricata_update_interval_sec", 86400))),
+    )
+    policy_raw.setdefault(
+        "suricata_update_cmd",
+        os.environ.get("SURICATA_UPDATE_CMD", "suricata-update"),
+    )
+    policy_raw.setdefault(
+        "suricata_update_status_path",
+        os.environ.get("SURICATA_UPDATE_STATUS_PATH", "/app/data/suricata-update-status.json"),
+    )
+    policy_raw.setdefault(
+        "suricata_update_cmd_timeout_sec",
+        int(os.environ.get("SURICATA_UPDATE_CMD_TIMEOUT_SEC", policy_raw.get("suricata_update_cmd_timeout_sec", 300))),
+    )
+    policy_raw.setdefault(
+        "autoupdate_report_ingest_path",
+        os.environ.get("AUTOUPDATE_REPORT_INGEST_PATH", "/api/v1/internal/ot-security/autoupdate-report"),
     )
 
     sighting_raw = expanded.get("sighting_report", {})
