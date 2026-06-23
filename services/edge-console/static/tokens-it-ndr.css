@@ -302,3 +302,38 @@ body.ndr-it-mode pre.card {
 body.ndr-it-mode .grid-dash-bottom-it {
   grid-template-columns: 1fr;
 }
+
+/* Protocol / IDS chips — high contrast on light IT NDR theme */
+body.ndr-it-mode .rule-chip {
+  font-weight: 600;
+}
+
+body.ndr-it-mode .rule-chip.proto-suricata {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #86efac;
+}
+
+body.ndr-it-mode .rule-chip.proto-snort {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
+body.ndr-it-mode .rule-chip.proto-ioc {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+body.ndr-it-mode .rule-chip.proto-ot {
+  background: #e0f2fe;
+  color: #075985;
+  border-color: #7dd3fc;
+}
+
+body.ndr-it-mode .rule-chip.proto-generic {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
