@@ -1,0 +1,8 @@
+# IT NDR seed rules — no OT protocol keywords (dnp3/modbus/enip).
+# Upload via Portal → NDR → 防護管理中心, then distribute with rule_profile=it_ndr.
+
+alert tcp any any -> any 445 (msg:"IT-NDR SMB lateral movement attempt"; flow:to_server; sid:9100001; rev:1;)
+alert tcp any any -> any 3389 (msg:"IT-NDR RDP connection attempt"; flow:to_server; sid:9100002; rev:1;)
+alert tcp any any -> any 22 (msg:"IT-NDR SSH connection attempt"; flow:to_server; sid:9100003; rev:1;)
+alert dns any any -> any any (msg:"IT-NDR DNS query"; dns.query; content:"malware"; nocase; sid:9100004; rev:1;)
+alert http any any -> any any (msg:"IT-NDR suspicious HTTP user-agent"; flow:to_server; content:"curl"; http_user_agent; sid:9100005; rev:1;)

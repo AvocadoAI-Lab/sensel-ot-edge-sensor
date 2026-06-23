@@ -1,11 +1,11 @@
 // 操作手冊 — 淺顯易懂的快速上手指南，首頁可進入。
 import { $, toast } from "../core/dom.js";
 import { api } from "../core/api.js";
-import { navigate } from "../core/shell.js";
+import { navigate, isItMode, setHeader } from "../core/shell.js";
 
 export const meta = { title: "操作手冊", sub: "快速上手 · 三步完成接入" };
 
-const STEPS = [
+const STEPS_OT = [
   {
     n: 1,
     title: "接好網路與鏡像流量",
@@ -38,14 +38,56 @@ const STEPS = [
   },
 ];
 
-const READINESS = [
+const STEPS_IT = [
+  {
+    n: 1,
+    title: "接好 SPAN 鏡像與擷取介面",
+    body: `將交換器 <b>SPAN / 鏡像埠</b> 接到感測器擷取網卡，並在「系統維運 → Packet Sensor」
+           確認 <b>CAPTURE_INTERFACE</b> 正確。IT NDR 以被動鏡像流量 + Suricata/Snort 偵測為主。`,
+    tip: "Lab 單網卡環境可同一張卡同時做管理與擷取。",
+  },
+  {
+    n: 2,
+    title: "接入精靈完成平台註冊",
+    body: `IT NDR 部署模式為<b>唯讀固定</b>。在「接入精靈」填入 SenseL API URL、API Key、
+           企業邀請碼與 MQTT Host，完成<b>儲存並註冊</b>。`,
+    tip: "註冊後控制平面會下發 MQTT 憑證；感測器會以 ndr_profile=it_ndr 出現在 Portal。",
+    cta: { label: "前往接入精靈", page: "setup" },
+  },
+  {
+    n: 3,
+    title: "Portal 派送 IT 規則包",
+    body: `登入 SenseL Portal → <b>網路安全營運（NDR）</b> → <b>防護管理中心</b>，
+           上傳或選用 <code>rule_profile=it_ndr</code> 規則包並派送至此感測器。
+           Edge Agent 約每 5 分鐘以 feed profile 拉取。`,
+    tip: "可在 Console「偵測與政策」頁查看 Suricata 規則套用狀態（版本 / ETag / ACK）。",
+    cta: { label: "查看規則狀態", page: "policy" },
+  },
+  {
+    n: 4,
+    title: "驗證偵測與上傳",
+    body: `在總覽按 <b>「送出測試事件」</b> 驗證北向鏈路；有 SPAN 流量後 Suricata 告警會出現在
+           「安全事件」與 Portal NDR 總覽時間軸。`,
+    tip: "Pipeline：Suricata IDS → MQTT Bus → SenseL Control Plane → Security Analytics",
+    testButton: true,
+  },
+];
+
+const READINESS_OT = [
   { key: "score", label: "Edge Readiness 分數", desc: "綜合整備度，越高越好" },
   { key: "baseline", label: "Baseline 基線", desc: "資產與通訊白名單，偵測異常的基準" },
   { key: "events", label: "安全事件", desc: "本機偵測或外部引擎產生的告警" },
   { key: "northbound", label: "北向連線", desc: "事件上傳到 SenseL 平台的通道" },
 ];
 
-const FAQ = [
+const READINESS_IT = [
+  { key: "score", label: "NDR Readiness 分數", desc: "IDS、規則同步、註冊、MQTT、擷取與事件上傳綜合評分" },
+  { key: "ids", label: "IDS 引擎", desc: "Suricata 或 Snort 運行狀態與規則版本" },
+  { key: "events", label: "安全事件", desc: "Suricata/Snort 告警與 IoC 比對事件" },
+  { key: "northbound", label: "北向 MQTT", desc: "告警上傳至 SenseL Control Plane / Portal NDR" },
+];
+
+const FAQ_OT = [
   {
     q: "用瀏覽器怎麼進到這個主控台？",
     a: "同網段下開 <code>http://sensel.local:8090</code>（或 HTTPS <code>https://sensel.local:8443</code>）。若名稱解析不到，改用開機畫面顯示的 IP，例如 <code>http://&lt;裝置IP&gt;:8090</code>。",
@@ -64,13 +106,40 @@ const FAQ = [
   },
 ];
 
+const FAQ_IT = [
+  {
+    q: "IT NDR 與 OT Edge 主控台有何不同？",
+    a: "IT NDR 為淡色介面、精簡導覽，不含 EdgeX / Baseline / OT 學習模式。偵測以 Suricata IT 規則包為主，Portal 請使用 <code>?tab=ndr</code> 五分頁。",
+  },
+  {
+    q: "規則包派送後 Console 仍顯示未套用？",
+    a: "Agent 預設每 5 分鐘拉取 feed（<code>profile=it_ndr</code>）。可到「偵測與政策」查看 ETag 與 suricata -T 結果；必要時重啟 edge-agent。",
+  },
+  {
+    q: "Pipeline 上 MQTT 節點變黃？",
+    a: "表示北向 MQTT 未連線或憑證未落地。請到「系統維運 → 北向連線」測試，並確認接入精靈已完成註冊。",
+  },
+  {
+    q: "Suricata 與 Snort 如何切換？",
+    a: "由部署 compose / 環境變數 <code>IDS_RULE_ENGINES</code> 決定，Console 為唯讀。Dashboard 會依實際運行引擎顯示名稱。",
+  },
+];
+
 export function render(root) {
+  const it = isItMode();
+  if (it) setHeader("操作手冊", "IT NDR · 快速上手");
+  const STEPS = it ? STEPS_IT : STEPS_OT;
+  const READINESS = it ? READINESS_IT : READINESS_OT;
+  const FAQ = it ? FAQ_IT : FAQ_OT;
+
   root.innerHTML = `
     <section class="page guide-page">
       <div class="guide-hero card-ot">
         <div class="guide-hero-main">
-          <h2>歡迎使用 SenseL OT Edge Sensor</h2>
-          <p class="hint">這是一台 OT 資安感測器。跟著下面四步，幾分鐘就能完成接入並驗證上傳。</p>
+          <h2>${it ? "歡迎使用 SenseL IT NDR" : "歡迎使用 SenseL OT Edge Sensor"}</h2>
+          <p class="hint">${it
+    ? "IT 網路偵測與回應（NDR）邊緣感測器。跟著下面四步完成接入、規則派送與驗證。"
+    : "這是一台 OT 資安感測器。跟著下面四步，幾分鐘就能完成接入並驗證上傳。"}</p>
         </div>
         <div class="guide-hero-actions">
           <button type="button" class="btn btn-primary" id="guideGoSetup">開始接入</button>

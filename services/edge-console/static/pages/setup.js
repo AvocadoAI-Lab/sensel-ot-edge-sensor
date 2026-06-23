@@ -11,6 +11,7 @@ export function render(root) {
   root.innerHTML = `
     <section class="page panel">
       <p class="hint">三步完成：感測器身分 → 連線 SenseL → 測試註冊</p>
+      <p id="ndrDeployModeHint" class="hint hidden"></p>
       <div class="wizard-steps">
         <span class="step-pill active" data-step="1">1 感測器</span>
         <span class="step-pill" data-step="2">2 SenseL</span>
@@ -19,7 +20,10 @@ export function render(root) {
 
       <div id="wizardStep1">
         <div class="grid-2">
-          <label>Sensor ID<input id="wSensorId" placeholder="ot-edge-001" /></label>
+          <label>Sensor ID
+            <input id="wSensorId" placeholder="ot-edge-hostname" />
+            <span class="hint" id="sensorIdHint">依主機名稱自動建議，每台 Edge 唯一（與 VPN IP 無關）</span>
+          </label>
           <label>Site ID<input id="wSiteId" placeholder="factory-lab-001" /></label>
         </div>
         <div class="actions"><button type="button" class="btn btn-primary" data-next="2">下一步</button></div>
@@ -167,7 +171,14 @@ function collect(extra = {}) {
 
 async function loadConfig() {
   const cfg = await api("/api/config");
-  $("#wSensorId").value = cfg.sensor_id || "";
+  const suggested = cfg.sensor_id_suggested || "";
+  const hint = $("#sensorIdHint");
+  if (hint && cfg.hostname) {
+    hint.textContent = `主機 ${cfg.hostname} → 建議 ${suggested}（來源：${cfg.sensor_id_source || "hostname"}）`;
+  }
+  const current = cfg.sensor_id || "";
+  const placeholder = !current || current === "ot-edge-001";
+  $("#wSensorId").value = placeholder ? suggested : current;
   $("#wSiteId").value = cfg.site_id || "";
   $("#wApiUrl").value = cfg.sensel_api_url || "";
   $("#wMqttHost").value = cfg.mqtt_host || "";
@@ -175,6 +186,15 @@ async function loadConfig() {
   $("#sVerifyTls").value = cfg.sensel_verify_tls ? "true" : "false";
   if (!cfg.sensel_api_key_set) $("#wApiKey").placeholder = "（已儲存，留空不變）";
   if (!cfg.registration_token_set) $("#wInvite").placeholder = "（已儲存，留空不變）";
+  const modeHint = $("#ndrDeployModeHint");
+  if (modeHint && cfg.ndr_profile === "it_ndr") {
+    modeHint.classList.remove("hidden");
+    modeHint.textContent = cfg.ndr_profile_locked
+      ? "部署模式：IT NDR（compose 固定，此頁僅顯示）"
+      : "部署模式：IT NDR";
+  } else if (modeHint) {
+    modeHint.classList.add("hidden");
+  }
 }
 
 async function pingSensel() {

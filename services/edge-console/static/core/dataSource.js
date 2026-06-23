@@ -8,6 +8,152 @@ import * as mock from "./mockApi.js";
 
 const FACTOR_VAL = { green: 1, blue: 0.7, yellow: 0.5, red: 0, gray: null };
 
+const IDS_DISPLAY = { suricata: "Suricata IDS", snort: "Snort IDS" };
+
+export function isItNdrStatus(status) {
+  const profile = (status?.ndr_profile || "").toLowerCase();
+  const sensorType = status?.sensor_type || "";
+  return profile === "it_ndr" || String(sensorType).startsWith("it-ndr");
+}
+
+export function resolveIdsEngineLabel(engines, idsStatus) {
+  const list = Array.isArray(engines) ? engines : [];
+  const running = list.find((e) => e.active && (e.status === "running" || e.status === "stale"));
+  if (running) return IDS_DISPLAY[running.name] || `${running.name} IDS`;
+  const configured = list.find((e) => e.configured);
+  if (configured) return IDS_DISPLAY[configured.name] || `${configured.name} IDS`;
+  const keys = Object.keys(idsStatus?.engines || {});
+  if (keys.length) return IDS_DISPLAY[keys[0]] || `${keys[0]} IDS`;
+  return "IDS Engine";
+}
+
+export function pickPrimaryEngine(engines, idsStatus) {
+  const list = Array.isArray(engines) ? engines : [];
+  const running = list.find((e) => e.active && (e.status === "running" || e.status === "stale"));
+  if (running) return running;
+  const configured = list.find((e) => e.configured);
+  if (configured) return configured;
+  const keys = Object.keys(idsStatus?.engines || {});
+  if (keys.length) return { name: keys[0], status: "unknown", configured: true };
+  return null;
+}
+
+function _engineFactorState(engine) {
+  if (!engine) return { state: "gray", value: "未設定" };
+  const status = String(engine.status || "unknown");
+  if (engine.active && (status === "running" || status === "stale")) {
+    const rules = engine.rules_enabled_count;
+    const ver = engine.rule_version && engine.rule_version !== "unknown" ? engine.rule_version : "";
+    const detail = [ver, rules != null ? `${rules} rules` : ""].filter(Boolean).join(" · ") || status;
+    return { state: status === "stale" ? "yellow" : "green", value: detail };
+  }
+  if (engine.configured) return { state: "yellow", value: status };
+  return { state: "red", value: status === "absent" ? "未部署" : status };
+}
+
+function _idsRulesFactorState(idsStatus) {
+  const engines = idsStatus?.engines || {};
+  const keys = Object.keys(engines);
+  if (!idsStatus?.loaded || !keys.length) {
+    return { state: "gray", value: "尚未同步" };
+  }
+  const ok = keys.some((k) => engines[k]?.ok === true && !engines[k]?.rolled_back);
+  const rolled = keys.some((k) => engines[k]?.rolled_back);
+  if (ok) {
+    const entry = keys.map((k) => engines[k]).find((e) => e?.ok);
+    return { state: "green", value: entry?.version || "已套用" };
+  }
+  if (rolled) return { state: "yellow", value: "已回滾" };
+  return { state: "red", value: "套用失敗" };
+}
+
+function _scoreFactors(factors) {
+  let num = 0;
+  let den = 0;
+  for (const f of factors) {
+    const v = FACTOR_VAL[f.state];
+    if (v == null) continue;
+    num += f.weight * v;
+    den += f.weight;
+  }
+  const score = den ? Math.round((num / den) * 100) : 0;
+  const grade = score >= 85 ? "ready" : score >= 50 ? "partial" : "attention";
+  return { score, grade };
+}
+
+async function getItReadiness(status) {
+  const idsStatus = await getIdsRuleStatus().catch(() => ({ loaded: false, engines: {} }));
+  const cards = status.cards || {};
+  const tm = status.metrics?.telemetry || {};
+  const engines = status.metrics?.engines || [];
+  const primary = pickPrimaryEngine(engines, idsStatus);
+  const idsLabel = resolveIdsEngineLabel(engines, idsStatus);
+  const idsEng = _engineFactorState(primary);
+  const idsRules = _idsRulesFactorState(idsStatus);
+  const mqttState = cards.mqtt ? stateFromOk(cards.mqtt.ok) : "gray";
+  const regState = cards.registration ? stateFromOk(cards.registration.ok) : "gray";
+  const captureState = tm.live ? "green" : "yellow";
+  const events24h = status.metrics?.events_24h || 0;
+  const ingestState = events24h > 0 ? "green" : captureState === "green" ? "blue" : "gray";
+
+  const factors = [
+    {
+      key: "ids",
+      label: idsLabel,
+      weight: 25,
+      state: idsEng.state,
+      value: idsEng.value,
+    },
+    {
+      key: "ids_rules",
+      label: "IDS Rules Sync",
+      weight: 20,
+      state: idsRules.state,
+      value: idsRules.value,
+    },
+    {
+      key: "registration",
+      label: "Sensor Registration",
+      weight: 15,
+      state: regState,
+      value: cards.registration?.detail || "—",
+    },
+    {
+      key: "mqtt",
+      label: "Northbound MQTT",
+      weight: 15,
+      state: mqttState,
+      value: cards.mqtt?.detail || "—",
+    },
+    {
+      key: "capture",
+      label: "Traffic Capture",
+      weight: 15,
+      state: captureState,
+      value: tm.live ? `${tm.instant_rate ?? 0} pkt/s live` : "無即時流量",
+    },
+    {
+      key: "ingest",
+      label: "Event Ingest",
+      weight: 10,
+      state: ingestState,
+      value: `${events24h} evt/24h`,
+    },
+  ];
+
+  const { score, grade } = _scoreFactors(factors);
+  return {
+    score,
+    grade,
+    factors,
+    status,
+    idsStatus,
+    primaryEngine: primary,
+    idsLabel,
+    profile: "it_ndr",
+  };
+}
+
 export function stateFromOk(ok) {
   if (ok === true) return "green";
   if (ok === false) return "red";
@@ -25,6 +171,9 @@ export async function getStatus(force = false) {
 
 export async function getReadiness() {
   const status = await getStatus();
+  if (isItNdrStatus(status)) {
+    return getItReadiness(status);
+  }
   let platform = null;
   try { platform = await api("/api/edgex/platform"); } catch { platform = null; }
   const cards = status.cards || {};
@@ -58,7 +207,7 @@ export async function getReadiness() {
   }
   const score = den ? Math.round((num / den) * 100) : 0;
   const grade = score >= 85 ? "ready" : score >= 50 ? "partial" : "attention";
-  return { score, grade, factors, status };
+  return { score, grade, factors, status, profile: "ot_ids" };
 }
 
 export async function getRuntime() {
@@ -255,6 +404,10 @@ export async function getProtocolCoverage() {
     };
   });
   return { protocols };
+}
+
+export async function getIdsRuleStatus() {
+  return api("/api/policy/ids-rules").catch(() => ({ loaded: false, engines: {} }));
 }
 
 export async function getPolicyReadiness() {

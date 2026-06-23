@@ -57,6 +57,20 @@ def test_apply_platform_overlay_intel_api_key(monkeypatch, tmp_path: Path) -> No
     assert merged.policy_sync.smb_intel_api_key == "intel-key-xyz"
 
 
+def test_apply_platform_overlay_skips_placeholder_sensor_id(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "platform.json"
+    path.write_text(json.dumps({"sensor_id": "ot-edge-001"}), encoding="utf-8")
+    monkeypatch.setenv("PLATFORM_CONFIG_PATH", str(path))
+    base = AppConfig(
+        sensor=SensorIdentity(id="ot-edge-hostname", site_id="site"),
+        sensel=SenselConfig(api_url="http://108", api_key="k"),
+        northbound_mqtt=NorthboundMqttConfig(host="203", tenant_id="company-test"),
+        logging=LoggingConfig(),
+    )
+    merged = apply_platform_overlay(base)
+    assert merged.sensor.id == "ot-edge-hostname"
+
+
 def test_apply_platform_overlay_requires_tenant_when_default(monkeypatch, tmp_path: Path) -> None:
     path = tmp_path / "platform.json"
     path.write_text(json.dumps({"mqtt_tenant_id": "default", "mqtt_enabled": True}), encoding="utf-8")

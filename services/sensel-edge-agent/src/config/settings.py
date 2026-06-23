@@ -145,6 +145,7 @@ class PolicySyncConfig(BaseModel):
     ids_rule_interval_sec: int = 300
     ids_rule_engines: list[str] = Field(default_factory=lambda: ["suricata"])
     ids_rule_feed_path_template: str = "/api/v1/feed/{tenant_id}/ot-rules.rules"
+    ids_rule_feed_profile: str = "ot_ids"
     ids_rule_target_dir: str = "/app/data/ids-rules"
     ids_rule_status_path: str = "/app/data/ids-rule-status.json"
     ids_rule_signing_secret: str = ""
@@ -280,7 +281,13 @@ def load_config(path: Path | None = None) -> AppConfig:
     if os.environ.get("SENSEL_VERIFY_TLS", "").lower() in ("0", "false", "no"):
         sensel_raw["verify_tls"] = False
 
-    sensor_raw.setdefault("id", os.environ.get("SENSOR_ID", "ot-edge-001"))
+    from src.config.sensor_id_resolve import load_platform_sensor_id, resolve_sensor_id
+
+    sensor_raw["id"] = resolve_sensor_id(
+        env_id=os.environ.get("SENSOR_ID", ""),
+        yaml_id=str(sensor_raw.get("id") or ""),
+        platform_id=load_platform_sensor_id(),
+    )
     sensor_raw.setdefault("site_id", os.environ.get("SITE_ID", "factory-lab-001"))
     # Resolve hardware label: explicit yaml/env wins; otherwise auto-detect the
     # real platform (pi4 / ubuntu / ubuntu-docker / …) so the platform sensor
@@ -578,6 +585,13 @@ def load_config(path: Path | None = None) -> AppConfig:
         "ids_rule_feed_path_template",
         os.environ.get("IDS_RULE_FEED_PATH_TEMPLATE", "/api/v1/feed/{tenant_id}/ot-rules.rules"),
     )
+    feed_profile = (
+        os.environ.get("IDS_RULE_FEED_PROFILE", "")
+        or os.environ.get("NDR_PROFILE", "")
+        or policy_raw.get("ids_rule_feed_profile", "ot_ids")
+    ).strip().lower()
+    if feed_profile in ("it_ndr", "ot_ids"):
+        policy_raw["ids_rule_feed_profile"] = feed_profile
     policy_raw.setdefault(
         "ids_rule_target_dir",
         os.environ.get("IDS_RULE_TARGET_DIR", "/app/data/ids-rules"),

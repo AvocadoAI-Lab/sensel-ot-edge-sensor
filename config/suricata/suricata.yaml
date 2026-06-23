@@ -18,7 +18,11 @@ vars:
 
 default-log-dir: /var/log/suricata
 
-# EVE JSON output consumed by the SenseL edge bridge. The "alert" event type is
+# Required for `suricatasc -c reload-rules` after Protection Center rule apply.
+unix-command:
+  enabled: yes
+
+# EVE JSON output consumed by the SenseL edge bridge.
 # the only one mapped in v0.1; the field names here are Suricata defaults and
 # form a stable contract with SuricataEveMapper — keep alert metadata enabled.
 outputs:
@@ -34,6 +38,7 @@ outputs:
 # Rule sources mounted into the container.
 default-rule-path: /etc/suricata/rules
 rule-files:
+  - suricata.rules
   - local.rules
 
 # App-layer parsers kept minimal; enable what your OT environment needs so the

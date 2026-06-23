@@ -115,6 +115,7 @@ class IdsRuleSync:
             if e.strip().lower() in SUPPORTED_ENGINES
         ) or ("suricata",)
         self._feed_template = ps.ids_rule_feed_path_template
+        self._feed_profile = (ps.ids_rule_feed_profile or "ot_ids").strip().lower()
         self._target_dir = Path(ps.ids_rule_target_dir)
         self._status_path = Path(ps.ids_rule_status_path)
         self._signing_secret = (ps.ids_rule_signing_secret or config.sensel.api_key or "").strip()
@@ -155,7 +156,11 @@ class IdsRuleSync:
         if not path.startswith("/"):
             path = f"/{path}"
         sep = "&" if "?" in path else "?"
-        return f"{self._base}{path}{sep}engine={engine}"
+        url = f"{self._base}{path}{sep}engine={engine}"
+        profile = (self._feed_profile or "ot_ids").strip().lower()
+        if profile in ("it_ndr", "ot_ids") and "profile=" not in url:
+            url = f"{url}&profile={profile}"
+        return url
 
     def _target_path(self, engine: str) -> Path:
         return self._target_dir / f"{engine}.rules"

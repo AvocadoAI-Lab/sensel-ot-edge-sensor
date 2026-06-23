@@ -3,6 +3,16 @@
 
 import { $ } from "./dom.js";
 
+let _consoleMode = "ot";
+
+export function setConsoleMode(mode) {
+  _consoleMode = mode === "it" ? "it" : "ot";
+}
+
+export function isItMode() {
+  return _consoleMode === "it";
+}
+
 export function setHeader(title, sub) {
   const t = $("#pageTitle");
   const s = $("#pageSubtitle");
@@ -29,16 +39,32 @@ export function setSensorMeta(sensorId, siteId) {
 export function updateShield(state) {
   const shield = $("#headerShield");
   if (!shield) return;
+  const it = isItMode();
   if (state === "green" || state === true) {
     shield.className = "header-shield ok";
-    shield.title = "Baseline 已載入";
+    shield.title = it ? "IDS 規則就緒" : "Baseline 已載入";
   } else if (state === "red" || state === false) {
     shield.className = "header-shield bad";
-    shield.title = "Baseline 未就緒";
+    shield.title = it ? "IDS 規則未就緒" : "Baseline 未就緒";
   } else {
     shield.className = "header-shield";
-    shield.title = "Policy / Baseline";
+    shield.title = it ? "IDS / 規則狀態" : "Policy / Baseline";
   }
+}
+
+export function updateItIdsBadge(engine) {
+  const badge = $("#headerModeBadge");
+  if (!badge) return;
+  const name = String(engine?.name || "").toLowerCase();
+  const label = name === "suricata" ? "Suricata" : name === "snort" ? "Snort" : "IDS";
+  const status = String(engine?.status || "unknown");
+  const running = engine?.active === true && (status === "running" || status === "stale");
+  badge.className = `header-mode-badge ${running ? "detect" : status === "absent" ? "idle" : "learning"}`;
+  badge.textContent = running ? `${label} · 運行中` : `${label} · ${status}`;
+  const rules = engine?.rules_enabled_count;
+  const ver = engine?.rule_version;
+  badge.title = [ver && ver !== "unknown" ? `rules ${ver}` : "", rules != null ? `${rules} rules` : ""]
+    .filter(Boolean).join(" · ") || label;
 }
 
 const MODE_BADGE = {
@@ -49,6 +75,7 @@ const MODE_BADGE = {
 };
 
 export function updateOperationalModeBadge(info) {
+  if (isItMode()) return;
   const badge = $("#headerModeBadge");
   if (!badge) return;
   const mode = String(info?.operational_mode || "idle").toLowerCase();

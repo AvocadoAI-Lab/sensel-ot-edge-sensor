@@ -2,6 +2,7 @@
 # Copy to sensor.yaml (gitignored) and customize per deployment
 
 sensor:
+  # 留空或 ot-edge-001 時，agent 會依主機名稱自動產生唯一 ID
   id: ot-edge-001
   site_id: factory-lab-001
   type: ot-edge-sensor

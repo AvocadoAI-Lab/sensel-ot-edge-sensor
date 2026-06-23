@@ -6,6 +6,11 @@
 
 > 完整 SBOM 是對**已建置 / 已拉取的容器映像**掃描而得，涵蓋 OS 套件層與所有 transitive 相依，而非僅 `requirements.txt` 的直接相依。
 
+## 授權說明
+
+- **本 repo 原始碼**：Apache License 2.0（見根目錄 [`LICENSE`](../LICENSE)、[`NOTICE`](../NOTICE)）。
+- **容器映像內第三方元件**：各 upstream 專案自有授權（EdgeX、Suricata、Snort 等）；SBOM 僅供供應鏈盤點，不變更 binary 授權條款。
+
 ## 合併版 SBOM（建議上傳用）
 
 [`sbom-sensel-ot-edge-sensor-merged.cdx.json`](sbom-sensel-ot-edge-sensor-merged.cdx.json) —

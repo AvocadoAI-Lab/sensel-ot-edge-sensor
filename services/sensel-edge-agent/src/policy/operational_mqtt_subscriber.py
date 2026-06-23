@@ -25,14 +25,28 @@ class OperationalModeMqttSubscriber:
         self._connected = False
         self._messages = 0
 
+    def _broker_config(self) -> tuple[str, int, str, str]:
+        ps = self._config.policy_sync
+        nb = self._config.northbound_mqtt
+        host = (ps.mqtt_host or nb.host or "").strip()
+        if ps.mqtt_host:
+            port = ps.mqtt_port
+        elif nb.host:
+            port = nb.port
+        else:
+            port = ps.mqtt_port
+        username = ps.mqtt_username or nb.username
+        password = ps.mqtt_password or nb.password
+        return host, port, username, password
+
     @property
     def enabled(self) -> bool:
         ps = self._config.policy_sync
+        host, _, _, _ = self._broker_config()
         return bool(
             self._sync.enabled
-            and ps.mqtt_enabled
-            and ps.mqtt_host
             and ps.operational_mode_mqtt_enabled
+            and host
         )
 
     @property
@@ -135,23 +149,23 @@ class OperationalModeMqttSubscriber:
                 logger.error("paho-mqtt required for operational mode MQTT subscriber")
                 return False
 
-            ps = self._config.policy_sync
+            host, port, username, password = self._broker_config()
             client_id = f"ot-edge-opmode-{self._config.sensor.id}-{uuid.uuid4().hex[:8]}"
             client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
-            if ps.mqtt_username:
-                client.username_pw_set(ps.mqtt_username, ps.mqtt_password or None)
+            if username:
+                client.username_pw_set(username, password or None)
             client.on_connect = self._on_connect
             client.on_disconnect = self._on_disconnect
             client.on_message = self._on_message
 
             try:
                 client.reconnect_delay_set(min_delay=2, max_delay=60)
-                client.connect(ps.mqtt_host, ps.mqtt_port, keepalive=60)
+                client.connect(host, port, keepalive=60)
             except Exception:
                 logger.exception(
                     "Operational mode MQTT connect failed host=%s port=%s",
-                    ps.mqtt_host,
-                    ps.mqtt_port,
+                    host,
+                    port,
                 )
                 return False
 
@@ -159,8 +173,8 @@ class OperationalModeMqttSubscriber:
             self._client = client
             logger.info(
                 "Operational mode MQTT client started host=%s port=%s tenant=%s",
-                ps.mqtt_host,
-                ps.mqtt_port,
+                host,
+                port,
                 tenant_id,
             )
             return True

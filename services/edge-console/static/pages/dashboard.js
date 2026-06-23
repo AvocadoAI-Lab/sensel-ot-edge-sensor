@@ -2,9 +2,17 @@
 import { $, toast, escapeHtml } from "../core/dom.js";
 import { api } from "../core/api.js";
 import { fmtTime, relTime, formatRate } from "../core/format.js";
-import { gauge, dot, badge, stateBlock, pipeline, copyField, STATE_LABEL, openDrawer } from "../ui/components.js";
-import { getReadiness, getBaseline, getEvents } from "../core/dataSource.js";
-import { setSensorMeta, updateShield, updateOperationalModeBadge, navigate } from "../core/shell.js";
+import { gauge, dot, badge, stateBlock, pipeline, openDrawer } from "../ui/components.js";
+import { getReadiness, getBaseline, getEvents, isItNdrStatus, resolveIdsEngineLabel } from "../core/dataSource.js";
+import {
+  setSensorMeta,
+  updateShield,
+  updateOperationalModeBadge,
+  updateItIdsBadge,
+  isItMode,
+  navigate,
+  setHeader,
+} from "../core/shell.js";
 
 export const meta = { title: "總覽 Dashboard", sub: "OT Edge Runtime + Security Validation" };
 
@@ -18,6 +26,8 @@ const BASELINE_UI = {
 };
 
 export function render(root) {
+  const it = isItMode();
+  if (it) setHeader("總覽 Dashboard", "IT NDR · Suricata Edge Sensor");
   root.innerHTML = `
     <section class="page">
       <div class="card-ot onboard-card" id="onboardCard" hidden></div>
@@ -29,15 +39,15 @@ export function render(root) {
       </div>
 
       <div class="card-ot" id="pipelineCard" style="margin-top:1rem">
-        <div class="title">Telemetry Pipeline</div>
+        <div class="title">${it ? "Detection Pipeline" : "Telemetry Pipeline"}</div>
         <div id="pipelineBody">${stateBlock("loading")}</div>
       </div>
 
-      <div class="title section-title" style="margin-top:1rem">Telemetry Flow</div>
+      <div class="title section-title" style="margin-top:1rem">${it ? "Traffic & Alerts" : "Telemetry Flow"}</div>
       <div class="grid-5" id="telemetryCards">${stateBlock("loading")}</div>
 
-      <div class="grid-dash-bottom" style="margin-top:1rem">
-        <div class="card-ot" id="baselineCard">${stateBlock("loading")}</div>
+      <div class="grid-dash-bottom ${it ? "grid-dash-bottom-it" : ""}" style="margin-top:1rem">
+        <div class="card-ot" id="baselineCard" ${it ? "hidden" : ""}>${stateBlock("loading")}</div>
         <div class="card-ot" id="eventsCard"><div class="title">Latest Security Events</div><div id="latestEvents">${stateBlock("loading")}</div></div>
       </div>
 
@@ -73,28 +83,45 @@ function fail(e) {
 }
 
 async function load() {
+  const it = isItMode();
   const [readiness, baseline, evts, traffic] = await Promise.all([
     getReadiness(),
-    getBaseline(),
+    it ? Promise.resolve(null) : getBaseline(),
     getEvents(5).catch(() => []),
     api("/api/traffic/live").catch(() => ({ metrics: {} })),
   ]);
   const status = readiness.status || {};
   if (status.sensor_id) setSensorMeta(status.sensor_id, status.site_id);
 
-  renderOnboarding(readiness, status);
-  renderReadiness(readiness);
-  renderPolicy(status.metrics?.policy_gauge || {});
-  renderOperationalMode(status.operational_mode || {});
-  renderPipeline(readiness, status, traffic);
-  renderTelemetry(status.metrics?.telemetry || {}, status.metrics || {}, traffic);
-  renderBaseline(baseline);
+  const profileIt = it || isItNdrStatus(status) || readiness.profile === "it_ndr";
+
+  renderOnboarding(readiness, status, profileIt);
+  renderReadiness(readiness, profileIt);
+  if (profileIt) {
+    renderPolicyIt(readiness, status);
+    renderIdsStatus(readiness);
+    renderPipelineIt(readiness, status, traffic);
+    renderTelemetryIt(status.metrics?.telemetry || {}, status.metrics || {}, traffic, readiness);
+    updateShield(readiness.idsStatus?.loaded && _idsRulesOk(readiness.idsStatus) ? "green" : "yellow");
+    updateItIdsBadge(readiness.primaryEngine);
+  } else {
+    renderPolicy(status.metrics?.policy_gauge || {});
+    renderOperationalMode(status.operational_mode || {});
+    renderPipeline(readiness, status, traffic);
+    renderTelemetry(status.metrics?.telemetry || {}, status.metrics || {}, traffic);
+    renderBaseline(baseline);
+    updateShield(baseline?.state === "active" ? "green" : baseline?.state === "not_loaded" ? "red" : "yellow");
+    updateOperationalModeBadge(status.operational_mode || {});
+  }
   renderEvents(evts);
-  updateShield(baseline.state === "active" ? "green" : baseline.state === "not_loaded" ? "red" : "yellow");
-  updateOperationalModeBadge(status.operational_mode || {});
 }
 
-function renderOnboarding(readiness, status) {
+function _idsRulesOk(idsStatus) {
+  const engines = idsStatus?.engines || {};
+  return Object.values(engines).some((e) => e?.ok === true && !e?.rolled_back);
+}
+
+function renderOnboarding(readiness, status, it) {
   const card = $("#onboardCard");
   if (!card) return;
   const fm = Object.fromEntries((readiness.factors || []).map((x) => [x.key, x]));
@@ -103,16 +130,22 @@ function renderOnboarding(readiness, status) {
   const eventsSeen = (status.metrics?.events_24h || 0) > 0;
 
   let icon = "🚀";
-  let title = "歡迎！跟著三步完成接入";
-  let desc = "第一次使用？建議先看操作手冊，再到接入精靈完成平台連線。";
+  let title = it ? "歡迎！完成 IT NDR 接入" : "歡迎！跟著三步完成接入";
+  let desc = it
+    ? "第一次使用？建議先看操作手冊，再到接入精靈完成 SenseL 平台連線與 IDS 規則派送。"
+    : "第一次使用？建議先看操作手冊，再到接入精靈完成平台連線。";
   let primary = `<button type="button" class="btn btn-primary" id="onbSetup">前往接入精靈</button>`;
 
   if (registered && nbOk) {
     icon = eventsSeen ? "✅" : "🟢";
-    title = eventsSeen ? "感測器運作中" : "已連線！送一筆測試事件確認";
+    title = eventsSeen ? "IT NDR 感測器運作中" : "已連線！送一筆測試事件確認";
     desc = eventsSeen
-      ? "北向已連線且已有事件上傳。可隨時送出測試事件再次驗證 SenseL 端可見性。"
-      : "北向 MQTT 已連線。按「送出測試事件」，數秒後即可在 SenseL 平台看到它。";
+      ? (it
+        ? "北向已連線且已有告警上傳。可在 SenseL Portal → 網路安全營運（NDR）查看事件。"
+        : "北向已連線且已有事件上傳。可隨時送出測試事件再次驗證 SenseL 端可見性。")
+      : (it
+        ? "北向 MQTT 已連線。按「送出測試事件」，數秒後即可在 Portal NDR 總覽看到它。"
+        : "北向 MQTT 已連線。按「送出測試事件」，數秒後即可在 SenseL 平台看到它。");
     primary = `<button type="button" class="btn btn-primary" id="onbTestEvent">送出測試事件</button>`;
   } else if (registered && !nbOk) {
     icon = "⚠️";
@@ -187,7 +220,35 @@ function renderOperationalMode(op) {
     ${hint}`;
 }
 
-function renderReadiness(r) {
+function renderIdsStatus(readiness) {
+  const card = $("#operationalModeCard");
+  if (!card) return;
+  const eng = readiness.primaryEngine;
+  const idsLabel = readiness.idsLabel || resolveIdsEngineLabel(readiness.status?.metrics?.engines, readiness.idsStatus);
+  if (!eng) {
+    card.innerHTML = `
+      <div class="title">IDS 引擎</div>
+      <div class="baseline-state">${badge("未部署", "gray")}</div>
+      <div class="sub">請確認 Suricata / Snort 容器正在執行</div>`;
+    return;
+  }
+  const status = String(eng.status || "unknown");
+  const running = eng.active && (status === "running" || status === "stale");
+  const state = running ? (status === "stale" ? "yellow" : "green") : eng.configured ? "yellow" : "red";
+  const stateLabel = running ? (status === "stale" ? "Stale" : "Running") : status;
+  const rules = eng.rules_enabled_count;
+  const ver = eng.rule_version && eng.rule_version !== "unknown" ? eng.rule_version : "—";
+  card.innerHTML = `
+    <div class="title">${escapeHtml(idsLabel)}</div>
+    <div class="baseline-state">${badge(stateLabel, state)}</div>
+    <div class="sub mono">Rules ${ver}${rules != null ? ` · ${rules} enabled` : ""}</div>
+    <div class="actions" style="margin-top:0.5rem">
+      <button type="button" class="btn btn-sm btn-ghost" id="idsPolicyLink">規則狀態 ↗</button>
+    </div>`;
+  $("#idsPolicyLink")?.addEventListener("click", () => navigate("policy"));
+}
+
+function renderReadiness(r, it) {
   const card = $("#readinessCard");
   if (!card) return;
   const gradeLabel = r.grade === "ready" ? "就緒" : r.grade === "partial" ? "部分就緒" : "需注意";
@@ -199,7 +260,7 @@ function renderReadiness(r) {
       <span class="rf-value mono" title="${escapeHtml(f.value)}">${escapeHtml(f.value)}</span>
     </div>`).join("");
   card.innerHTML = `
-    <div class="title">Edge Readiness Score</div>
+    <div class="title">${it ? "NDR Readiness Score" : "Edge Readiness Score"}</div>
     <div class="readiness-main">
       ${gauge(r.score, gradeLabel)}
       <details class="readiness-details" open>
@@ -234,6 +295,34 @@ function renderPolicy(gaugeData) {
     </details>`;
 }
 
+function renderPolicyIt(readiness, status) {
+  const card = $("#policyCard");
+  if (!card) return;
+  const fm = Object.fromEntries((readiness.factors || []).map((x) => [x.key, x]));
+  const checklist = [
+    { key: "ids_rules", label: "IDS 規則已套用" },
+    { key: "registration", label: "感測器已註冊" },
+    { key: "capture", label: "Traffic 即時擷取" },
+    { key: "mqtt", label: "北向 MQTT 連線" },
+    { key: "ingest", label: "事件已上傳" },
+  ];
+  const doneCount = checklist.filter((c) => fm[c.key]?.state === "green").length;
+  const pct = Math.round((doneCount / checklist.length) * 100);
+  const label = pct >= 85 ? "就緒" : pct >= 50 ? "部分就緒" : "待設定";
+  const items = checklist.map((c) => {
+    const f = fm[c.key];
+    const done = f?.state === "green";
+    return `<div class="checklist-item ${done ? "done" : "todo"}"><span class="ck-mark">${done ? "✓" : "○"}</span>${escapeHtml(c.label)}</div>`;
+  }).join("");
+  card.innerHTML = `
+    <div class="title">IDS & Platform Status</div>
+    ${gauge(pct, label)}
+    <details class="policy-checklist" open>
+      <summary>IT NDR 檢查清單</summary>
+      <div class="checklist">${items}</div>
+    </details>`;
+}
+
 function renderPipeline(readiness, status, traffic) {
   const fm = Object.fromEntries((readiness.factors || []).map((x) => [x.key, x]));
   const st = (k) => fm[k]?.state || "gray";
@@ -253,6 +342,47 @@ function renderPipeline(readiness, status, traffic) {
     { label: "MQTT Bus", state: st("mqtt"), hint: mqttHint },
     { label: "SenseL Control Plane", state: st("registration"), hint: cards.registration?.detail || fm.registration?.value || "" },
     { label: "Security Analytics", state: (status.metrics?.events_24h || 0) > 0 ? "green" : "blue", detail: `${status.metrics?.events_24h || 0} evt/24h` },
+  ];
+  $("#pipelineBody").innerHTML = pipeline(nodes);
+}
+
+function renderPipelineIt(readiness, status, traffic) {
+  const fm = Object.fromEntries((readiness.factors || []).map((x) => [x.key, x]));
+  const cards = status.cards || {};
+  const nb = status.northbound || {};
+  const tm = status.metrics?.telemetry || {};
+  const idsLabel = readiness.idsLabel || "IDS Engine";
+  const idsState = fm.ids?.state || "gray";
+  const captureIf = status.metrics?.capture_interface || "";
+  const mqttHint = [cards.mqtt?.detail, nb.last_error ? `最後錯誤：${nb.last_error}` : ""].filter(Boolean).join(" · ");
+  const idsHint = [
+    fm.ids?.value,
+    tm.live ? `${formatRate(tm.instant_rate || traffic.metrics?.instant_rate)} pkt/s` : "",
+    captureIf ? `介面 ${captureIf}` : "",
+    fm.ids_rules?.value ? `規則 ${fm.ids_rules.value}` : "",
+  ].filter(Boolean).join(" · ");
+  const nodes = [
+    {
+      label: idsLabel,
+      state: idsState,
+      detail: fm.ids?.value || "—",
+      hint: idsHint || "請確認 Suricata / Snort 容器與 SPAN 流量",
+    },
+    {
+      label: "MQTT Bus",
+      state: fm.mqtt?.state || "gray",
+      hint: mqttHint || "本地 MQTT → 北向上傳",
+    },
+    {
+      label: "SenseL Control Plane",
+      state: fm.registration?.state || "gray",
+      hint: cards.registration?.detail || fm.registration?.value || "",
+    },
+    {
+      label: "Security Analytics",
+      state: (status.metrics?.events_24h || 0) > 0 ? "green" : "blue",
+      detail: `${status.metrics?.events_24h || 0} evt/24h`,
+    },
   ];
   $("#pipelineBody").innerHTML = pipeline(nodes);
 }
@@ -277,9 +407,31 @@ function renderTelemetry(t, metrics, traffic) {
     </div>`).join("");
 }
 
+function renderTelemetryIt(t, metrics, traffic, readiness) {
+  const box = $("#telemetryCards");
+  if (!box) return;
+  const eng = readiness.primaryEngine;
+  const rulesCount = eng?.rules_enabled_count ?? "—";
+  const topRules = (metrics.top_rules_24h || []).slice(0, 1);
+  const topRule = topRules.length ? topRules[0][0] : "—";
+  const cards = [
+    { title: "Packet Rate", value: `${formatRate(t.instant_rate)}`, sub: "pkt/s", state: t.live ? "green" : "yellow" },
+    { title: "24h Alerts", value: `${metrics.events_24h ?? 0}`, sub: "events", state: (metrics.events_24h || 0) > 0 ? "green" : "gray" },
+    { title: "IDS Rules Enabled", value: `${rulesCount}`, sub: eng?.rule_version && eng.rule_version !== "unknown" ? eng.rule_version : "rules", state: rulesCount !== "—" && rulesCount > 0 ? "green" : "gray" },
+    { title: "Unique IPs (live)", value: `${t.unique_ips ?? 0}`, sub: "hosts", state: (t.unique_ips || 0) > 0 ? "green" : "gray" },
+    { title: "Top Rule (24h)", value: topRule, sub: "alerts", state: topRule !== "—" ? "blue" : "gray" },
+  ];
+  box.innerHTML = cards.map((c) => `
+    <div class="card-ot metric-card">
+      <div class="title">${dot(c.state)}${escapeHtml(c.title)}</div>
+      <div class="value metric-value">${escapeHtml(String(c.value))}</div>
+      <div class="sub">${escapeHtml(c.sub)}</div>
+    </div>`).join("");
+}
+
 function renderBaseline(b) {
   const card = $("#baselineCard");
-  if (!card) return;
+  if (!card || card.hidden) return;
   const ui = BASELINE_UI[b.state] || BASELINE_UI.not_loaded;
   const progress = b.state === "learning" ? `<div class="baseline-progress"><div class="bar" style="width:${b.learning?.progress_pct || 0}%"></div></div><div class="sub">學習進度 ${b.learning?.progress_pct || 0}%（${b.learning?.window}）</div>` : "";
   const detail = b.state === "drift"

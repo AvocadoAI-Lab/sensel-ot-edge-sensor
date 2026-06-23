@@ -43,10 +43,21 @@ def _probe_edgex_core_data() -> str:
         return "unreachable"
 
 
+def _disk_alert_threshold_pct() -> float:
+    raw = (os.environ.get("DISK_ALERT_THRESHOLD_PCT") or "85").strip()
+    try:
+        return max(1.0, min(float(raw), 99.0))
+    except ValueError:
+        return 85.0
+
+
 def collect_health(config: AppConfig) -> dict:
     cpu = psutil.cpu_percent(interval=0.1)
     mem = psutil.virtual_memory().percent
-    disk = psutil.disk_usage("/").percent
+    disk_usage = psutil.disk_usage("/")
+    disk = disk_usage.percent
+    disk_threshold = _disk_alert_threshold_pct()
+    disk_alert_active = disk >= disk_threshold
 
     engines = probe_engines(config)
 
@@ -56,6 +67,10 @@ def collect_health(config: AppConfig) -> dict:
         "cpu_usage": round(cpu, 2),
         "memory_usage": round(mem, 2),
         "disk_usage": round(disk, 2),
+        "disk_free_gb": round(disk_usage.free / (1024**3), 2),
+        "disk_total_gb": round(disk_usage.total / (1024**3), 2),
+        "disk_alert_threshold_pct": disk_threshold,
+        "disk_alert_active": disk_alert_active,
         "packet_rate": 0,
         "dropped_packets": 0,
         "edgex_status": _probe_edgex_core_data(),
