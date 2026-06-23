@@ -113,4 +113,11 @@ CTI-origin sighting 細節見 `docker-compose.snort.yml` / `docker-compose.suric
 
 ## 授權
 
-Proprietary — SenseL / 內部使用
+本 repository 原始碼（`services/`、`config/`、`scripts/`、`docs/` 等）以
+[**Apache License 2.0**](LICENSE) 釋出，Copyright © 2026 Avocado AI Lab。
+
+公開 repo：<https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor>
+
+**重要**：Docker Compose 部署時拉取的第三方容器（EdgeX、Suricata、Snort、
+Mosquitto 等）各自適用其 upstream 授權，詳見 [NOTICE](NOTICE) 與
+[docs/sbom/README.md](docs/sbom/README.md)。

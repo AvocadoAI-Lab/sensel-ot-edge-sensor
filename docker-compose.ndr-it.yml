@@ -1,5 +1,6 @@
 # IT NDR overlay — Ubuntu amd64 lab sensors (e.g. ndr-198 @ 192.168.1.198).
 # No EdgeX. Adds Edge Console + full agent/sensor env on top of the NDR base.
+# SPDX-License-Identifier: Apache-2.0 (see LICENSE in repo root)
 #
 #   docker compose -f docker-compose.openwrt.yml \
 #     -f docker-compose.ndr-it.yml \

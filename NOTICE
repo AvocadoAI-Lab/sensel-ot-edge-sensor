@@ -1,0 +1,32 @@
+SenseL OT Edge Sensor
+Copyright 2026 Avocado AI Lab
+
+This product includes software developed by Avocado AI Lab
+(https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor).
+
+Licensed under the Apache License, Version 2.0.
+
+---
+
+Third-party runtime components
+
+When you deploy via Docker Compose, additional components are pulled or built
+separately. Those components are NOT licensed under this repository's
+Apache 2.0 license. Refer to each upstream project for terms:
+
+  - EdgeX Foundry (Apache License 2.0)
+      https://github.com/edgexfoundry
+  - Eclipse Mosquitto (EPL-2.0 / EDL-1.0 dual license)
+      https://mosquitto.org/
+  - Suricata (GNU General Public License v2)
+      https://suricata.io/
+  - Snort 3 (GPLv2; check Cisco Talos distribution terms)
+      https://www.snort.org/
+  - PostgreSQL (PostgreSQL License)
+  - Python runtime and PyPI dependencies (per-package licenses; see SBOM)
+
+SBOM artifacts under docs/sbom/ document container image composition for
+supply-chain review. They do not change the license of upstream binaries.
+
+Trademarks: SenseL, Avocado AI, and related product names are trademarks of
+their respective owners. This NOTICE does not grant trademark rights.
