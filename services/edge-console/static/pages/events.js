@@ -92,6 +92,15 @@ function protoOf(e) {
   return e.protocol || e.proto || "—";
 }
 
+function protoChipClass(label) {
+  const s = String(label || "").toLowerCase();
+  if (s.includes("suricata")) return "proto-suricata";
+  if (s.includes("snort")) return "proto-snort";
+  if (s.includes("ioc")) return "proto-ioc";
+  if (["goose", "mms", "modbus", "opc ua", "s7"].some((p) => s.includes(p))) return "proto-ot";
+  return "proto-generic";
+}
+
 function apply() {
   const rows = $("#eventsRows");
   const it = pageIt;
@@ -112,7 +121,7 @@ function apply() {
         <td class="mono">${fmtTime(e.timestamp)}</td>
         <td>${badge(sev, SEV_STATE[sev] || "yellow")}</td>
         <td>${escapeHtml(asset)}<div class="sub mono">${escapeHtml(e.rule_id || "")}</div></td>
-        <td><span class="rule-chip">${escapeHtml(protoOf(e))}</span></td>
+        <td><span class="rule-chip ${protoChipClass(protoOf(e))}">${escapeHtml(protoOf(e))}</span></td>
         <td>${ruleMatch}</td>
         <td><span class="action-pill action-${ev.recommended_action.toLowerCase().replace(/\s+/g, "-")}">${escapeHtml(ev.recommended_action)}</span></td>
         <td><button type="button" class="btn btn-ghost btn-xs" data-evidence="${i}">查看</button></td>
@@ -131,7 +140,7 @@ function apply() {
         <td class="mono">${fmtTime(e.timestamp)}</td>
         <td>${badge(sev, SEV_STATE[sev] || "yellow")}</td>
         <td>${escapeHtml(asset)}<div class="sub mono">${escapeHtml(e.rule_id || "")}</div></td>
-        <td><span class="rule-chip">${escapeHtml(protoOf(e))}</span></td>
+        <td><span class="rule-chip ${protoChipClass(protoOf(e))}">${escapeHtml(protoOf(e))}</span></td>
         <td>${badge(deviation, devState)}</td>
         <td>${policyCell}</td>
         <td><span class="action-pill action-${ev.recommended_action.toLowerCase().replace(/\s+/g, "-")}">${escapeHtml(ev.recommended_action)}</span></td>
