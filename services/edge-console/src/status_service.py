@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,36 @@ def _safe_mqtt_credentials(raw: Any) -> dict[str, Any]:
     }
 
 
+def _disk_alert_threshold_pct() -> float:
+    raw = (os.environ.get("DISK_ALERT_THRESHOLD_PCT") or "85").strip()
+    try:
+        return max(1.0, min(float(raw), 99.0))
+    except ValueError:
+        return 85.0
+
+
+def _host_disk_stats(*, runtime: dict[str, Any]) -> dict[str, Any]:
+    """Root filesystem usage for dashboard cards and >threshold alerts."""
+    threshold = _disk_alert_threshold_pct()
+    try:
+        usage = shutil.disk_usage("/")
+        pct = round(usage.used / usage.total * 100, 1) if usage.total else 0.0
+        free_gb = round(usage.free / (1024**3), 2)
+        total_gb = round(usage.total / (1024**3), 2)
+    except OSError:
+        pct = float(runtime.get("disk_usage") or 0)
+        free_gb = float(runtime.get("disk_free_gb") or 0)
+        total_gb = 0.0
+    alert = pct >= threshold
+    return {
+        "disk_usage_pct": pct,
+        "disk_free_gb": free_gb,
+        "disk_total_gb": total_gb,
+        "disk_alert_threshold_pct": threshold,
+        "disk_alert_active": alert,
+    }
+
+
 def _engines_view(raw: Any) -> list[dict[str, Any]]:
     """Normalize the agent's engines summary list for the dashboard/wizard."""
     if not isinstance(raw, list):
@@ -173,11 +204,14 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
         or str(runtime.get("tenant_id") or "")
     )
     operational = read_operational_mode()
+    disk = _host_disk_stats(runtime=runtime)
 
     return {
         "configured": config.configured,
         "sensor_id": config.sensor_id,
         "site_id": config.site_id,
+        "ndr_profile": getattr(config, "ndr_profile", None) or "ot_ids",
+        "sensor_type": config.sensor_type,
         "tenant_id": tenant_id,
         "operational_mode": operational,
         "cards": {
@@ -213,6 +247,18 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
                     else "未載入"
                 ),
             },
+            "disk": {
+                "label": "宿主磁碟",
+                "ok": not disk.get("disk_alert_active"),
+                "detail": (
+                    f"{disk.get('disk_usage_pct', 0):.1f}% 已用 · 剩 {disk.get('disk_free_gb', 0):.1f} GB"
+                    + (
+                        f" · 超過 {disk.get('disk_alert_threshold_pct', 85):.0f}% 告警"
+                        if disk.get("disk_alert_active")
+                        else ""
+                    )
+                ),
+            },
         },
         "northbound": {
             "mqtt_connected": bool(runtime.get("mqtt_connected")),
@@ -244,6 +290,9 @@ def build_status(store: ConfigStore) -> dict[str, Any]:
             # IDS engine (Snort/Suricata) liveness + rule package status,
             # written by the edge-agent health loop into agent-runtime.json.
             "engines": _engines_view(runtime.get("engines")),
+            "disk": disk,
+            "cpu_usage_pct": runtime.get("cpu_usage"),
+            "memory_usage_pct": runtime.get("memory_usage"),
         },
         "last_register_at": config.last_register_at or runtime.get("last_register_at"),
     }

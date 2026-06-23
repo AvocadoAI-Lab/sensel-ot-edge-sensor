@@ -58,6 +58,10 @@ services:
     volumes:
       - ./data/suricata:/app/data/suricata:ro
 
+  edge-console:
+    environment:
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+
   # Optional: report CTI-origin Suricata alerts as sightings. Off unless a CTI
   # SID range is provided (SNORT_CTI_SID_MIN/MAX — the range is shared across
   # engines); a generic Suricata hit is never a sighting. Requires
@@ -74,3 +78,20 @@ services:
       # the Edge Console. Set by the Control Plane rule provisioning in v0.2;
       # static label for v0.1 labs.
       - SURICATA_RULE_VERSION=${SURICATA_RULE_VERSION:-}
+      - SURICATA_RULES_PATH=/etc/suricata/rules/suricata.rules
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+      # Protection Center rule bundle pull (D4): write into the shared rules dir,
+      # reload Suricata via docker exec, and validate with suricata -T.
+      - IDS_RULE_ENABLED=${IDS_RULE_ENABLED:-true}
+      - IDS_RULE_INTERVAL_SEC=${IDS_RULE_INTERVAL_SEC:-300}
+      - IDS_RULE_ENGINES=${IDS_RULE_ENGINES:-suricata}
+      - IDS_RULE_TARGET_DIR=/etc/suricata/rules
+      - IDS_RULE_STATUS_PATH=/app/data/ids-rule-status.json
+      - IDS_RULE_RELOAD_CMD=docker exec sensel-suricata suricatasc -c reload-rules
+      - IDS_RULE_HEALTHCHECK_CMD=docker exec sensel-suricata suricata -T -c /etc/suricata/suricata.yaml
+      - IDS_RULE_CMD_TIMEOUT_SEC=${IDS_RULE_CMD_TIMEOUT_SEC:-120}
+      - IDS_RULE_MQTT_ENABLED=${IDS_RULE_MQTT_ENABLED:-true}
+    volumes:
+      - ./config/suricata/rules:/etc/suricata/rules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro

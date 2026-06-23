@@ -139,7 +139,13 @@ def load_config(path: Path | None = None) -> AppConfig:
     features_raw = expanded.get("features", {})
     detection_raw = expanded.get("detection", {})
 
-    sensor_raw.setdefault("id", os.environ.get("SENSOR_ID", "ot-edge-001"))
+    from src.config.sensor_id_resolve import load_platform_sensor_id, resolve_sensor_id
+
+    sensor_raw["id"] = resolve_sensor_id(
+        env_id=os.environ.get("SENSOR_ID", ""),
+        yaml_id=str(sensor_raw.get("id") or ""),
+        platform_id=load_platform_sensor_id(),
+    )
     sensor_raw.setdefault("site_id", os.environ.get("SITE_ID", "factory-lab-001"))
     capture_raw.setdefault("interface", os.environ.get("CAPTURE_INTERFACE", "eth1"))
     capture_raw.setdefault("bpf_filter", os.environ.get("CAPTURE_BPF_FILTER", ""))

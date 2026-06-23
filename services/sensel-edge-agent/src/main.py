@@ -272,7 +272,8 @@ def main() -> int:
     operational_mode_sync = OperationalModeSync(config)
     operational_mode_mqtt = (
         OperationalModeMqttSubscriber(config, operational_mode_sync)
-        if operational_mode_sync.enabled and config.policy_sync.mqtt_enabled
+        if operational_mode_sync.enabled
+        and config.policy_sync.operational_mode_mqtt_enabled
         else None
     )
     baseline_profile_sync = BaselineProfileSync(config)
@@ -542,6 +543,12 @@ def main() -> int:
                 registered=registration.complete,
                 tenant_id=registration.tenant_id or config.northbound_mqtt.tenant_id,
                 mqtt_connected=mqtt.connected if mqtt.enabled else None,
+                disk_usage=health.get("disk_usage"),
+                disk_alert_active=health.get("disk_alert_active"),
+                disk_alert_threshold_pct=health.get("disk_alert_threshold_pct"),
+                disk_free_gb=health.get("disk_free_gb"),
+                cpu_usage=health.get("cpu_usage"),
+                memory_usage=health.get("memory_usage"),
                 # Surface IDS engine status + landed MQTT credentials so the
                 # Edge Console setup wizard can show field operators which engine
                 # is running, its rule version/freshness, and whether the
@@ -576,6 +583,14 @@ def main() -> int:
                 )
                 observe_tick_publisher.maybe_publish()
                 topology_snapshot_publisher.maybe_publish()
+
+            if health.get("disk_alert_active"):
+                logger.warning(
+                    "Disk usage %.1f%% >= threshold %.1f%% (free %.2f GB)",
+                    health["disk_usage"],
+                    health.get("disk_alert_threshold_pct", 85),
+                    health.get("disk_free_gb", 0),
+                )
 
             try:
                 client.upload_health(health)

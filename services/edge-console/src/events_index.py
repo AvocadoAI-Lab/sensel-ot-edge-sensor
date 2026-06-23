@@ -122,3 +122,30 @@ def scan_events_stats(path: Path, *, recent_limit: int = 8) -> EventsStats:
 def read_jsonl_tail(path: Path, limit: int = 5) -> list[dict[str, Any]]:
     """Small tail read for non-dashboard endpoints."""
     return scan_events_stats(path, recent_limit=limit).recent_events
+
+
+def read_merged_jsonl_tail(paths: list[Path], limit: int = 5) -> list[dict[str, Any]]:
+    """Merge recent events from multiple JSONL sources, newest first.
+
+    Packet-sensor detections land in ``security-events.jsonl``; Suricata/Snort
+    IDS bridges write to separate files. The console presents a unified view.
+    """
+    if limit <= 0:
+        return []
+    per_file = min(max(limit * 3, limit), 200)
+    combined: list[dict[str, Any]] = []
+    for path in paths:
+        combined.extend(scan_events_stats(path, recent_limit=per_file).recent_events)
+    combined.sort(key=lambda ev: _parse_event_ts(ev) or 0.0, reverse=True)
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for ev in combined:
+        eid = str(ev.get("event_id") or "").strip()
+        if eid:
+            if eid in seen:
+                continue
+            seen.add(eid)
+        out.append(ev)
+        if len(out) >= limit:
+            break
+    return out

@@ -35,8 +35,12 @@ def apply_platform_overlay(config: AppConfig) -> AppConfig:
     sensel = config.sensel.model_copy(deep=True)
     mqtt = config.northbound_mqtt.model_copy(deep=True)
 
+    from src.config.sensor_id_resolve import is_placeholder_sensor_id
+
     if raw.get("sensor_id"):
-        sensor.id = str(raw["sensor_id"])
+        overlay_id = str(raw["sensor_id"])
+        if not is_placeholder_sensor_id(overlay_id):
+            sensor.id = overlay_id
     if raw.get("site_id"):
         sensor.site_id = str(raw["site_id"])
     if raw.get("sensor_type"):

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -27,7 +27,7 @@ from src.auth import (
 )
 from src.config_store import ConfigStore, PlatformConfig
 from src.sensel_api import ping_sensel, register_sensor
-from src.events_index import read_jsonl_tail
+from src.events_index import read_jsonl_tail, read_merged_jsonl_tail
 from src.status_service import build_status
 from src.traffic_service import read_live_traffic
 from src.lab_traffic_service import apply_lab_traffic_action, build_lab_traffic_status
@@ -190,6 +190,19 @@ def download_root_ca() -> FileResponse:
         media_type="application/x-x509-ca-cert",
         filename="sensel-root-ca.crt",
     )
+
+
+@app.get("/api/branding")
+def branding() -> dict[str, str]:
+    """Public branding hint for static shell (login page theme before auth)."""
+    profile = (os.environ.get("NDR_PROFILE", "") or "").strip().lower()
+    cfg = store.load()
+    ndr = profile in ("it", "it_ndr") or getattr(cfg, "ndr_profile", "") == "it_ndr"
+    return {
+        "mode": "it_ndr" if ndr else "ot_ids",
+        "product_name": "SenseL NDR" if ndr else "SenseL OT Edge",
+        "logo": "/assets/brand/logo-ndr.png" if ndr else "/assets/brand/logo-horizontal.jpg",
+    }
 
 
 @app.get("/api/auth/status")
@@ -427,6 +440,17 @@ def vpn_diagnose(
 @app.get("/api/detection-policy/applied")
 def detection_policy_applied(_: None = Depends(require_session)) -> dict[str, Any]:
     return build_applied_detection_policy()
+
+
+@app.get("/api/policy/ids-rules")
+def policy_ids_rules(_: None = Depends(require_session)) -> dict[str, Any]:
+    from src.ids_rule_status import read_ids_rule_status
+
+    cfg = store.load()
+    payload = read_ids_rule_status()
+    payload["ndr_profile"] = getattr(cfg, "ndr_profile", None) or "ot_ids"
+    payload["feed_profile"] = "it_ndr" if payload["ndr_profile"] == "it_ndr" else "ot_ids"
+    return payload
 
 
 # --- Baseline lifecycle (MVP-1: pcap → candidate → approve / rollback) ------
@@ -760,7 +784,12 @@ def audit_recent(limit: int = 30, _: None = Depends(require_session)) -> dict[st
 @app.get("/api/events/recent")
 def recent_events(limit: int = 50, _: None = Depends(require_session)) -> dict[str, Any]:
     assets = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
-    events = read_jsonl_tail(assets / "security-events.jsonl", limit=min(limit, 200))
+    event_paths = [
+        assets / "security-events.jsonl",
+        assets / "suricata-events.jsonl",
+        assets / "snort-events.jsonl",
+    ]
+    events = read_merged_jsonl_tail(event_paths, limit=min(limit, 200))
     device_payload = list_devices(enrich_telemetry=False)
     ip_map = build_ip_device_map(device_payload.get("devices") or [])
     enriched = enrich_events(events, ip_map)
@@ -874,11 +903,38 @@ if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 
 
-@app.get("/")
-def index() -> FileResponse:
+@app.get("/", response_model=None)
+def index() -> HTMLResponse | FileResponse:
     index_path = STATIC_DIR / "index.html"
     if not index_path.is_file():
         raise HTTPException(status_code=404, detail="UI not found")
+    profile = (os.environ.get("NDR_PROFILE", "") or "").strip().lower()
+    if profile in ("it", "it_ndr"):
+        html = index_path.read_text(encoding="utf-8")
+        html = html.replace(
+            '<html lang="zh-Hant">',
+            '<html lang="zh-Hant" class="ndr-it-mode">',
+            1,
+        )
+        html = html.replace("<body>", '<body class="ndr-it-mode">', 1)
+        html = html.replace(' id="ndrItTheme" disabled', ' id="ndrItTheme"')
+        html = html.replace(
+            'src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="login-logo"',
+            'src="/assets/brand/logo-ndr.png" alt="SenseL NDR" class="login-logo logo-ndr"',
+        )
+        html = html.replace(
+            'src="/assets/brand/logo-horizontal.jpg" alt="SenseL EdgeX by AvocadoAI" class="sidebar-logo-horizontal"',
+            'src="/assets/brand/logo-ndr.png" alt="SenseL NDR" class="sidebar-logo-horizontal logo-ndr"',
+        )
+        html = html.replace(
+            "OT Edge Runtime · Telemetry Pipeline · Security Validation",
+            "IT Network Detection & Response · Suricata Edge Sensor",
+        )
+        html = html.replace(
+            "<title>SenseL OT Edge Console</title>",
+            "<title>SenseL IT NDR Console</title>",
+        )
+        return HTMLResponse(html)
     return FileResponse(index_path)
 
 
@@ -890,6 +946,14 @@ def style_css() -> FileResponse:
 @app.get("/tokens.css")
 def tokens_css() -> FileResponse:
     return FileResponse(STATIC_DIR / "tokens.css")
+
+
+@app.get("/tokens-it-ndr.css")
+def tokens_it_ndr_css() -> FileResponse:
+    path = STATIC_DIR / "tokens-it-ndr.css"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Theme not found")
+    return FileResponse(path, media_type="text/css")
 
 
 @app.get("/app.js")
