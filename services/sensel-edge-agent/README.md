@@ -20,7 +20,7 @@ EdgeX Core Metadata 是 site 內的 device registry，Edge Agent 是 Control Pla
 | 方向 | MQTT 5 topic | Protobuf message | 行為 |
 |------|--------------|------------------|------|
 | Edge → Tier 3 | `sensel/{tenant}/{site}/{sensor}/inventory/v1` | `InventorySnapshot` | EdgeX device/profile + manual/probe/passive evidence；內容 revision 去重 |
-| Tier 3 → Edge | `sensel/{tenant}/{site}/{sensor}/device/desired/v1` | `DesiredDeviceStateCommand` | QoS 1 retained；驗 route、expiry、revision 與 sampling allowlist |
+| Tier 3 → Edge | `sensel/{tenant}/{site}/{sensor}/device/desired/{asset}/v1` | `DesiredDeviceStateCommand` | 每 asset 一個 QoS 1 retained topic；驗 route、asset、expiry、revision 與 sampling allowlist |
 | Edge → Tier 3 | `sensel/{tenant}/{site}/{sensor}/device/observed/v1` | `ObservedDeviceStateReport` | durable SQLite outbox；回報 applied/no-change/rejected/failed |
 
 Reconciler 只允許修改 `adminState` 與既有 `autoEvents.interval`；不修改 protocol endpoint、device profile，也不發 OT read/write command。`QUARANTINED` 與 `RETIRED` 一律映射為 `LOCKED`。

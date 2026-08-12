@@ -5,13 +5,15 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from sensel.device.v1 import device_management_pb2
-
 from src.config.settings import AppConfig
 from src.edgex.state import InvalidDesiredDeviceCommand, decode_desired_command
-from src.northbound.topics import desired_device_state_topic
+from src.northbound.topics import (
+    desired_device_state_asset_from_topic,
+    desired_device_state_subscription,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ class DesiredDeviceStateSubscriber:
         return self.config.northbound_mqtt.tenant_id.strip()
 
     def _desired_topic(self) -> str:
-        return desired_device_state_topic(
+        return desired_device_state_subscription(
             self._tenant_id(),
             self.config.sensor.site_id,
             self.config.sensor.id,
@@ -87,7 +89,7 @@ class DesiredDeviceStateSubscriber:
         properties = getattr(message, "properties", None)
         content_type = str(getattr(properties, "ContentType", "") or "")
         payload_format = getattr(properties, "PayloadFormatIndicator", None)
-        if content_type != _CONTENT_TYPE or payload_format not in (None, 0):
+        if content_type != _CONTENT_TYPE or payload_format != 0:
             self.rejected += 1
             logger.warning(
                 "Rejected EdgeX desired command content-type=%s pfi=%s",
@@ -96,15 +98,33 @@ class DesiredDeviceStateSubscriber:
             )
             return
         try:
+            topic_asset_id = desired_device_state_asset_from_topic(
+                str(getattr(message, "topic", "") or ""),
+                self._tenant_id(),
+                self.config.sensor.site_id,
+                self.config.sensor.id,
+            )
             command = decode_desired_command(
                 bytes(message.payload),
                 tenant_id=self._tenant_id(),
                 site_id=self.config.sensor.site_id,
                 sensor_id=self.config.sensor.id,
             )
+            if command.asset_id != topic_asset_id:
+                raise InvalidDesiredDeviceCommand(
+                    "desired command asset_id does not match MQTT topic"
+                )
+            correlation_data = getattr(properties, "CorrelationData", None)
+            if not isinstance(correlation_data, bytes) or (
+                correlation_data.decode("utf-8", errors="replace")
+                != command.command_id
+            ):
+                raise InvalidDesiredDeviceCommand(
+                    "desired command correlation data does not match command_id"
+                )
             if self.handler(command):
                 self.accepted += 1
-        except InvalidDesiredDeviceCommand as exc:
+        except (InvalidDesiredDeviceCommand, ValueError) as exc:
             self.rejected += 1
             logger.warning("Rejected EdgeX desired command: %s", exc)
         except Exception:

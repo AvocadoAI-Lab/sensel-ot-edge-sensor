@@ -44,12 +44,47 @@ def inventory_snapshot_topic(tenant_id: str, site_id: str, sensor_id: str) -> st
     )
 
 
-def desired_device_state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
-    return "sensel/{}/{}/{}/device/desired/v1".format(
+def desired_device_state_topic(
+    tenant_id: str,
+    site_id: str,
+    sensor_id: str,
+    asset_id: str,
+) -> str:
+    return "sensel/{}/{}/{}/device/desired/{}/v1".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+        _segment(asset_id, "asset_id"),
+    )
+
+
+def desired_device_state_subscription(
+    tenant_id: str,
+    site_id: str,
+    sensor_id: str,
+) -> str:
+    return "sensel/{}/{}/{}/device/desired/+/v1".format(
         _segment(tenant_id, "tenant_id"),
         _segment(site_id, "site_id"),
         _segment(sensor_id, "sensor_id"),
     )
+
+
+def desired_device_state_asset_from_topic(
+    topic: str,
+    tenant_id: str,
+    site_id: str,
+    sensor_id: str,
+) -> str:
+    prefix = "sensel/{}/{}/{}/device/desired/".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
+    suffix = "/v1"
+    if not topic.startswith(prefix) or not topic.endswith(suffix):
+        raise ValueError("desired device topic does not match this edge")
+    return _segment(topic[len(prefix) : -len(suffix)], "asset_id")
 
 
 def observed_device_state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
