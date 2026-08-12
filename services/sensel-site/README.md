@@ -4,8 +4,9 @@
 
 P3-B 提供隔離的 XGBoost trainer、trainer-key signed UBJSON candidate 與獨立 validator /
 quarantine。P3-C 再加入 asset/latest-time holdout、UBJSON → ONNX parity、ARM benchmark，及與
-模型 parser 完全分離的人工 approval/release signer。它仍不執行 Flower round、不訓練 Tiny
-LSTM，也沒有 distribution 或 candidate activation path。
+模型 parser 完全分離的人工 approval/release signer。P4-A 再加入 signed round verification 與
+Site-key signed XGBoost update boundary；三 Site Flower round 只在 Tier 3 sandbox 執行。Site 仍不
+訓練 Tiny LSTM，也沒有 distribution 或 candidate activation path。
 Isolation Forest 維持 Edge local baseline，Tiny LSTM 等完整 sequence materialization 後再開放。
 
 ## Required environment
