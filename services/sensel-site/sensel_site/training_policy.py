@@ -41,6 +41,7 @@ class XGBoostTrainingPolicy:
     minimum_samples: int
     minimum_per_class: int
     minimum_validation_per_class: int
+    minimum_validation_assets: int
     num_boost_round: int
     parameters: dict[str, Any]
     maximum_samples: int
@@ -51,6 +52,15 @@ class XGBoostTrainingPolicy:
     minimum_balanced_accuracy: float
     maximum_logloss: float
     metric_tolerance: float
+    target_opset: int
+    maximum_onnx_bytes: int
+    maximum_absolute_probability_error: float
+    maximum_relative_probability_error: float
+    benchmark_warmup: int
+    benchmark_iterations: int
+    maximum_p95_latency_ms: float
+    maximum_rss_mb: float
+    required_release_architectures: frozenset[str]
 
     def encode_label(self, value: Any) -> int:
         if not isinstance(value, str) or not value.strip():
@@ -91,8 +101,14 @@ def load_xgboost_policy(path: str | Path) -> XGBoostTrainingPolicy:
     if not positive or not negative or positive & negative:
         raise ValueError("training policy labels must be non-empty and disjoint")
     split = document["split"]
+    if (
+        split.get("strategy") != "asset-group-latest"
+        or split.get("require_asset_disjoint") is not True
+    ):
+        raise ValueError("training policy requires asset-group-latest holdout")
     training = document["training"]
     gates = document["validation_gates"]
+    conversion = gates["conversion"]
     parameters = dict(training["parameters"])
     if set(parameters) != _PARAMETERS:
         raise ValueError("training policy contains unsupported XGBoost parameters")
@@ -125,6 +141,7 @@ def load_xgboost_policy(path: str | Path) -> XGBoostTrainingPolicy:
         minimum_samples=int(split["minimum_samples"]),
         minimum_per_class=int(split["minimum_per_class"]),
         minimum_validation_per_class=int(split["minimum_validation_per_class"]),
+        minimum_validation_assets=int(split["minimum_validation_assets"]),
         num_boost_round=int(training["num_boost_round"]),
         parameters=parameters,
         maximum_samples=int(gates["maximum_samples"]),
@@ -135,6 +152,22 @@ def load_xgboost_policy(path: str | Path) -> XGBoostTrainingPolicy:
         minimum_balanced_accuracy=float(gates["minimum_balanced_accuracy"]),
         maximum_logloss=float(gates["maximum_logloss"]),
         metric_tolerance=float(gates["metric_tolerance"]),
+        target_opset=int(conversion["target_opset"]),
+        maximum_onnx_bytes=int(conversion["maximum_onnx_bytes"]),
+        maximum_absolute_probability_error=float(
+            conversion["maximum_absolute_probability_error"]
+        ),
+        maximum_relative_probability_error=float(
+            conversion["maximum_relative_probability_error"]
+        ),
+        benchmark_warmup=int(conversion["benchmark_warmup"]),
+        benchmark_iterations=int(conversion["benchmark_iterations"]),
+        maximum_p95_latency_ms=float(conversion["maximum_p95_latency_ms"]),
+        maximum_rss_mb=float(conversion["maximum_rss_mb"]),
+        required_release_architectures=frozenset(
+            str(item).strip().lower()
+            for item in conversion["required_release_architectures"]
+        ),
     )
     if not 0 < policy.validation_fraction < 0.5:
         raise ValueError("validation_fraction must be between zero and 0.5")
@@ -142,14 +175,27 @@ def load_xgboost_policy(path: str | Path) -> XGBoostTrainingPolicy:
         policy.minimum_samples < 4
         or policy.minimum_per_class < 2
         or policy.minimum_validation_per_class < 1
+        or policy.minimum_validation_assets < 2
         or policy.maximum_samples < policy.minimum_samples
         or policy.maximum_features < 1
         or policy.maximum_dataset_bytes < 1_048_576
         or policy.maximum_model_bytes < 1024
         or policy.maximum_boost_rounds < 1
         or policy.num_boost_round < 1
+        or not 7 <= policy.target_opset <= 22
+        or policy.maximum_onnx_bytes < 1024
+        or policy.benchmark_warmup < 1
+        or policy.benchmark_iterations < 10
+        or policy.maximum_p95_latency_ms <= 0
+        or policy.maximum_rss_mb <= 0
+        or not policy.required_release_architectures
     ):
         raise ValueError("training sample gates are unsafe")
+    if (
+        not 0 < policy.maximum_absolute_probability_error <= 0.01
+        or not 0 < policy.maximum_relative_probability_error <= 0.01
+    ):
+        raise ValueError("conversion parity tolerances are unsafe")
     if not 0 <= policy.minimum_balanced_accuracy <= 1:
         raise ValueError("balanced accuracy gate is invalid")
     if policy.maximum_logloss <= 0 or policy.metric_tolerance <= 0:

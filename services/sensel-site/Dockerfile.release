@@ -1,0 +1,34 @@
+FROM python:3.11-slim-bookworm AS base
+
+RUN groupadd --system --gid 10003 sensel-release \
+    && useradd --system --uid 10003 --gid sensel-release --home /nonexistent sensel-release
+
+WORKDIR /app
+
+COPY services/sensel-site/requirements-release.txt ./requirements-release.txt
+RUN pip install --no-cache-dir -r requirements-release.txt
+
+COPY services/sensel-site/sensel_site/__init__.py ./sensel_site/__init__.py
+COPY services/sensel-site/sensel_site/lineage.py ./sensel_site/lineage.py
+COPY services/sensel-site/sensel_site/release_signer.py ./sensel_site/release_signer.py
+COPY services/sensel-site/sensel_site/signed_documents.py ./sensel_site/signed_documents.py
+COPY services/sensel-site/sensel_site/worker_config.py ./sensel_site/worker_config.py
+
+RUN mkdir -p /input/approval-bundles /input/manual /output/releases \
+    && chown -R sensel-release:sensel-release /output/releases \
+    && chmod 0755 /input/approval-bundles /input/manual /output/releases
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+USER 10003:10003
+
+FROM base AS test
+
+USER root
+RUN pip install --no-cache-dir pytest==8.4.2
+USER 10003:10003
+
+FROM base AS runtime
+
+CMD ["python", "-m", "sensel_site.release_signer"]

@@ -108,11 +108,11 @@ read-only；candidate volume 對 validator 也是 read-only。預設限制每個
 | Isolation | Trainer/validator have no network or Site/Tier 1 state mount |
 | No activation | No activation API、volume、DB transition or distribution call exists |
 
-Deferred to later slices：
+P3-C 已完成 UBJSON → ONNX、asset/latest-time holdout、prediction parity、ARM benchmark 與獨立
+人工 release signer；詳見 `docs/sensel-p3c-onnx-release-gate.md`。仍 deferred：
 
-- UBJSON → ONNX conversion、ONNX parity test、ARM inference benchmark；
-- human/Control Plane approval and separately signed release artifact；
-- asset-group/time-based holdout、drift/leakage analysis 與 production-grade accuracy policy；
+- Control Plane approval orchestration、release transparency log 與 artifact distribution；
+- pure time-window / cross-site holdout、drift analysis 與 production-grade accuracy policy；
 - federation gRPC/protobuf client and central aggregation；
 - dataset/candidate/quarantine physical purge worker；
 - full sequence materialization required by Tiny LSTM。

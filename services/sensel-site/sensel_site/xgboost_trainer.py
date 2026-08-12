@@ -112,6 +112,7 @@ def train_signed_candidate(config: TrainerWorkerConfig) -> dict[str, Any]:
         "dataset_samples_sha256": data.request["dataset_samples_sha256"],
         "artifact_sha256": artifact_digest,
         "metrics": metrics,
+        "split": data.split_manifest,
         "training_policy_definition_sha256": policy.definition_sha256,
     }
     candidate_id = "candidate-" + sha256_bytes(canonical_json(identity)).removeprefix(
@@ -151,6 +152,7 @@ def train_signed_candidate(config: TrainerWorkerConfig) -> dict[str, Any]:
             "num_boost_round": booster.num_boosted_rounds(),
             "class_counts": data.class_counts,
             "seed": int(policy.parameters["seed"]),
+            "split": data.split_manifest,
         },
         "metrics": metrics,
         "artifact": {

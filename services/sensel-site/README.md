@@ -3,7 +3,9 @@
 `sensel-site` 是與 R2C Edge Agent 分開部署、分開 process 的 Tier 2 service。它接收同一 site 多台 Edge 的 `TrustEpisode` protobuf，保存可重播 receipt，建立 immutable dataset lineage，並只透過簽章後的 trainer inbox 交付訓練資料。
 
 P3-B 提供隔離的 XGBoost trainer、trainer-key signed UBJSON candidate 與獨立 validator /
-quarantine。它仍不執行 Flower round、不訓練 Tiny LSTM，也沒有 candidate activation path。
+quarantine。P3-C 再加入 asset/latest-time holdout、UBJSON → ONNX parity、ARM benchmark，及與
+模型 parser 完全分離的人工 approval/release signer。它仍不執行 Flower round、不訓練 Tiny
+LSTM，也沒有 distribution 或 candidate activation path。
 Isolation Forest 維持 Edge local baseline，Tiny LSTM 等完整 sequence materialization 後再開放。
 
 ## Required environment
@@ -57,3 +59,16 @@ validated/quarantine volume。兩者均使用 `network_mode=none`。Validated re
 decision，不會寫入 artifact cache 的 active state，也不會觸發 Edge 或 Control Plane distribution。
 
 完整邊界與 key provisioning 見 `docs/sensel-p3b-xgboost-candidate.md`。
+
+## P3-C conversion/release workflow
+
+```text
+make convert-site JOB_ID=trainer-<sha256>
+make release-site JOB_ID=trainer-<sha256> \
+  APPROVAL_FILE=/absolute/path/to/approval.json
+```
+
+Converter 無 private key；release signer 無 model mount，且 image 不包含 XGBoost/ONNX parser。
+Signer 只讀 digest-only approval bundle 和人工建立的 exact-digest approval，輸出的 signed release
+authorization 固定聲明 distribution/activation 均未執行。完整 contract 與 approval JSON 格式見
+`docs/sensel-p3c-onnx-release-gate.md`。

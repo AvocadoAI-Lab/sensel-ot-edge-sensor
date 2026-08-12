@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,10 @@ def _episode(index: int, *, positive: bool) -> bytes:
     message.meta.sensor_id = f"edge-{index % 4}"
     message.meta.trace_id = f"trace-{episode_id}"
     message.asset_id = f"asset-{index % 6}"
+    ended_at = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(hours=index)
+    message.meta.observed_at.FromDatetime(ended_at)
+    message.started_at.FromDatetime(ended_at - timedelta(minutes=5))
+    message.ended_at.FromDatetime(ended_at)
     message.features.feature_contract_id = "ot-window-v1"
     message.features.sequence_ref = f"sha256:{index:064x}"
     del message.features.latest_values[:]
@@ -303,6 +308,7 @@ def test_validly_resigned_false_metrics_are_recomputed_and_quarantined(
             "dataset_samples_sha256": manifest["dataset"]["samples_sha256"],
             "artifact_sha256": manifest["artifact"]["sha256"],
             "metrics": manifest["metrics"],
+            "split": manifest["training"]["split"],
             "training_policy_definition_sha256": manifest["training_policy"][
                 "definition_sha256"
             ],

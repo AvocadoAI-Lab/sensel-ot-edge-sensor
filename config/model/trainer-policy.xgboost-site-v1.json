@@ -23,10 +23,13 @@
     ]
   },
   "split": {
+    "strategy": "asset-group-latest",
     "validation_fraction": 0.25,
     "minimum_samples": 16,
     "minimum_per_class": 4,
-    "minimum_validation_per_class": 1
+    "minimum_validation_per_class": 1,
+    "minimum_validation_assets": 2,
+    "require_asset_disjoint": true
   },
   "training": {
     "num_boost_round": 24,
@@ -54,7 +57,21 @@
     "maximum_boost_rounds": 64,
     "minimum_balanced_accuracy": 0.6,
     "maximum_logloss": 0.8,
-    "metric_tolerance": 1e-08
+    "metric_tolerance": 1e-08,
+    "conversion": {
+      "target_opset": 15,
+      "maximum_onnx_bytes": 8388608,
+      "maximum_absolute_probability_error": 1e-05,
+      "maximum_relative_probability_error": 0.0001,
+      "benchmark_warmup": 20,
+      "benchmark_iterations": 200,
+      "maximum_p95_latency_ms": 10.0,
+      "maximum_rss_mb": 512.0,
+      "required_release_architectures": [
+        "aarch64",
+        "arm64"
+      ]
+    }
   },
-  "definition_sha256": "a43db03f4f5aa1dc412d1c32340af05beedbc4af21ecedd19f7cf45f4b0c28c5"
+  "definition_sha256": "2ed2515604551943d731208cc37ca72608ceb48114c3cdcf53e844277f90d242"
 }

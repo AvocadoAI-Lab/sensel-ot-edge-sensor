@@ -7,6 +7,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ class PreparedTrainingData:
     validation_features: tuple[tuple[float, ...], ...]
     validation_labels: tuple[int, ...]
     class_counts: dict[str, int]
+    split_manifest: dict[str, Any]
 
 
 def _require_job_directory(root: str | Path, job_id: str) -> Path:
@@ -44,35 +46,108 @@ def _require_job_directory(root: str | Path, job_id: str) -> Path:
     return job
 
 
+def _timestamp(value: Any) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("training sample ended_at is invalid") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("training sample ended_at must include timezone")
+    return parsed.astimezone(timezone.utc)
+
+
 def _split_indices(
     records: list[dict[str, Any]],
     labels: list[int],
     policy: XGBoostTrainingPolicy,
-) -> tuple[list[int], list[int]]:
-    seed = int(policy.parameters["seed"])
-    train: list[int] = []
-    validation: list[int] = []
-    for label in (0, 1):
-        members = [index for index, value in enumerate(labels) if value == label]
-        if len(members) < policy.minimum_per_class:
+) -> tuple[list[int], list[int], dict[str, Any]]:
+    groups: dict[str, list[int]] = {}
+    for index, record in enumerate(records):
+        asset_id = str(record.get("asset_id") or "").strip()
+        if not asset_id:
+            raise ValueError("training sample asset identity is required")
+        _timestamp(record.get("ended_at"))
+        groups.setdefault(asset_id, []).append(index)
+    if len(groups) <= policy.minimum_validation_assets:
+        raise ValueError("dataset does not contain enough assets for disjoint holdout")
+    totals = {label: labels.count(label) for label in (0, 1)}
+    for count in totals.values():
+        if count < policy.minimum_per_class * 2:
             raise ValueError("dataset does not meet minimum samples per class")
-        ranked = sorted(
-            members,
-            key=lambda index: hashlib.sha256(
-                (
-                    f"{seed}:{records[index]['sensor_id']}:"
-                    f"{records[index]['episode_id']}"
-                ).encode("utf-8")
-            ).digest(),
+    ranked_assets = sorted(
+        groups,
+        key=lambda asset_id: (
+            max(_timestamp(records[index]["ended_at"]) for index in groups[asset_id]),
+            hashlib.sha256(asset_id.encode("utf-8")).digest(),
+        ),
+        reverse=True,
+    )
+    desired = max(
+        policy.minimum_validation_per_class * 2,
+        round(len(records) * policy.validation_fraction),
+    )
+    selected: list[str] = []
+    selected_indices: list[int] = []
+    selected_counts = {0: 0, 1: 0}
+    for asset_id in ranked_assets:
+        group = groups[asset_id]
+        group_counts = {label: sum(labels[index] == label for index in group) for label in (0, 1)}
+        if any(
+            totals[label] - selected_counts[label] - group_counts[label]
+            < policy.minimum_per_class
+            for label in (0, 1)
+        ):
+            continue
+        selected.append(asset_id)
+        selected_indices.extend(group)
+        for label in (0, 1):
+            selected_counts[label] += group_counts[label]
+        if (
+            len(selected) >= policy.minimum_validation_assets
+            and len(selected_indices) >= desired
+            and all(
+                selected_counts[label] >= policy.minimum_validation_per_class
+                for label in (0, 1)
+            )
+        ):
+            break
+    if (
+        len(selected) < policy.minimum_validation_assets
+        or any(
+            selected_counts[label] < policy.minimum_validation_per_class
+            for label in (0, 1)
         )
-        validation_count = max(
-            policy.minimum_validation_per_class,
-            round(len(ranked) * policy.validation_fraction),
-        )
-        validation_count = min(validation_count, len(ranked) - 1)
-        validation.extend(ranked[:validation_count])
-        train.extend(ranked[validation_count:])
-    return sorted(train), sorted(validation)
+    ):
+        raise ValueError("dataset cannot produce an asset-disjoint class-balanced holdout")
+    validation = sorted(selected_indices)
+    validation_set = set(validation)
+    train = [index for index in range(len(records)) if index not in validation_set]
+    train_assets = sorted(set(groups) - set(selected))
+    train_times = [_timestamp(records[index]["ended_at"]) for index in train]
+    validation_times = [_timestamp(records[index]["ended_at"]) for index in validation]
+    asset_latest = {
+        asset_id: max(
+            _timestamp(records[index]["ended_at"]) for index in groups[asset_id]
+        ).isoformat()
+        for asset_id in sorted(groups)
+    }
+    split = {
+        "strategy": "asset-group-latest",
+        "asset_disjoint": True,
+        "train_asset_ids": train_assets,
+        "validation_asset_ids": sorted(selected),
+        "train_time_range": {
+            "minimum": min(train_times).isoformat(),
+            "maximum": max(train_times).isoformat(),
+        },
+        "validation_time_range": {
+            "minimum": min(validation_times).isoformat(),
+            "maximum": max(validation_times).isoformat(),
+        },
+        "selection_basis": "assets-ranked-by-latest-ended-at",
+        "asset_latest_ended_at": asset_latest,
+    }
+    return train, validation, split
 
 
 def verify_training_input(
@@ -211,7 +286,9 @@ def verify_training_input(
         raise ValueError("training sample count does not match signed manifest")
     if not policy.minimum_samples <= len(records) <= policy.maximum_samples:
         raise ValueError("dataset sample count is outside training policy")
-    train_indices, validation_indices = _split_indices(records, labels, policy)
+    train_indices, validation_indices, split_manifest = _split_indices(
+        records, labels, policy
+    )
     return PreparedTrainingData(
         request=request,
         request_digest=request_digest,
@@ -228,4 +305,5 @@ def verify_training_input(
             "train": len(train_indices),
             "validation": len(validation_indices),
         },
+        split_manifest=split_manifest,
     )

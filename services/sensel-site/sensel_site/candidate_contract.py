@@ -109,6 +109,7 @@ def verify_candidate_package(
         "dataset_samples_sha256": dataset.get("samples_sha256"),
         "artifact_sha256": artifact.get("sha256"),
         "metrics": manifest["metrics"],
+        "split": manifest.get("training", {}).get("split"),
         "training_policy_definition_sha256": policy.definition_sha256,
     }
     expected_candidate_id = "candidate-" + sha256_bytes(

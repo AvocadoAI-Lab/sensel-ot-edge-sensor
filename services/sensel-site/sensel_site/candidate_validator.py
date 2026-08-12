@@ -86,6 +86,7 @@ def _validate_model(
             training.get("runtime_version") != xgb.__version__,
             training.get("class_counts") != data.class_counts,
             training.get("seed") != int(policy.parameters["seed"]),
+            training.get("split") != data.split_manifest,
         )
     ):
         raise ValueError("candidate XGBoost training metadata is not validator-approved")

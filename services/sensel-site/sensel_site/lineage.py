@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -22,10 +22,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
-from sensel_site.store import SiteStore
-
-if False:  # pragma: no cover - type-checking without an import cycle
+if TYPE_CHECKING:
     from sensel_site.feature_contracts import FeatureContractRegistry
+    from sensel_site.store import SiteStore
 
 RETENTION_POLICIES = {
     "training-short": 30,

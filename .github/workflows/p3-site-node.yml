@@ -51,9 +51,10 @@ jobs:
         run: |
           docker compose --env-file .env.site.example -f docker-compose.site.yml config >/dev/null
           docker compose --env-file .env.site.example -f docker-compose.site.yml --profile training config >/dev/null
+          docker compose --env-file .env.site.example -f docker-compose.site.yml --profile model-release config >/dev/null
 
   xgboost-candidate-boundary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
@@ -61,14 +62,28 @@ jobs:
         run: >-
           docker build --target test
           -f services/sensel-site/Dockerfile.worker
-          -t sensel-site-worker:p3b-test .
+          -t sensel-site-worker:p3c-test .
 
-      - name: Train, validate, and quarantine without network
+      - name: Build minimal release signer test image
+        run: >-
+          docker build --target test
+          -f services/sensel-site/Dockerfile.release
+          -t sensel-site-release:p3c-test .
+
+      - name: Train, validate, convert, benchmark, and gate release without network
         run: >-
           docker run --rm --network none --read-only
-          --tmpfs /tmp:size=256m,mode=1777
+          --tmpfs /tmp:size=512m,mode=1777
           -v "$PWD:/workspace:ro" -w /workspace
           -e PYTHONPATH=/workspace/services/sensel-site:/workspace/services/sensel-edge-agent
-          sensel-site-worker:p3b-test
+          sensel-site-worker:p3c-test
           python -m pytest -q -p no:cacheprovider
           services/sensel-site/tests/test_site_p3b.py
+          services/sensel-site/tests/test_site_p3c.py
+
+      - name: Assert release signer contains no model parser
+        run: |
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:size=16m,mode=1777 \
+            sensel-site-release:p3c-test python -c \
+            "import importlib.util, sensel_site.release_signer; names=('xgboost','onnx','onnxruntime','onnxmltools'); assert all(importlib.util.find_spec(name) is None for name in names)"
