@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -13,14 +12,17 @@ from typing import Any
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from sensel_site.lineage import canonical_json, sha256_bytes, verify_dataset_export
+from sensel_site.signed_documents import detached_signature, verify_detached_document
 from sensel_site.store import SiteStore
+from sensel_site.training_policy import XGBoostTrainingPolicy
 
 ALGORITHMS = {"xgboost"}
 LOCAL_ONLY_ALGORITHMS = {"isolation-forest"}
+_MODEL_IDENTITY = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 def _write(path: Path, payload: bytes) -> None:
-    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o640)
+    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o444)
     try:
         view = memoryview(payload)
         while view:
@@ -42,6 +44,7 @@ class TrainerBoundary:
         public_key,
         signing_key: Ed25519PrivateKey,
         signing_key_id: str,
+        training_policy: XGBoostTrainingPolicy,
     ) -> None:
         self.store = store
         self.tenant_id = tenant_id
@@ -50,6 +53,7 @@ class TrainerBoundary:
         self.public_key = public_key
         self.signing_key = signing_key
         self.signing_key_id = signing_key_id
+        self.training_policy = training_policy
 
     def prepare_job(
         self,
@@ -70,10 +74,10 @@ class TrainerBoundary:
         if normalized_algorithm not in ALGORITHMS:
             raise ValueError("unsupported Site trainer algorithm")
         if not all(
-            value.strip()
+            _MODEL_IDENTITY.fullmatch(value.strip())
             for value in (model_id, base_model_version, expected_feature_contract_id)
         ):
-            raise ValueError("model, base version and feature contract are required")
+            raise ValueError("model, base version or feature contract identity is invalid")
         dataset = self.store.get_dataset(dataset_id)
         export_path = dataset.get("export_path")
         if not export_path:
@@ -100,18 +104,45 @@ class TrainerBoundary:
                 "feature_contract_definition_sha256"
             ],
             "dataset_samples_sha256": manifest["samples"]["sha256"],
+            "training_policy_id": self.training_policy.policy_id,
+            "training_policy_version": self.training_policy.version,
+            "training_policy_definition_sha256": (
+                self.training_policy.definition_sha256
+            ),
         }
         job_id = "trainer-" + sha256_bytes(canonical_json(identity)).removeprefix(
             "sha256:"
         )
         existing_path = self.inbox_root / job_id
         if existing_path.is_dir():
-            request = json.loads(
-                (existing_path / "request.json").read_text(encoding="utf-8")
+            if existing_path.is_symlink():
+                raise ValueError("existing trainer job must not be a symlink")
+            request, request_digest = verify_detached_document(
+                existing_path / "request.json",
+                existing_path / "request.sig",
+                public_key=self.public_key,
+                expected_key_id=self.signing_key_id,
             )
+            if request.get("job_id") != job_id or any(
+                request.get(name) != value for name, value in identity.items()
+            ):
+                raise ValueError("existing trainer job request conflicts with lineage")
+            copied_manifest = verify_dataset_export(
+                existing_path / "dataset",
+                public_key=self.public_key,
+                expected_tenant_id=self.tenant_id,
+                expected_site_id=self.site_id,
+                expected_key_id=self.signing_key_id,
+            )
+            if (
+                copied_manifest.get("dataset_id") != dataset_id
+                or copied_manifest["samples"].get("sha256")
+                != manifest["samples"]["sha256"]
+            ):
+                raise ValueError("existing trainer job dataset conflicts with lineage")
             self.store.save_trainer_job(
                 request,
-                request_digest=sha256_bytes(canonical_json(request)),
+                request_digest=request_digest,
                 inbox_path=str(existing_path),
             )
             return request, False
@@ -131,33 +162,40 @@ class TrainerBoundary:
                 "read_only": True,
             },
             "output": {
-                "directory": "candidate-outbox",
+                "channel": "signed-candidate-outbox",
+                "job_relative_path": job_id,
                 "network_access_required": False,
                 "candidate_requires_separate_validation": True,
+                "automatic_activation_allowed": False,
             },
             "created_at": created_at,
+            "training_policy": {
+                "policy_id": self.training_policy.policy_id,
+                "version": self.training_policy.version,
+                "definition_sha256": self.training_policy.definition_sha256,
+            },
         }
         request_bytes = canonical_json(request)
-        signature = self.signing_key.sign(request_bytes)
-        signed = {
-            "algorithm": "Ed25519",
-            "key_id": self.signing_key_id,
-            "signed_sha256": sha256_bytes(request_bytes),
-            "signature": base64.b64encode(signature).decode("ascii"),
-        }
+        signed = detached_signature(
+            request_bytes,
+            private_key=self.signing_key,
+            key_id=self.signing_key_id,
+        )
         staging = self.inbox_root / ".staging" / f"{job_id}-{uuid.uuid4()}"
+        staging.mkdir(parents=True, mode=0o750)
         dataset_target = staging / "dataset"
-        dataset_target.mkdir(parents=True, mode=0o750)
+        dataset_target.mkdir(mode=0o750)
         source = Path(export_path)
         for filename in ("manifest.json", "manifest.sig", "samples.jsonl"):
             shutil.copyfile(source / filename, dataset_target / filename)
-            os.chmod(dataset_target / filename, 0o440)
-        (staging / "candidate-outbox").mkdir(mode=0o750)
+            os.chmod(dataset_target / filename, 0o444)
         _write(staging / "request.json", request_bytes + b"\n")
         _write(staging / "request.sig", canonical_json(signed) + b"\n")
+        os.chmod(dataset_target, 0o555)
         final = self.inbox_root / job_id
         final.parent.mkdir(parents=True, exist_ok=True)
         os.replace(staging, final)
+        os.chmod(final, 0o555)
         request_digest = sha256_bytes(request_bytes)
         created = self.store.save_trainer_job(
             request,

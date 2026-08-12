@@ -11,6 +11,7 @@ from sensel_site.feature_contracts import FeatureContractRegistry
 from sensel_site.lineage import DatasetLineageService, load_private_key
 from sensel_site.store import SiteStore
 from sensel_site.trainer import TrainerBoundary
+from sensel_site.training_policy import load_xgboost_policy
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -109,6 +110,7 @@ def execute(args: argparse.Namespace, config: SiteConfig, store: SiteStore) -> A
             public_key=private_key.public_key(),
             signing_key=private_key,
             signing_key_id=config.signing_key_id,
+            training_policy=load_xgboost_policy(config.trainer_policy_path),
         )
         request, created = boundary.prepare_job(
             dataset_id=args.dataset_id,

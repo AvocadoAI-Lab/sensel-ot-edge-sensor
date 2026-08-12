@@ -1,4 +1,4 @@
-.PHONY: help up down logs build health test lint up-ui up-site down-site verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 apply-lab-61850-edgex wait-upstream verify-pi-health deploy-pi deploy-pi-full
+.PHONY: help up down logs build health test lint up-ui up-site down-site train-site validate-site verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 apply-lab-61850-edgex wait-upstream verify-pi-health deploy-pi deploy-pi-full
 
 help:
 	@echo "SenseL OT Edge Sensor"
@@ -8,6 +8,8 @@ help:
 	@echo "  make up-lab-61850   - Start stack + IEC 61850 lab overlay"
 	@echo "  make up-pi4         - Start stack with Pi4 overlay"
 	@echo "  make up-site        - Start isolated Tier 2 Site broker/ingress"
+	@echo "  make train-site JOB_ID=...    - Run offline P3-B XGBoost trainer"
+	@echo "  make validate-site JOB_ID=... - Validate/quarantine signed candidate"
 	@echo "  make deploy-pi      - Deploy to lab Pi (existing EdgeX, default edgex@192.168.1.123)"
 	@echo "  make deploy-pi-full - Stop existing EdgeX on Pi, deploy full stack"
 	@echo "  make verify-modbus  - Verify Modbus sim → Core Data telemetry"
@@ -35,6 +37,14 @@ up-site:
 
 down-site:
 	docker compose --env-file .env.site -f docker-compose.site.yml down
+
+train-site:
+	@test -n "$(JOB_ID)" || (echo "JOB_ID is required" && exit 2)
+	SENSEL_SITE_TRAINER_JOB_ID="$(JOB_ID)" docker compose --env-file .env.site -f docker-compose.site.yml --profile training run --rm sensel-site-trainer
+
+validate-site:
+	@test -n "$(JOB_ID)" || (echo "JOB_ID is required" && exit 2)
+	SENSEL_SITE_VALIDATOR_JOB_ID="$(JOB_ID)" docker compose --env-file .env.site -f docker-compose.site.yml --profile training run --rm sensel-site-validator
 
 up-lab-61850:
 	docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d

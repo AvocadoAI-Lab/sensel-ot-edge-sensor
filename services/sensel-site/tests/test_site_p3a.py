@@ -29,10 +29,12 @@ from sensel_site.lineage import (
 from sensel_site.mqtt_ingress import SiteEpisodeIngress, SiteMqttSubscriber
 from sensel_site.store import SiteStore
 from sensel_site.trainer import TrainerBoundary
+from sensel_site.training_policy import load_xgboost_policy
 
 EDGE_AGENT_ROOT = Path(__file__).resolve().parents[2] / "sensel-edge-agent"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTRACT_DIR = REPO_ROOT / "config" / "model"
+TRAINER_POLICY = CONTRACT_DIR / "trainer-policy.xgboost-site-v1.json"
 GOLDEN = EDGE_AGENT_ROOT / "tests" / "fixtures" / "trust_episode.v1.bin"
 
 
@@ -58,6 +60,8 @@ def _config(tmp_path: Path) -> SiteConfig:
         max_episode_bytes=1_048_576,
         episode_retention_days=30,
         feature_contract_dir=CONTRACT_DIR,
+        trainer_inbox_dir=tmp_path / "trainer-inbox",
+        trainer_policy_path=TRAINER_POLICY,
     )
 
 
@@ -65,7 +69,7 @@ def _episode(
     *,
     sensor_id: str = "edge-a",
     episode_id: str = "episode-a",
-    sequence_ref: str = "sha256:sequence-a",
+    sequence_ref: str = "sha256:" + ("a" * 64),
 ) -> bytes:
     message = trust_episode_pb2.TrustEpisode.FromString(GOLDEN.read_bytes())
     message.episode_id = episode_id
@@ -466,6 +470,7 @@ def test_trainer_boundary_only_accepts_signed_xgboost_dataset(tmp_path: Path) ->
         public_key=private.public_key(),
         signing_key=private,
         signing_key_id=config.signing_key_id,
+        training_policy=load_xgboost_policy(TRAINER_POLICY),
     )
     try:
         request, created = boundary.prepare_job(
@@ -492,6 +497,8 @@ def test_trainer_boundary_only_accepts_signed_xgboost_dataset(tmp_path: Path) ->
             "manifest.sig",
             "samples.jsonl",
         ]
+        assert not (job_path / "candidate-outbox").exists()
+        assert request["output"]["automatic_activation_allowed"] is False
         assert not list(job_path.rglob("*.db"))
         assert not list(job_path.rglob("*.pcap"))
         with pytest.raises(ValueError, match="full sequence materialization"):

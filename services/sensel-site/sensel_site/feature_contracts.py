@@ -17,6 +17,7 @@ class FeatureContract:
     version: str
     definition_sha256: str
     feature_count: int
+    feature_names: tuple[str, ...]
     sequence_length: int
 
 
@@ -42,6 +43,21 @@ class FeatureContractRegistry:
                 or sequence_length <= 0
             ):
                 raise ValueError(f"invalid feature contract: {path}")
+            feature_names = tuple(
+                str(item.get("name") or "").strip()
+                for item in features
+                if isinstance(item, dict)
+            )
+            feature_indices = tuple(
+                item.get("index") for item in features if isinstance(item, dict)
+            )
+            if (
+                len(feature_names) != len(features)
+                or any(not name for name in feature_names)
+                or len(set(feature_names)) != len(feature_names)
+                or feature_indices != tuple(range(len(features)))
+            ):
+                raise ValueError(f"feature contract indices/names are invalid: {path}")
             if contract_id in self._contracts:
                 raise ValueError(f"duplicate feature contract_id: {contract_id}")
             self._contracts[contract_id] = FeatureContract(
@@ -49,6 +65,7 @@ class FeatureContractRegistry:
                 version=version,
                 definition_sha256="sha256:" + expected,
                 feature_count=len(features),
+                feature_names=feature_names,
                 sequence_length=sequence_length,
             )
         if not self._contracts:

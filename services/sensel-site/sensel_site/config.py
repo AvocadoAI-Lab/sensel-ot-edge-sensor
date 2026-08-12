@@ -54,6 +54,8 @@ class SiteConfig:
     max_episode_bytes: int
     episode_retention_days: int
     feature_contract_dir: Path
+    trainer_inbox_dir: Path
+    trainer_policy_path: Path
 
     @classmethod
     def from_env(cls) -> SiteConfig:
@@ -119,6 +121,18 @@ class SiteConfig:
             feature_contract_dir=Path(
                 os.getenv("SENSEL_SITE_FEATURE_CONTRACT_DIR", "/app/contracts")
             ),
+            trainer_inbox_dir=Path(
+                os.getenv(
+                    "SENSEL_SITE_TRAINER_INBOX_DIR",
+                    "/var/lib/sensel-trainer-inbox",
+                )
+            ),
+            trainer_policy_path=Path(
+                os.getenv(
+                    "SENSEL_SITE_TRAINER_POLICY_PATH",
+                    "/app/policies/trainer-policy.xgboost-site-v1.json",
+                )
+            ),
         )
 
     @property
@@ -128,10 +142,6 @@ class SiteConfig:
     @property
     def export_dir(self) -> Path:
         return self.data_dir / "datasets"
-
-    @property
-    def trainer_inbox_dir(self) -> Path:
-        return self.data_dir / "trainer-inbox"
 
     @property
     def mqtt_topic(self) -> str:

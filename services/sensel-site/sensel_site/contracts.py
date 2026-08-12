@@ -13,6 +13,7 @@ from sensel.episode.v1 import trust_episode_pb2
 
 TRUST_EPISODE_CONTENT_TYPE = "application/x-protobuf; message=sensel.episode.v1.TrustEpisode"
 _SEGMENT = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class InvalidSitePublish(ValueError):
@@ -95,8 +96,8 @@ def decode_episode_publish(
         raise InvalidSitePublish("Trust Episode identity is too long")
     if not message.asset_id or not message.features.feature_contract_id:
         raise InvalidSitePublish("Trust Episode asset/feature contract is required")
-    if not message.features.sequence_ref:
-        raise InvalidSitePublish("Trust Episode sequence reference is required")
+    if not _SHA256_REF.fullmatch(message.features.sequence_ref):
+        raise InvalidSitePublish("Trust Episode sequence reference must be SHA-256")
     if not message.features.latest_values:
         raise InvalidSitePublish("Trust Episode contains no feature vector")
     if any(not math.isfinite(value) for value in message.features.latest_values):

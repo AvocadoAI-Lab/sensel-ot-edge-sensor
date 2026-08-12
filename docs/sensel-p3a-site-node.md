@@ -81,10 +81,11 @@ The trainer inbox contains only:
 │   ├── manifest.json
 │   ├── manifest.sig
 │   └── samples.jsonl
-└── candidate-outbox/
 ```
 
-The actual trainer and signed candidate artifact are deliberately deferred. A future trainer process writes only into `candidate-outbox`; a separate validator must verify metrics、model format、feature compatibility and artifact signature before any federation submission or activation.
+P3-B 已將 actual trainer、candidate outbox 與 validation/quarantine 實作在不同 process 和
+volume；參閱 `docs/sensel-p3b-xgboost-candidate.md`。Trainer inbox 本身維持 read-only，
+不再把 writable candidate directory 放在 job 內。
 
 ## Deployment
 
@@ -94,7 +95,9 @@ Copy `.env.site.example` to an ignored `.env.site`, provision the CA/server/clie
 docker compose --env-file .env.site -f docker-compose.site.yml up -d --build
 ```
 
-The compose profile uses a read-only root filesystem、drops capabilities、sets `no-new-privileges`, and gives only `/var/lib/sensel-site` as persistent writable state. Production startup fails closed when MQTT mTLS material or required scope identity is missing.
+The compose profile uses a read-only root filesystem、drops capabilities、sets `no-new-privileges`,
+and separates Site DB from the trainer inbox volume. Production startup fails closed when MQTT mTLS
+material or required scope identity is missing.
 
 ## P3-A acceptance and rollback
 

@@ -11,9 +11,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY services/sensel-site/sensel_site/ ./sensel_site/
 COPY services/sensel-edge-agent/sensel/ ./sensel/
 COPY config/model/feature-contract.*.json ./contracts/
+COPY config/model/trainer-policy.*.json ./policies/
 
-RUN mkdir -p /var/lib/sensel-site \
-    && chown -R sensel-site:sensel-site /var/lib/sensel-site
+RUN mkdir -p /var/lib/sensel-site /var/lib/sensel-trainer-inbox \
+    && chown -R sensel-site:sensel-site \
+        /var/lib/sensel-site /var/lib/sensel-trainer-inbox
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

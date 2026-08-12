@@ -1,5 +1,18 @@
 # Release Notes — SenseL OT Edge Sensor
 
+## P3-B — Isolated XGBoost candidate validation（2026-08-13）
+
+- 新增無網路、non-root、read-only root filesystem 的 XGBoost CPU trainer worker。
+- Training policy、signed dataset/request、feature contract digest 與 deterministic split 全部
+  fail closed；未知 label、單一 class、oversize dataset/model 均不可產生 candidate。
+- Candidate 使用 XGBoost UBJSON，manifest 綁定完整 lineage/metrics/artifact SHA-256，並由
+  獨立 trainer Ed25519 key 簽章。
+- Validator 在另一個無網路 process 重新驗證輸入、載入模型並重算 metrics；任何不一致
+  進 durable quarantine。
+- Site DB、trainer inbox、candidate outbox、validation/quarantine 分離 volume；candidate 永不
+  自動啟用，validation result 也不是 release authorization。
+- 尚未實作 ONNX conversion/parity、人工核准、release signing、模型派送或 federated round。
+
 ## P3-A — Site dataset lineage / trainer boundary（2026-08-12）
 
 新增獨立 Tier 2 Site Node 服務，接收 Tier 1 以 protobuf 發布的 `TrustEpisode`，並在
@@ -22,8 +35,8 @@ lineage metadata，不保存原始封包，也不允許 trainer 直接讀取 Tie
 
 ### 已知限制 / 後續
 
-- P3-A 建立資料與信任邊界，尚未執行實際 trainer，也尚未產生或啟用 signed candidate
-  model；建議由 P3-B 實作隔離的 XGBoost trainer、候選模型驗證與 quarantine。
+- P3-A 建立資料與信任邊界；實際 trainer、signed candidate 與 quarantine 已由 P3-B 補上，
+  但 activation / distribution 仍刻意不存在。
 - 目前 episode 只帶最新 feature vector 與 sequence reference，因此可供 XGBoost handoff；
   Tiny LSTM 必須等完整且可驗證的 sequence materialization，Isolation Forest 維持 Tier 1
   local-only。

@@ -1,0 +1,60 @@
+{
+  "schema_version": "sensel.site.xgboost-training-policy.v1",
+  "policy_id": "xgboost-site-v1",
+  "version": "1.0.0",
+  "algorithm": "xgboost",
+  "artifact_format": "ubj",
+  "labels": {
+    "positive": [
+      "alert",
+      "anomaly",
+      "attack",
+      "block",
+      "confirmed_attack",
+      "malicious",
+      "suspicious"
+    ],
+    "negative": [
+      "allow",
+      "benign",
+      "clear",
+      "no_alert",
+      "normal"
+    ]
+  },
+  "split": {
+    "validation_fraction": 0.25,
+    "minimum_samples": 16,
+    "minimum_per_class": 4,
+    "minimum_validation_per_class": 1
+  },
+  "training": {
+    "num_boost_round": 24,
+    "parameters": {
+      "objective": "binary:logistic",
+      "eval_metric": "logloss",
+      "tree_method": "hist",
+      "device": "cpu",
+      "max_depth": 4,
+      "eta": 0.1,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 1.0,
+      "lambda": 1.0,
+      "alpha": 0.0,
+      "seed": 20260813,
+      "nthread": 1
+    }
+  },
+  "validation_gates": {
+    "maximum_samples": 100000,
+    "maximum_features": 256,
+    "maximum_dataset_bytes": 268435456,
+    "maximum_model_bytes": 8388608,
+    "maximum_boost_rounds": 64,
+    "minimum_balanced_accuracy": 0.6,
+    "maximum_logloss": 0.8,
+    "metric_tolerance": 1e-08
+  },
+  "definition_sha256": "a43db03f4f5aa1dc412d1c32340af05beedbc4af21ecedd19f7cf45f4b0c28c5"
+}
