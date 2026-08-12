@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -11,6 +13,7 @@ from sensel.federation.v1 import federation_pb2
 from sensel_site.federation import (
     build_signed_site_update,
     deterministic_partition_seed,
+    prepare_safe_xgboost_update,
     verify_round_spec,
 )
 
@@ -104,3 +107,79 @@ def test_partition_seed_is_reproducible_and_site_specific() -> None:
     first = deterministic_partition_seed("round-a", "site-1")
     assert first == deterministic_partition_seed("round-a", "site-1")
     assert first != deterministic_partition_seed("round-a", "site-2")
+
+
+def test_xgboost_update_is_structurally_clipped_and_leaf_noise_is_attested() -> None:
+    tree = {
+        "parents": [2147483647, 0, 0],
+        "left_children": [1, -1, -1],
+        "base_weights": [0.0, 3.0, 4.0],
+        "split_conditions": [0.5, 3.0, 4.0],
+    }
+    artifact = json.dumps(
+        {"learner": {"gradient_booster": {"model": {"trees": [tree]}}}}
+    ).encode()
+    clip = federation_pb2.UpdateClipPolicy(
+        maximum_trees=2,
+        maximum_tree_depth=2,
+        maximum_total_nodes=8,
+        maximum_leaf_l2_norm=1.0,
+        maximum_artifact_bytes=4096,
+    )
+    privacy = federation_pb2.PrivacyBudgetPolicy(
+        mechanism_id="leaf_vector_gaussian_v1",
+        epsilon=2.0,
+        delta=1e-5,
+        maximum_cumulative_epsilon=8.0,
+        privacy_scope="leaf_values_only_fixed_topology",
+        formal_full_model_dp_claim_allowed=False,
+    )
+    output, evidence = prepare_safe_xgboost_update(
+        artifact,
+        clip_policy=clip,
+        privacy_policy=privacy,
+        noise_source=lambda _mean, _sigma: 0.0,
+    )
+    document = json.loads(output)
+    safe_tree = document["learner"]["gradient_booster"]["model"]["trees"][0]
+
+    assert safe_tree["split_conditions"][1:] == pytest.approx([0.6, 0.8])
+    assert evidence.clipping_applied is True
+    assert evidence.original_leaf_l2_norm == pytest.approx(5.0)
+    assert evidence.output_leaf_l2_norm == pytest.approx(1.0)
+    assert evidence.noise_stddev > 0
+    assert evidence.formal_full_model_dp_claim is False
+    assert math.isfinite(evidence.noise_stddev)
+
+
+def test_xgboost_update_exceeding_structural_policy_is_rejected() -> None:
+    artifact = json.dumps(
+        {
+            "learner": {
+                "gradient_booster": {
+                    "model": {
+                        "trees": [
+                            {
+                                "parents": [2147483647, 0, 1],
+                                "left_children": [1, 2, -1],
+                                "base_weights": [0.0, 0.0, 1.0],
+                                "split_conditions": [0.5, 0.5, 1.0],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    ).encode()
+    with pytest.raises(ValueError, match="exceeds"):
+        prepare_safe_xgboost_update(
+            artifact,
+            clip_policy=federation_pb2.UpdateClipPolicy(
+                maximum_trees=1,
+                maximum_tree_depth=1,
+                maximum_total_nodes=8,
+                maximum_leaf_l2_norm=1.0,
+                maximum_artifact_bytes=4096,
+            ),
+            privacy_policy=federation_pb2.PrivacyBudgetPolicy(mechanism_id="none"),
+        )
