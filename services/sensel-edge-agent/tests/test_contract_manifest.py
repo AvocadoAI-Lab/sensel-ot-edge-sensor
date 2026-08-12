@@ -8,6 +8,8 @@ from google.protobuf import descriptor_pb2
 
 from sensel.common.v1 import common_pb2
 from sensel.device.v1 import device_management_pb2
+from sensel.episode.v1 import trust_episode_pb2
+from sensel.feature.v1 import feature_contract_pb2
 from sensel.federation.v1 import federation_pb2
 from sensel.security.v1 import security_event_pb2
 from src.contracts.security_event_codec import encode_security_event
@@ -22,6 +24,8 @@ def _descriptor_sha256() -> str:
     descriptors = (
         common_pb2.DESCRIPTOR,
         device_management_pb2.DESCRIPTOR,
+        trust_episode_pb2.DESCRIPTOR,
+        feature_contract_pb2.DESCRIPTOR,
         federation_pb2.DESCRIPTOR,
         security_event_pb2.DESCRIPTOR,
     )
@@ -78,7 +82,7 @@ def _legacy_event() -> dict:
 def test_generated_descriptors_match_canonical_manifest() -> None:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    assert manifest["contract_version"] == "0.1.0"
+    assert manifest["contract_version"] == "0.2.0"
     assert _descriptor_sha256() == manifest["descriptor_sha256"]
 
 

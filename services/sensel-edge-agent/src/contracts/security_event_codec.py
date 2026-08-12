@@ -156,6 +156,10 @@ def security_event_from_mapping(
         message.fusion.policy_version = str(raw_fusion.get("policy_version") or "")
         message.fusion.score = float(raw_fusion.get("score") or 0)
         message.fusion.decision = str(raw_fusion.get("decision") or "")
+        message.fusion.severity = str(raw_fusion.get("severity") or "")
+        message.fusion.input_ids.extend(
+            str(item) for item in (raw_fusion.get("input_ids") or [])
+        )
         if raw_fusion.get("threshold") is not None:
             message.fusion.threshold = float(raw_fusion["threshold"])
 
@@ -216,6 +220,8 @@ def security_event_to_mapping(message: security_event_pb2.SecurityEvent) -> dict
                 message.fusion.threshold if message.fusion.HasField("threshold") else None
             ),
             "decision": message.fusion.decision,
+            "severity": message.fusion.severity,
+            "input_ids": list(message.fusion.input_ids),
         }
     return event
 

@@ -24,10 +24,11 @@
 ```mermaid
 flowchart LR
     packet["Packet parser + deterministic rules"] --> summary["Feature window summary"]
-    summary --> future["P1 FeatureContract + sequence builder"]
-    future --> onnx["OnnxSequenceRuntime"]
+    summary --> contract["P1-A FeatureContract + sequence builder"]
+    contract --> onnx["OnnxSequenceRuntime"]
     onnx --> score["Versioned inference score"]
-    score --> fusion["Future risk fusion"]
+    score --> fusion["P1-A deterministic risk fusion"]
+    fusion --> episode["TrustEpisode protobuf"]
     packet --> event["Existing SecurityEvent path remains active"]
 ```
 
@@ -76,12 +77,11 @@ P0 smoke budget 為 batch 1、shape `[1,8,4]`、p95 ≤ 25 ms、process max RSS 
 
 ---
 
-## 📌 P1 前置工作
+## 📌 P1-A 完成與後續工作
 
-1. 定義 `FeatureContract`：欄位順序、dtype、normalization、missing value 與版本。
-   Model output 也必須定義為已校準的 `[0,1]` risk score；raw logits 不可直接進 fusion。
-2. 建立 sequence builder，明確定義 asset/session grouping 與時間窗。
-3. 取得可重現的 Tiny LSTM training code、checkpoint、dataset lineage 與 evaluation report。
+1. 已定義 `ot-window-v1` FeatureContract、missing policy、normalization 與 60-frame sequence builder。
+2. 已建立 deterministic `fusion-v1` 及 SLM-independent Trust Episode protobuf/codec。
+3. 下一步取得可重現的 Tiny LSTM training code、checkpoint、dataset lineage 與 evaluation report。
 4. 在 training environment 匯出 ONNX；Edge image 只安裝 ONNX Runtime。
-5. 將 inference result 加入 protobuf `InferenceScore`，再進行 risk fusion 與 Trust Episode。
-6. Isolation Forest 與 XGBoost 先各自建立 adapter；XGBoost federation 不得套用 FedAvg。
+5. 實作 Isolation Forest、XGBoost、Tiny LSTM adapters 與 calibration；raw logits 不可直接進 fusion。
+6. XGBoost federation 不得套用 FedAvg，需使用 model-specific aggregation 或只共享統計/蒸餾成果。

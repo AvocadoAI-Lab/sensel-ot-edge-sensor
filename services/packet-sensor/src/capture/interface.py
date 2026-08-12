@@ -99,6 +99,8 @@ class CaptureSession:
             edgex_device_name=config.features.mqtt.edgex_device_name,
             edgex_data_topic=config.features.mqtt.edgex_data_topic,
             feature_window_sec=config.features.window_sec,
+            feature_contract_id=config.features.contract_id,
+            feature_contract_path=config.features.contract_path,
             ioc_enabled=config.ioc.enabled,
             ioc_cache_path=config.ioc.cache_path,
             ioc_stamp_path=config.ioc.stamp_path,

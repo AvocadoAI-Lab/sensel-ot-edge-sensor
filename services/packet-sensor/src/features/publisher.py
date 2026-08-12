@@ -33,6 +33,7 @@ class FeaturePublisher:
         topic_prefix: str = "sensel/ot",
         edgex_device_name: str = "packet-sensor-features",
         edgex_data_topic: str = "",
+        feature_contract_id: str = "ot-window-v1",
     ) -> None:
         self._sensor_id = sensor_id
         self._site_id = site_id
@@ -40,6 +41,7 @@ class FeaturePublisher:
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._topic_prefix = topic_prefix.rstrip("/")
         self._edgex_device_name = edgex_device_name
+        self._feature_contract_id = feature_contract_id
         self._edgex_data_topic = edgex_data_topic or (
             f"incoming/data/{edgex_device_name}/FeatureSummary"
         )
@@ -64,17 +66,20 @@ class FeaturePublisher:
             "site_id": self._site_id,
             "window": f"{window_sec}s",
             "protocol": "aggregate",
+            "feature_contract_id": self._feature_contract_id,
             "packet_count": l2.window_total,
             "packet_rate": packet_rate,
             "unique_mac_count": unique_macs,
+            "goose_message_count": goose.message_count if goose else 0,
+            "goose_stnum_changes": goose.stnum_changes if goose else 0,
+            "goose_test_flag_count": goose.test_flag_count if goose else 0,
+            "goose_unique_publishers": len(goose.publishers) if goose else 0,
+            "mms_session_count": len(mms.session_keys) if mms else 0,
+            "mms_read_count": mms.read_count if mms else 0,
+            "mms_write_count": mms.write_count if mms else 0,
+            "mms_report_count": mms.report_count if mms else 0,
             "timestamp": _utc_now_iso(),
         }
-        if goose and goose.message_count:
-            summary["goose_message_count"] = goose.message_count
-            summary["goose_unique_publishers"] = len(goose.publishers)
-        if mms and (mms.read_count or mms.write_count or mms.session_keys):
-            summary["mms_write_count"] = mms.write_count
-            summary["mms_read_count"] = mms.read_count
 
         self._write("feature-summary.json", summary)
         self._publish_sensel(f"features/summary", summary)

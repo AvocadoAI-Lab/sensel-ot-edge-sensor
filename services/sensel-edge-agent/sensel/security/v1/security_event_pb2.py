@@ -25,19 +25,19 @@ _sym_db = _symbol_database.Default()
 from sensel.common.v1 import common_pb2 as sensel_dot_common_dot_v1_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'sensel/security/v1/security_event.proto\x12\x12sensel.security.v1\x1a\x1dsensel/common/v1/common.proto\"\xa8\x01\n\x0eInferenceScore\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12\r\n\x05score\x18\x03 \x01(\x01\x12\x1d\n\x10\x63\x61librated_score\x18\x04 \x01(\x01H\x00\x88\x01\x01\x12\r\n\x05label\x18\x05 \x01(\t\x12\x1b\n\x13\x66\x65\x61ture_contract_id\x18\x06 \x01(\tB\x13\n\x11_calibrated_score\"m\n\x0c\x46usionResult\x12\x16\n\x0epolicy_version\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x01\x12\x16\n\tthreshold\x18\x03 \x01(\x01H\x00\x88\x01\x01\x12\x10\n\x08\x64\x65\x63ision\x18\x04 \x01(\tB\x0c\n\n_threshold\"\x96\x04\n\rSecurityEvent\x12)\n\x04meta\x18\x01 \x01(\x0b\x32\x1b.sensel.common.v1.EventMeta\x12\x10\n\x08\x61sset_id\x18\x02 \x01(\t\x12\x0f\n\x07rule_id\x18\x03 \x01(\t\x12\x12\n\nevent_type\x18\x04 \x01(\t\x12\x36\n\x08severity\x18\x05 \x01(\x0e\x32$.sensel.security.v1.SecuritySeverity\x12\x17\n\nrisk_score\x18\x06 \x01(\x01H\x00\x88\x01\x01\x12\x10\n\x08protocol\x18\x07 \x01(\t\x12\x0e\n\x06src_ip\x18\x08 \x01(\t\x12\x0e\n\x06\x64st_ip\x18\t \x01(\t\x12\x15\n\x08\x64st_port\x18\n \x01(\rH\x01\x88\x01\x01\x12\x13\n\x0b\x64\x65scription\x18\x0b \x01(\t\x12\x35\n\x08\x65vidence\x18\x0c \x03(\x0b\x32#.sensel.common.v1.EvidenceAttribute\x12\x14\n\x0c\x65vidence_ref\x18\r \x01(\t\x12\x1b\n\x13\x66\x65\x61ture_contract_id\x18\x0e \x01(\t\x12<\n\x10inference_scores\x18\x0f \x03(\x0b\x32\".sensel.security.v1.InferenceScore\x12\x30\n\x06\x66usion\x18\x10 \x01(\x0b\x32 .sensel.security.v1.FusionResultB\r\n\x0b_risk_scoreB\x0b\n\t_dst_port*\xc6\x01\n\x10SecuritySeverity\x12!\n\x1dSECURITY_SEVERITY_UNSPECIFIED\x10\x00\x12\x1a\n\x16SECURITY_SEVERITY_INFO\x10\x01\x12\x19\n\x15SECURITY_SEVERITY_LOW\x10\x02\x12\x1c\n\x18SECURITY_SEVERITY_MEDIUM\x10\x03\x12\x1a\n\x16SECURITY_SEVERITY_HIGH\x10\x04\x12\x1e\n\x1aSECURITY_SEVERITY_CRITICAL\x10\x05\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'sensel/security/v1/security_event.proto\x12\x12sensel.security.v1\x1a\x1dsensel/common/v1/common.proto\"\xa8\x01\n\x0eInferenceScore\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12\r\n\x05score\x18\x03 \x01(\x01\x12\x1d\n\x10\x63\x61librated_score\x18\x04 \x01(\x01H\x00\x88\x01\x01\x12\r\n\x05label\x18\x05 \x01(\t\x12\x1b\n\x13\x66\x65\x61ture_contract_id\x18\x06 \x01(\tB\x13\n\x11_calibrated_score\"\x92\x01\n\x0c\x46usionResult\x12\x16\n\x0epolicy_version\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x01\x12\x16\n\tthreshold\x18\x03 \x01(\x01H\x00\x88\x01\x01\x12\x10\n\x08\x64\x65\x63ision\x18\x04 \x01(\t\x12\x10\n\x08severity\x18\x05 \x01(\t\x12\x11\n\tinput_ids\x18\x06 \x03(\tB\x0c\n\n_threshold\"\x96\x04\n\rSecurityEvent\x12)\n\x04meta\x18\x01 \x01(\x0b\x32\x1b.sensel.common.v1.EventMeta\x12\x10\n\x08\x61sset_id\x18\x02 \x01(\t\x12\x0f\n\x07rule_id\x18\x03 \x01(\t\x12\x12\n\nevent_type\x18\x04 \x01(\t\x12\x36\n\x08severity\x18\x05 \x01(\x0e\x32$.sensel.security.v1.SecuritySeverity\x12\x17\n\nrisk_score\x18\x06 \x01(\x01H\x00\x88\x01\x01\x12\x10\n\x08protocol\x18\x07 \x01(\t\x12\x0e\n\x06src_ip\x18\x08 \x01(\t\x12\x0e\n\x06\x64st_ip\x18\t \x01(\t\x12\x15\n\x08\x64st_port\x18\n \x01(\rH\x01\x88\x01\x01\x12\x13\n\x0b\x64\x65scription\x18\x0b \x01(\t\x12\x35\n\x08\x65vidence\x18\x0c \x03(\x0b\x32#.sensel.common.v1.EvidenceAttribute\x12\x14\n\x0c\x65vidence_ref\x18\r \x01(\t\x12\x1b\n\x13\x66\x65\x61ture_contract_id\x18\x0e \x01(\t\x12<\n\x10inference_scores\x18\x0f \x03(\x0b\x32\".sensel.security.v1.InferenceScore\x12\x30\n\x06\x66usion\x18\x10 \x01(\x0b\x32 .sensel.security.v1.FusionResultB\r\n\x0b_risk_scoreB\x0b\n\t_dst_port*\xc6\x01\n\x10SecuritySeverity\x12!\n\x1dSECURITY_SEVERITY_UNSPECIFIED\x10\x00\x12\x1a\n\x16SECURITY_SEVERITY_INFO\x10\x01\x12\x19\n\x15SECURITY_SEVERITY_LOW\x10\x02\x12\x1c\n\x18SECURITY_SEVERITY_MEDIUM\x10\x03\x12\x1a\n\x16SECURITY_SEVERITY_HIGH\x10\x04\x12\x1e\n\x1aSECURITY_SEVERITY_CRITICAL\x10\x05\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'sensel.security.v1.security_event_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SECURITYSEVERITY']._serialized_start=914
-  _globals['_SECURITYSEVERITY']._serialized_end=1112
+  _globals['_SECURITYSEVERITY']._serialized_start=952
+  _globals['_SECURITYSEVERITY']._serialized_end=1150
   _globals['_INFERENCESCORE']._serialized_start=95
   _globals['_INFERENCESCORE']._serialized_end=263
-  _globals['_FUSIONRESULT']._serialized_start=265
-  _globals['_FUSIONRESULT']._serialized_end=374
-  _globals['_SECURITYEVENT']._serialized_start=377
-  _globals['_SECURITYEVENT']._serialized_end=911
+  _globals['_FUSIONRESULT']._serialized_start=266
+  _globals['_FUSIONRESULT']._serialized_end=412
+  _globals['_SECURITYEVENT']._serialized_start=415
+  _globals['_SECURITYEVENT']._serialized_end=949
 # @@protoc_insertion_point(module_scope)

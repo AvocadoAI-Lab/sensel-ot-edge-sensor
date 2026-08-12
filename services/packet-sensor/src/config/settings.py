@@ -58,6 +58,8 @@ class FeaturesConfig(BaseModel):
     window_sec: int = 60
     mqtt: FeaturesMqttConfig = Field(default_factory=FeaturesMqttConfig)
     assets_dir: str = "/app/data/assets"
+    contract_id: str = "ot-window-v1"
+    contract_path: str = "/app/config/model/feature-contract.ot-window-v1.json"
 
 
 class DetectionConfig(BaseModel):
@@ -183,6 +185,17 @@ def load_config(path: Path | None = None) -> AppConfig:
     )
     features_raw["mqtt"] = mqtt_raw
     features_raw.setdefault("assets_dir", os.environ.get("ASSETS_DIR", "/app/data/assets"))
+    features_raw.setdefault(
+        "contract_id",
+        os.environ.get("FEATURE_CONTRACT_ID", "ot-window-v1"),
+    )
+    features_raw.setdefault(
+        "contract_path",
+        os.environ.get(
+            "FEATURE_CONTRACT_PATH",
+            "/app/config/model/feature-contract.ot-window-v1.json",
+        ),
+    )
 
     detection_raw.setdefault(
         "policy_file",

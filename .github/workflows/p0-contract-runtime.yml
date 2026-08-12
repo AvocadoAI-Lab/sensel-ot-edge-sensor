@@ -7,6 +7,15 @@ on:
       - "services/sensel-edge-agent/src/contracts/**"
       - "services/sensel-edge-agent/tests/test_contract_manifest.py"
       - "services/sensel-edge-agent/tests/test_security_event_codec.py"
+      - "services/sensel-edge-agent/tests/test_trust_episode_codec.py"
+      - "config/model/**"
+      - "services/packet-sensor/src/features/**"
+      - "services/packet-sensor/src/fusion/**"
+      - "services/packet-sensor/src/episode/**"
+      - "services/packet-sensor/tests/test_feature_contract.py"
+      - "services/packet-sensor/tests/test_feature_publisher_contract.py"
+      - "services/packet-sensor/tests/test_risk_fusion.py"
+      - "services/packet-sensor/tests/test_trust_episode_builder.py"
       - "services/packet-sensor/src/inference/**"
       - "services/packet-sensor/tests/test_onnx_sequence_runtime.py"
       - "services/packet-sensor/tests/fixtures/**"
@@ -18,6 +27,10 @@ on:
     paths:
       - "services/sensel-edge-agent/sensel/**"
       - "services/sensel-edge-agent/src/contracts/**"
+      - "config/model/**"
+      - "services/packet-sensor/src/features/**"
+      - "services/packet-sensor/src/fusion/**"
+      - "services/packet-sensor/src/episode/**"
       - "services/packet-sensor/src/inference/**"
       - "services/packet-sensor/tests/fixtures/**"
   workflow_dispatch:
@@ -49,6 +62,7 @@ jobs:
           PYTHONPATH=. pytest -q \
             tests/test_contract_manifest.py \
             tests/test_security_event_codec.py \
+            tests/test_trust_episode_codec.py \
             tests/test_northbound_mqtt.py
 
   arm-runtime-smoke:
@@ -85,6 +99,11 @@ jobs:
 
       - name: Run runtime tests and benchmark gate
         run: |
-          PYTHONPATH=. pytest -q tests/test_onnx_sequence_runtime.py
+          PYTHONPATH=. pytest -q \
+            tests/test_onnx_sequence_runtime.py \
+            tests/test_feature_contract.py \
+            tests/test_feature_publisher_contract.py \
+            tests/test_risk_fusion.py \
+            tests/test_trust_episode_builder.py
           PYTHONPATH=. python -m src.inference.benchmark \
             --model tests/fixtures/sequence-risk-smoke.onnx

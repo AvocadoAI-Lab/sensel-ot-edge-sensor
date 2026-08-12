@@ -57,6 +57,8 @@ pcap:
 
 features:
   window_sec: 60
+  contract_id: ot-window-v1
+  contract_path: /app/config/model/feature-contract.ot-window-v1.json
   mqtt:
     host: ${LOCAL_MQTT_HOST}
     port: ${LOCAL_MQTT_PORT}

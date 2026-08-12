@@ -1,6 +1,6 @@
 {
-  "contract_version": "0.1.0",
-  "descriptor_sha256": "2a162a8a5e78b51fa0d9691a19ed27bdff428bc22c23249d21dd017f81ba4654",
+  "contract_version": "0.2.0",
+  "descriptor_sha256": "d142770afb340710463b971eacd02878d06c9776bfc16ec54bca928659ed34a4",
   "generated_with": {
     "grpcio_tools": "1.76.0",
     "protobuf": "6.33.6"
@@ -9,6 +9,18 @@
     "security_event.v1.bin": {
       "message_type": "sensel.security.v1.SecurityEvent",
       "sha256": "0c224f9b9b67066ae740390dea5bfa4d151dfc822c301f3e9ead3db3ece9aa63"
+    },
+    "trust_episode.v1.bin": {
+      "message_type": "sensel.episode.v1.TrustEpisode",
+      "sha256": "7b8489cac684e2059ed17821f511fed7aa44532608bff97fd17dbdc4b40508b9"
+    }
+  },
+  "feature_contracts": {
+    "feature_contract.ot-window-v1.json": {
+      "contract_id": "ot-window-v1",
+      "version": "1.0.0",
+      "definition_sha256": "d73760ca607432c50ac43576ee536df8166ff1116f914da533bae190240fd81e",
+      "sha256": "a6879fbfa17d9526403ff5cd1f5766a346eb5cdf76f1fddc5596774d0f7a4128"
     }
   }
 }

@@ -161,3 +161,12 @@ def record_goose(stats: GooseStats, frame: GooseFrame) -> None:
         stats.stnum_changes += 1
     stats._last_stnum[key] = frame.st_num
     stats.publishers[key] = frame
+
+
+def reset_goose_window(stats: GooseStats) -> None:
+    """Reset window counters while retaining cross-window stNum continuity."""
+
+    stats.message_count = 0
+    stats.stnum_changes = 0
+    stats.test_flag_count = 0
+    stats.publishers.clear()

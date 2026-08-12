@@ -14,11 +14,26 @@ from src.detection.mvp import MvpDetector
 from src.events.generator import EventStore
 from src.evidence.ring_buffer import PcapRingBuffer
 from src.features.publisher import FeaturePublisher
+from src.features.contract import (
+    FeatureContractSpec,
+    FeatureSequence,
+    FeatureSequenceBuilder,
+)
 from src.parser.l2.ethernet import L2Stats, parse_ethernet, record_l2, reset_l2_window
 from src.parser.l3.ip import L3Stats, parse_ip, record_l3
 from src.parser.l4.transport import parse_transport
-from src.parser.l7.iec61850.goose import GooseStats, parse_goose_packet, record_goose
-from src.parser.l7.iec61850.mms import MmsStats, parse_mms_packet, record_mms
+from src.parser.l7.iec61850.goose import (
+    GooseStats,
+    parse_goose_packet,
+    record_goose,
+    reset_goose_window,
+)
+from src.parser.l7.iec61850.mms import (
+    MmsStats,
+    parse_mms_packet,
+    record_mms,
+    reset_mms_window,
+)
 from src.parser.l7.modbus.tcp import parse_modbus_tcp
 from src.policy.loader import load_policy
 from src.policy.detection_policy_store import DetectionPolicyStore
@@ -50,6 +65,8 @@ class PacketPipeline:
         edgex_device_name: str = "packet-sensor-features",
         edgex_data_topic: str = "",
         feature_window_sec: int = 60,
+        feature_contract_id: str = "ot-window-v1",
+        feature_contract_path: str = "/app/config/model/feature-contract.ot-window-v1.json",
         ring_buffer_max_packets: int = 5000,
         ioc_enabled: bool = True,
         ioc_cache_path: str = "/app/data/agent/ioc-cache.json",
@@ -73,6 +90,25 @@ class PacketPipeline:
         self._sensor_id = sensor_id
         self._site_id = site_id
         self._feature_window_sec = feature_window_sec
+        self._feature_sequence_number = 0
+        self._latest_feature_sequence: FeatureSequence | None = None
+        self._feature_sequence_builder: FeatureSequenceBuilder | None = None
+        try:
+            feature_contract = FeatureContractSpec.load(feature_contract_path)
+            if feature_contract.contract_id != feature_contract_id:
+                raise ValueError(
+                    "configured feature contract ID does not match contract file"
+                )
+            if feature_contract.frame_interval_seconds != feature_window_sec:
+                raise ValueError(
+                    "feature window interval does not match contract file"
+                )
+            self._feature_sequence_builder = FeatureSequenceBuilder(feature_contract)
+        except (OSError, ValueError, TypeError) as exc:
+            logger.warning(
+                "Feature sequence disabled; deterministic detection remains active: %s",
+                exc,
+            )
         self._mode_store = OperationalModeStore(
             mode_path=operational_mode_path,
             stamp_path=operational_mode_stamp_path,
@@ -144,6 +180,7 @@ class PacketPipeline:
             topic_prefix=topic_prefix,
             edgex_device_name=edgex_device_name,
             edgex_data_topic=edgex_data_topic,
+            feature_contract_id=feature_contract_id,
         )
 
     def reload_detection_policy(self) -> bool:
@@ -252,15 +289,30 @@ class PacketPipeline:
 
     def flush_features(self) -> None:
         self._emit(self._mvp.evaluate_window(self._feature_window_sec))
-        self._features.publish_window(
+        summary = self._features.publish_window(
             self.state.l2,
             self._feature_window_sec,
             self.state.goose,
             self.state.mms,
         )
+        if self._feature_sequence_builder is not None:
+            self._feature_sequence_number += 1
+            try:
+                sequence = self._feature_sequence_builder.add_frame(
+                    entity_id=self._sensor_id,
+                    observed_at=summary["timestamp"],
+                    sequence_number=self._feature_sequence_number,
+                    values=summary,
+                )
+                if sequence is not None:
+                    self._latest_feature_sequence = sequence
+            except (TypeError, ValueError):
+                logger.exception("Feature frame rejected by contract")
         if self._mode_store.alerts_enabled():
             self._coverage.flush()
         reset_l2_window(self.state.l2)
+        reset_goose_window(self.state.goose)
+        reset_mms_window(self.state.mms)
 
     def close(self) -> None:
         self._features.close()
@@ -280,3 +332,7 @@ class PacketPipeline:
     @property
     def ring_buffer(self) -> PcapRingBuffer:
         return self._ring
+
+    @property
+    def latest_feature_sequence(self) -> FeatureSequence | None:
+        return self._latest_feature_sequence
