@@ -5,3 +5,4 @@ httpx>=0.27
 aiosqlite>=0.19
 psutil>=5.9
 paho-mqtt>=2.0
+protobuf>=6.33.6,<7

@@ -1,0 +1,1 @@
+"""SenseL federation protobuf namespace."""

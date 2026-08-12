@@ -1,0 +1,90 @@
+name: P0 Contract And Runtime
+
+on:
+  pull_request:
+    paths:
+      - "services/sensel-edge-agent/sensel/**"
+      - "services/sensel-edge-agent/src/contracts/**"
+      - "services/sensel-edge-agent/tests/test_contract_manifest.py"
+      - "services/sensel-edge-agent/tests/test_security_event_codec.py"
+      - "services/packet-sensor/src/inference/**"
+      - "services/packet-sensor/tests/test_onnx_sequence_runtime.py"
+      - "services/packet-sensor/tests/fixtures/**"
+      - "services/packet-sensor/requirements-ml*.txt"
+      - ".github/workflows/p0-contract-runtime.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/sensel-edge-agent/sensel/**"
+      - "services/sensel-edge-agent/src/contracts/**"
+      - "services/packet-sensor/src/inference/**"
+      - "services/packet-sensor/tests/fixtures/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protobuf-wire:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/sensel-edge-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/sensel-edge-agent/requirements.txt
+
+      - name: Install Edge Agent dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Verify embedded contract and golden wire
+        run: |
+          PYTHONPATH=. pytest -q \
+            tests/test_contract_manifest.py \
+            tests/test_security_event_codec.py \
+            tests/test_northbound_mqtt.py
+
+  arm-runtime-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/packet-sensor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            services/packet-sensor/requirements.txt
+            services/packet-sensor/requirements-ml.txt
+            services/packet-sensor/requirements-ml-tools.txt
+
+      - name: Install inference test dependencies
+        run: |
+          pip install \
+            -r requirements.txt \
+            -r requirements-ml.txt \
+            -r requirements-ml-tools.txt \
+            pytest
+
+      - name: Verify reproducible smoke model
+        run: |
+          temporary_model="$(mktemp)"
+          python scripts/generate_smoke_onnx.py "${temporary_model}"
+          cmp "${temporary_model}" tests/fixtures/sequence-risk-smoke.onnx
+
+      - name: Run runtime tests and benchmark gate
+        run: |
+          PYTHONPATH=. pytest -q tests/test_onnx_sequence_runtime.py
+          PYTHONPATH=. python -m src.inference.benchmark \
+            --model tests/fixtures/sequence-risk-smoke.onnx

@@ -1,0 +1,14 @@
+{
+  "contract_version": "0.1.0",
+  "descriptor_sha256": "2a162a8a5e78b51fa0d9691a19ed27bdff428bc22c23249d21dd017f81ba4654",
+  "generated_with": {
+    "grpcio_tools": "1.76.0",
+    "protobuf": "6.33.6"
+  },
+  "golden_fixtures": {
+    "security_event.v1.bin": {
+      "message_type": "sensel.security.v1.SecurityEvent",
+      "sha256": "0c224f9b9b67066ae740390dea5bfa4d151dfc822c301f3e9ead3db3ece9aa63"
+    }
+  }
+}
