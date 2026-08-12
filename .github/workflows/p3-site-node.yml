@@ -1,0 +1,49 @@
+name: P3 Site Node
+
+on:
+  pull_request:
+    paths:
+      - "services/sensel-site/**"
+      - "services/sensel-edge-agent/sensel/**"
+      - "config/model/feature-contract.*.json"
+      - "docker-compose.site.yml"
+      - ".env.site.example"
+      - ".github/workflows/p3-site-node.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/sensel-site/**"
+      - "services/sensel-edge-agent/sensel/**"
+      - "config/model/feature-contract.*.json"
+      - "docker-compose.site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  site-lineage-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/sensel-site/requirements.txt
+
+      - name: Install Site dependencies
+        run: pip install -r services/sensel-site/requirements.txt pytest ruff
+
+      - name: Verify Site ingestion and trainer boundary
+        env:
+          PYTHONPATH: services/sensel-site:services/sensel-edge-agent
+        run: |
+          ruff check services/sensel-site
+          pytest -q services/sensel-site/tests/test_site_p3a.py
+
+      - name: Validate Site deployment profile
+        run: docker compose --env-file .env.site.example -f docker-compose.site.yml config >/dev/null

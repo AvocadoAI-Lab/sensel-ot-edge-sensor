@@ -23,6 +23,7 @@ OT 設備 ──► EdgeX Device Services ──► SenseL Exporter ──► Se
 | `services/sensel-edge-agent/` | 與 SenseL 平台通訊、政策同步、健康回報 |
 | `services/edge-console/` | 本機接入精靈 + 狀態主控台（含引擎/憑證落地狀態） |
 | `services/mqtt-broker/` | 本地 MQTT（特徵摘要 → EdgeX device-mqtt） |
+| `services/sensel-site/` | Tier 2 Site protobuf ingress、dataset lineage 與 trainer boundary（P3-A） |
 | `config/` | 感測器、擷取、政策與 EdgeX 設定 |
 | `schemas/` | Telemetry / Security Event / Health JSON Schema |
 | `deploy/` | Ubuntu 與 Pi4 部署腳本與網路設定範本 |

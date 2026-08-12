@@ -1,0 +1,79 @@
+name: sensel-site
+
+services:
+  site-mqtt:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "${SENSEL_SITE_MQTT_BIND_IP:-0.0.0.0}:8883:8883"
+    volumes:
+      - ./services/sensel-site/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${SENSEL_SITE_MQTT_ACL_FILE:-./secrets/site-mqtt/site.acl}:/mosquitto/config/site.acl:ro
+      - ${SENSEL_SITE_MQTT_CERT_DIR:-./secrets/site-mqtt}:/mosquitto/certs:ro
+      - site-mqtt-data:/mosquitto/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+
+  sensel-site:
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      SENSEL_SITE_ENV: ${SENSEL_SITE_ENV:-production}
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_NODE_ID: ${SENSEL_SITE_NODE_ID:?set SENSEL_SITE_NODE_ID}
+      SENSEL_SITE_DATA_DIR: /var/lib/sensel-site
+      SENSEL_SITE_FEATURE_CONTRACT_DIR: /app/contracts
+      SENSEL_SITE_MQTT_ENABLED: ${SENSEL_SITE_MQTT_ENABLED:-true}
+      SENSEL_SITE_MQTT_HOST: site-mqtt
+      SENSEL_SITE_MQTT_PORT: "8883"
+      SENSEL_SITE_MQTT_TLS: "true"
+      SENSEL_SITE_MQTT_SESSION_EXPIRY_SEC: ${SENSEL_SITE_MQTT_SESSION_EXPIRY_SEC:-86400}
+      SENSEL_SITE_MQTT_CA_PATH: /run/secrets/site-mqtt/ca.crt
+      SENSEL_SITE_MQTT_CERT_PATH: /run/secrets/site-client/client.crt
+      SENSEL_SITE_MQTT_KEY_PATH: /run/secrets/site-client/client.key
+      SENSEL_SITE_SIGNING_KEY_PATH: /run/secrets/site-signing/signing-key.pem
+      SENSEL_SITE_SIGNING_KEY_ID: ${SENSEL_SITE_SIGNING_KEY_ID:?set SENSEL_SITE_SIGNING_KEY_ID}
+      SENSEL_SITE_EPISODE_RETENTION_DAYS: ${SENSEL_SITE_EPISODE_RETENTION_DAYS:-30}
+      SENSEL_SITE_MAX_EPISODE_BYTES: ${SENSEL_SITE_MAX_EPISODE_BYTES:-1048576}
+    volumes:
+      - site-data:/var/lib/sensel-site
+      - ${SENSEL_SITE_MQTT_CERT_DIR:-./secrets/site-mqtt}:/run/secrets/site-mqtt:ro
+      - ${SENSEL_SITE_CLIENT_CERT_DIR:-./secrets/site-client}:/run/secrets/site-client:ro
+      - ${SENSEL_SITE_SIGNING_DIR:-./secrets/site-signing}:/run/secrets/site-signing:ro
+    depends_on:
+      - site-mqtt
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json; assert json.load(open('/var/lib/sensel-site/health.json'))['status'] == 'ok'"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  site-mqtt-data:
+  site-data:
+
+networks:
+  sensel-site:
+    driver: bridge

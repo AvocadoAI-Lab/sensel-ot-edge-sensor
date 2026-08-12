@@ -1,4 +1,4 @@
-.PHONY: help up down logs build health test lint up-ui verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 apply-lab-61850-edgex wait-upstream verify-pi-health deploy-pi deploy-pi-full
+.PHONY: help up down logs build health test lint up-ui up-site down-site verify-modbus verify-61850 verify-mqtt verify-mvp up-lab-61850 apply-lab-61850-edgex wait-upstream verify-pi-health deploy-pi deploy-pi-full
 
 help:
 	@echo "SenseL OT Edge Sensor"
@@ -7,6 +7,7 @@ help:
 	@echo "  make up-ui          - Start stack with EdgeX lab UI (port 4000)"
 	@echo "  make up-lab-61850   - Start stack + IEC 61850 lab overlay"
 	@echo "  make up-pi4         - Start stack with Pi4 overlay"
+	@echo "  make up-site        - Start isolated Tier 2 Site broker/ingress"
 	@echo "  make deploy-pi      - Deploy to lab Pi (existing EdgeX, default edgex@192.168.1.123)"
 	@echo "  make deploy-pi-full - Stop existing EdgeX on Pi, deploy full stack"
 	@echo "  make verify-modbus  - Verify Modbus sim → Core Data telemetry"
@@ -28,6 +29,12 @@ up-ui:
 
 up-pi4:
 	docker compose -f docker-compose.yml -f docker-compose.pi4.yml up -d
+
+up-site:
+	docker compose --env-file .env.site -f docker-compose.site.yml up -d --build
+
+down-site:
+	docker compose --env-file .env.site -f docker-compose.site.yml down
 
 up-lab-61850:
 	docker compose -f docker-compose.yml -f docker-compose.lab-61850.yml up -d

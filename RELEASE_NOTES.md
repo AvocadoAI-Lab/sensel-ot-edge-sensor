@@ -1,5 +1,34 @@
 # Release Notes — SenseL OT Edge Sensor
 
+## P3-A — Site dataset lineage / trainer boundary（2026-08-12）
+
+新增獨立 Tier 2 Site Node 服務，接收 Tier 1 以 protobuf 發布的 `TrustEpisode`，並在
+MQTT ACK 前完成驗證與 durable receipt。Site Node 只保存訓練必要的 episode、label 與
+lineage metadata，不保存原始封包，也不允許 trainer 直接讀取 Tier 1、EdgeX 或 Site DB。
+
+### 新增
+
+- **Site ingestion skeleton** — MQTT v5 / QoS 1 persistent session、mTLS、明確 topic ACL、
+  protobuf content type / schema / identity / finite-value / feature contract 驗證，以及 poison
+  message dead-letter metadata。
+- **可重播 dataset lineage** — SQLite WAL receipt 與 append-only label、確定性 dataset ID、
+  feature contract definition digest、來源 episode digest、保留等級與時間窗皆寫入 manifest。
+- **簽章資料集匯出** — dataset manifest 與 detached Ed25519 signature；trainer 入口會重新
+  驗證簽章、scope、樣本 digest、保留期限與演算法邊界。
+- **Trainer isolation boundary** — trainer inbox 只接收已驗證的 manifest、signature 與
+  NDJSON samples；不掛載 Site DB、PCAP、EdgeX 或 Tier 1 runtime state。
+- **部署與 CI** — `docker-compose.site.yml`、非 root / read-only Site image、Mosquitto mTLS
+  overlay、環境範例、P3-A 測試 workflow 與架構文件。
+
+### 已知限制 / 後續
+
+- P3-A 建立資料與信任邊界，尚未執行實際 trainer，也尚未產生或啟用 signed candidate
+  model；建議由 P3-B 實作隔離的 XGBoost trainer、候選模型驗證與 quarantine。
+- 目前 episode 只帶最新 feature vector 與 sequence reference，因此可供 XGBoost handoff；
+  Tiny LSTM 必須等完整且可驗證的 sequence materialization，Isolation Forest 維持 Tier 1
+  local-only。
+- Manifest 會綁定並驗證 retention class / expiry；實體資料清除 worker 尚未納入此切片。
+
 ## v0.2 — NDR Edge（2026-06-19）
 
 軟體 NDR 偵測能力上線：在內建 OT 規則偵測之外，加入 Snort 3 / Suricata 引擎橋接、

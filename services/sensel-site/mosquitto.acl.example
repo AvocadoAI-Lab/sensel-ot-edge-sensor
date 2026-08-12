@@ -1,0 +1,10 @@
+# Add one explicit user/topic pair for every Edge client certificate CN.
+user edge-a
+topic write sensel/tenant-a/site-a/edge-a/episode/v1
+
+user edge-b
+topic write sensel/tenant-a/site-a/edge-b/episode/v1
+
+# Site subscriber certificate CN. Replace both values for the deployment.
+user site-node-a
+topic read sensel/tenant-a/site-a/+/episode/v1
