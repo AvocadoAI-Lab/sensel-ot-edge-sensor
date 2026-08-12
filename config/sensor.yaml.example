@@ -54,6 +54,28 @@ northbound_mqtt:
   protobuf_failure_threshold: 3
   rollback_state_path: /app/data/northbound-wire-state.json
 
+# P2-A: EdgeX Core Metadata is the device-management registry. The agent is
+# the only control-plane writer; packet capture and passive inventory continue
+# independently if EdgeX is unavailable.
+edgex_device_management:
+  enabled: true
+  metadata_url: http://edgex-core-metadata:59881
+  request_timeout_sec: 5
+  inventory_interval_sec: 60
+  gateway_id: ""  # empty uses sensor.id
+  live_observed_path: /app/data/assets/baseline/live-observed.json
+  identity_inventory_path: /app/data/asset-inventory.json
+  inventory_state_path: /app/data/edgex-inventory-state.json
+  desired_state_path: /app/data/edgex-desired-state.json
+  reconcile_state_path: /app/data/edgex-reconcile-state.json
+  observed_spool_db_path: /app/data/edgex-observed-spool.db
+  desired_mqtt_enabled: true
+  sampling_profiles:
+    disabled: ""
+    slow: 60s
+    standard: 10s
+    fast: 1s
+
 capture:
   interface: ${CAPTURE_INTERFACE}
   promiscuous: true

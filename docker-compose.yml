@@ -128,6 +128,10 @@ services:
     env_file: .env
     environment:
       - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - EDGEX_CORE_METADATA_URL=http://edgex-core-metadata:59881
+      - EDGEX_DEVICE_MANAGEMENT_ENABLED=${EDGEX_DEVICE_MANAGEMENT_ENABLED:-true}
+      - EDGEX_INVENTORY_INTERVAL_SEC=${EDGEX_INVENTORY_INTERVAL_SEC:-60}
+      - EDGEX_DESIRED_MQTT_ENABLED=${EDGEX_DESIRED_MQTT_ENABLED:-true}
       - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-false}
       - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
       - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
@@ -180,6 +184,8 @@ services:
       local-mqtt:
         condition: service_started
       core-data:
+        condition: service_started
+      core-metadata:
         condition: service_started
     networks:
       - sensel-edge

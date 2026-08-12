@@ -36,6 +36,30 @@ def trust_episode_protobuf_topic(
     )
 
 
+def inventory_snapshot_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return "sensel/{}/{}/{}/inventory/v1".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
+
+
+def desired_device_state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return "sensel/{}/{}/{}/device/desired/v1".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
+
+
+def observed_device_state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return "sensel/{}/{}/{}/device/observed/v1".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
+
+
 def state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
     return f"{topic_base(tenant_id, site_id, sensor_id)}/state"
 

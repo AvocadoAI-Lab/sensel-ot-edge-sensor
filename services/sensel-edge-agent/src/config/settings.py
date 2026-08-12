@@ -92,6 +92,32 @@ class NorthboundMqttConfig(BaseModel):
     rollback_reset: bool = False
 
 
+class EdgeXDeviceManagementConfig(BaseModel):
+    """EdgeX is the site device registry; passive capture remains independent."""
+
+    enabled: bool = True
+    metadata_url: str = "http://edgex-core-metadata:59881"
+    request_timeout_sec: float = Field(default=5.0, gt=0)
+    inventory_interval_sec: int = Field(default=60, ge=5)
+    gateway_id: str = ""
+    live_observed_path: str = "/app/data/assets/baseline/live-observed.json"
+    identity_inventory_path: str = "/app/data/asset-inventory.json"
+    inventory_state_path: str = "/app/data/edgex-inventory-state.json"
+    desired_state_path: str = "/app/data/edgex-desired-state.json"
+    reconcile_state_path: str = "/app/data/edgex-reconcile-state.json"
+    observed_spool_db_path: str = "/app/data/edgex-observed-spool.db"
+    desired_mqtt_enabled: bool = True
+    max_pending_reports: int = Field(default=2000, ge=1)
+    sampling_profiles: dict[str, str] = Field(
+        default_factory=lambda: {
+            "disabled": "",
+            "slow": "60s",
+            "standard": "10s",
+            "fast": "1s",
+        }
+    )
+
+
 class SenselConfig(BaseModel):
     api_url: str
     api_key: str
@@ -223,6 +249,9 @@ class AppConfig(BaseModel):
     sensor: SensorIdentity
     sensel: SenselConfig
     northbound_mqtt: NorthboundMqttConfig = Field(default_factory=NorthboundMqttConfig)
+    edgex_device_management: EdgeXDeviceManagementConfig = Field(
+        default_factory=EdgeXDeviceManagementConfig
+    )
     policy_sync: PolicySyncConfig = Field(default_factory=PolicySyncConfig)
     sighting_report: SightingReportConfig = Field(default_factory=SightingReportConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -402,6 +431,69 @@ def load_config(path: Path | None = None) -> AppConfig:
     reset_env = os.environ.get("NORTHBOUND_WIRE_ROLLBACK_RESET", "").lower()
     if reset_env in ("1", "true", "yes", "on"):
         nb_raw["rollback_reset"] = True
+
+    edgex_dm_raw = expanded.get("edgex_device_management", {})
+    dm_enabled_env = os.environ.get("EDGEX_DEVICE_MANAGEMENT_ENABLED", "").lower()
+    if dm_enabled_env in ("1", "true", "yes", "on"):
+        edgex_dm_raw["enabled"] = True
+    elif dm_enabled_env in ("0", "false", "no", "off"):
+        edgex_dm_raw["enabled"] = False
+    edgex_dm_raw["metadata_url"] = os.environ.get(
+        "EDGEX_CORE_METADATA_URL",
+        str(edgex_dm_raw.get("metadata_url", "http://edgex-core-metadata:59881")),
+    )
+    edgex_dm_raw["request_timeout_sec"] = float(
+        os.environ.get(
+            "EDGEX_METADATA_TIMEOUT_SEC",
+            str(edgex_dm_raw.get("request_timeout_sec", 5.0)),
+        )
+    )
+    edgex_dm_raw["inventory_interval_sec"] = int(
+        os.environ.get(
+            "EDGEX_INVENTORY_INTERVAL_SEC",
+            str(edgex_dm_raw.get("inventory_interval_sec", 60)),
+        )
+    )
+    if os.environ.get("EDGEX_GATEWAY_ID"):
+        edgex_dm_raw["gateway_id"] = os.environ["EDGEX_GATEWAY_ID"]
+    for key, env_name, default in (
+        (
+            "live_observed_path",
+            "LIVE_OBSERVED_PATH",
+            "/app/data/assets/baseline/live-observed.json",
+        ),
+        (
+            "identity_inventory_path",
+            "EDGEX_IDENTITY_INVENTORY_PATH",
+            "/app/data/asset-inventory.json",
+        ),
+        (
+            "inventory_state_path",
+            "EDGEX_INVENTORY_STATE_PATH",
+            "/app/data/edgex-inventory-state.json",
+        ),
+        (
+            "desired_state_path",
+            "EDGEX_DESIRED_STATE_PATH",
+            "/app/data/edgex-desired-state.json",
+        ),
+        (
+            "reconcile_state_path",
+            "EDGEX_RECONCILE_STATE_PATH",
+            "/app/data/edgex-reconcile-state.json",
+        ),
+        (
+            "observed_spool_db_path",
+            "EDGEX_OBSERVED_SPOOL_DB",
+            "/app/data/edgex-observed-spool.db",
+        ),
+    ):
+        edgex_dm_raw.setdefault(key, os.environ.get(env_name, default))
+    desired_mqtt_env = os.environ.get("EDGEX_DESIRED_MQTT_ENABLED", "").lower()
+    if desired_mqtt_env in ("1", "true", "yes", "on"):
+        edgex_dm_raw["desired_mqtt_enabled"] = True
+    elif desired_mqtt_env in ("0", "false", "no", "off"):
+        edgex_dm_raw["desired_mqtt_enabled"] = False
 
     policy_raw = expanded.get("policy_sync", {})
     enabled_env = os.environ.get("POLICY_SYNC_ENABLED", "").lower()
@@ -841,6 +933,7 @@ def load_config(path: Path | None = None) -> AppConfig:
             sensor=SensorIdentity(**sensor_raw),
             sensel=SenselConfig(**sensel_raw),
             northbound_mqtt=NorthboundMqttConfig(**nb_raw),
+            edgex_device_management=EdgeXDeviceManagementConfig(**edgex_dm_raw),
             policy_sync=PolicySyncConfig(**policy_raw),
             sighting_report=SightingReportConfig(**sighting_raw),
             logging=LoggingConfig(**expanded.get("logging", {})),

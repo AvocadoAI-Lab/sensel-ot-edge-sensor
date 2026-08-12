@@ -17,6 +17,7 @@ from pathlib import Path
 from src.api.client import SenseLClient
 from src.config.settings import load_config
 from src.health.collector import collect_health
+from src.edgex.manager import EdgeXDeviceManager
 from src.northbound.mqtt import NorthboundMqttClient
 from src.northbound.wire_mode import WireModeController
 from src.northbound.observe_tick_publisher import ObserveTickPublisher
@@ -244,6 +245,14 @@ def main() -> int:
 
     client = SenseLClient(config)
     mqtt = NorthboundMqttClient(config.northbound_mqtt, config.sensor)
+    edgex_device_manager = None
+    if config.edgex_device_management.enabled:
+        try:
+            edgex_device_manager = EdgeXDeviceManager(config, mqtt)
+        except Exception:
+            logger.exception(
+                "EdgeX device management initialization failed; continuing fail-open"
+            )
     buffer = UploadBuffer(
         config.sensel.buffer.db_path,
         max_events=config.sensel.buffer.max_events,
@@ -416,6 +425,9 @@ def main() -> int:
             force=True,
         )
 
+        if edgex_device_manager:
+            edgex_device_manager.start()
+
         if policy_mqtt and policy_mqtt.enabled:
             policy_mqtt.start()
         if detection_policy_mqtt and detection_policy_mqtt.enabled:
@@ -482,6 +494,9 @@ def main() -> int:
                 state=registration,
             )
 
+            if edgex_device_manager:
+                edgex_device_manager.refresh_subscription()
+
             if policy_mqtt and policy_mqtt.enabled:
                 policy_mqtt.ensure_connected()
             if detection_policy_mqtt and detection_policy_mqtt.enabled:
@@ -496,6 +511,11 @@ def main() -> int:
                 ids_rule_mqtt.ensure_connected()
             if listfile_mqtt and listfile_mqtt.enabled:
                 listfile_mqtt.ensure_connected()
+
+            if edgex_device_manager:
+                edgex_device_manager.tick(
+                    registration.tenant_id or config.northbound_mqtt.tenant_id
+                )
 
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
@@ -653,6 +673,8 @@ def main() -> int:
                     break
                 time.sleep(1)
     finally:
+        if edgex_device_manager:
+            edgex_device_manager.close()
         if operational_mode_mqtt:
             operational_mode_mqtt.stop()
         if baseline_profile_mqtt:

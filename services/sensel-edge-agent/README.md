@@ -11,6 +11,21 @@
 | `sighting/` | OT-019 → SMB sightings ingest + 離線佇列（Track B-S3） |
 | `health/` | Pi 資源、擷取統計、服務狀態 |
 | `upload/` | 離線緩衝與重試上傳（NFR-3） |
+| `edgex/` | Core Metadata inventory、desired-state reconciliation、observed outbox |
+
+## EdgeX device management（P2-A）
+
+EdgeX Core Metadata 是 site 內的 device registry，Edge Agent 是 Control Plane desired state 寫入 EdgeX 的唯一 writer。packet-sensor 的鏡像封包分析不經 EdgeX，所以 metadata 暫時不可用不會中斷 OT 偵測。
+
+| 方向 | MQTT 5 topic | Protobuf message | 行為 |
+|------|--------------|------------------|------|
+| Edge → Tier 3 | `sensel/{tenant}/{site}/{sensor}/inventory/v1` | `InventorySnapshot` | EdgeX device/profile + manual/probe/passive evidence；內容 revision 去重 |
+| Tier 3 → Edge | `sensel/{tenant}/{site}/{sensor}/device/desired/v1` | `DesiredDeviceStateCommand` | QoS 1 retained；驗 route、expiry、revision 與 sampling allowlist |
+| Edge → Tier 3 | `sensel/{tenant}/{site}/{sensor}/device/observed/v1` | `ObservedDeviceStateReport` | durable SQLite outbox；回報 applied/no-change/rejected/failed |
+
+Reconciler 只允許修改 `adminState` 與既有 `autoEvents.interval`；不修改 protocol endpoint、device profile，也不發 OT read/write command。`QUARANTINED` 與 `RETIRED` 一律映射為 `LOCKED`。
+
+主要環境變數：`EDGEX_DEVICE_MANAGEMENT_ENABLED`、`EDGEX_CORE_METADATA_URL`、`EDGEX_INVENTORY_INTERVAL_SEC`、`EDGEX_DESIRED_MQTT_ENABLED`。狀態可從 `/app/data/agent-runtime.json` 的 `edgex_device_management` 查看。
 
 ## 連線韌性（S5 / 階段 2）
 

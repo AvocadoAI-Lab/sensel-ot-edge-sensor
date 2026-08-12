@@ -78,6 +78,33 @@ def test_publish_success_when_connected() -> None:
         mock_instance.publish.assert_called_once()
 
 
+def test_device_management_protobuf_uses_canonical_topic_and_content_type() -> None:
+    cfg, sensor = _client_cfg()
+    nb = NorthboundMqttClient(cfg, sensor)
+    mock_instance = MagicMock()
+    mock_info = MagicMock(rc=0)
+    mock_info.is_published.return_value = True
+    mock_instance.publish.return_value = mock_info
+
+    with patch("paho.mqtt.client.Client", return_value=mock_instance), patch(
+        "src.northbound.mqtt.write_agent_runtime"
+    ):
+        nb._ensure_client()
+        nb._on_connect(mock_instance, None, None, 0)
+        assert nb.publish_inventory_snapshot(b"wire", snapshot_id="snapshot-1")
+
+    args, kwargs = mock_instance.publish.call_args
+    assert args[:2] == (
+        "sensel/company-test/site-a/ot-edge-001/inventory/v1",
+        b"wire",
+    )
+    assert kwargs["properties"].PayloadFormatIndicator == 0
+    assert kwargs["properties"].ContentType.endswith(
+        "sensel.device.v1.InventorySnapshot"
+    )
+    assert kwargs["properties"].CorrelationData == b"snapshot-1"
+
+
 def test_publish_failure_keeps_client_for_auto_reconnect() -> None:
     cfg, sensor = _client_cfg()
     nb = NorthboundMqttClient(cfg, sensor)

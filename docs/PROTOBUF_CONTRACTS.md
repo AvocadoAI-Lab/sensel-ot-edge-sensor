@@ -1,14 +1,13 @@
 # SenseL Edge Protobuf Contracts
 
-Tier 1 與 Tier 2 共用此 repository。跨層 canonical `.proto` 由 `AvocadoAI-Lab/AristaConnector` 的 `contracts/proto` 管理；此處的 `sensel` package 是 contract version `0.2.0` 的 Python bindings。
+Tier 1 與 Tier 2 共用此 repository。跨層 canonical `.proto` 由 `AvocadoAI-Lab/AristaConnector` 的 `contracts/proto` 管理；此處的 `sensel` package 是 contract version `0.3.0` 的 Python bindings。
 
 ## 🏗️ P0 整合狀態
 
 - `src/contracts/security_event_codec.py` 可將既有 security event dictionary 編碼為 `sensel.security.v1.SecurityEvent`。
 - `sensel/CONTRACT_MANIFEST.json` 與 canonical golden fixture 會驗證 descriptor 及 Edge encoder 的 byte-level compatibility。
-- 目前 MQTT publisher 仍只送既有 JSON，production behavior 未改變。
-- 下一階段才加入 v2 protobuf topic、content type、dual-publish parity 與 rollback flag。
-- `sensel.device.v1` 預留 EdgeX inventory 與 desired/observed state reconciliation。
+- Security event 保留既有 JSON；Trust Episode 已支援 JSON／dual／protobuf 與 rollback，P2-A device-management topics 固定使用 protobuf。
+- `sensel.device.v1` 提供 EdgeX inventory，以及帶 asset routing、command/report identity、expiry 與 reconcile status 的 desired/observed state reconciliation。
 - `sensel.federation.v1` 只承載 round policy 與 artifact manifest；Flower 維持 training transport。
 
 ## 🧠 P1-A Feature 與 Episode Foundation

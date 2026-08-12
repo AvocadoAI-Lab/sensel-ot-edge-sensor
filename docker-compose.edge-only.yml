@@ -52,6 +52,10 @@ services:
     env_file: .env
     environment:
       - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - EDGEX_CORE_METADATA_URL=http://edgex-core-metadata:59881
+      - EDGEX_DEVICE_MANAGEMENT_ENABLED=${EDGEX_DEVICE_MANAGEMENT_ENABLED:-true}
+      - EDGEX_INVENTORY_INTERVAL_SEC=${EDGEX_INVENTORY_INTERVAL_SEC:-60}
+      - EDGEX_DESIRED_MQTT_ENABLED=${EDGEX_DESIRED_MQTT_ENABLED:-true}
       - SENSEL_API_URL=http://mock-sensel:8765
       - SENSEL_VERIFY_TLS=false
     volumes:

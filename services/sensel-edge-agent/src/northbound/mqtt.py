@@ -13,7 +13,9 @@ from src.config.settings import NorthboundMqttConfig, SensorIdentity
 from src.northbound.topics import (
     coverage_topic,
     events_topic,
+    inventory_snapshot_topic,
     observe_tick_topic,
+    observed_device_state_topic,
     policy_ack_topic,
     state_topic,
     topology_snapshot_topic,
@@ -302,6 +304,52 @@ class NorthboundMqttClient:
             content_type=(
                 "application/x-protobuf; "
                 "message=sensel.episode.v1.TrustEpisode"
+            ),
+            correlation_data=trace_id.encode("utf-8"),
+            qos=1,
+        )
+
+    def publish_inventory_snapshot(
+        self,
+        payload: bytes,
+        *,
+        snapshot_id: str,
+    ) -> bool:
+        if self._cfg.require_tenant and self._cfg.tenant_id.strip() in ("", "default"):
+            return False
+        return self.publish_bytes(
+            inventory_snapshot_topic(
+                self._cfg.tenant_id,
+                self._sensor.site_id,
+                self._sensor.id,
+            ),
+            payload,
+            content_type=(
+                "application/x-protobuf; "
+                "message=sensel.device.v1.InventorySnapshot"
+            ),
+            correlation_data=snapshot_id.encode("utf-8"),
+            qos=1,
+        )
+
+    def publish_observed_device_state(
+        self,
+        payload: bytes,
+        *,
+        trace_id: str,
+    ) -> bool:
+        if self._cfg.require_tenant and self._cfg.tenant_id.strip() in ("", "default"):
+            return False
+        return self.publish_bytes(
+            observed_device_state_topic(
+                self._cfg.tenant_id,
+                self._sensor.site_id,
+                self._sensor.id,
+            ),
+            payload,
+            content_type=(
+                "application/x-protobuf; "
+                "message=sensel.device.v1.ObservedDeviceStateReport"
             ),
             correlation_data=trace_id.encode("utf-8"),
             qos=1,
