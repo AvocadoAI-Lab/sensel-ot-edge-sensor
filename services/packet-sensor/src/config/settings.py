@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -255,6 +256,32 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     def _model_config(name: str, prefix: str, *, output_index: int = 0) -> dict[str, Any]:
         model_raw = inference_raw.get(name, {})
+        deployment_path = Path(
+            os.environ.get(
+                f"{prefix}_DEPLOYMENT_MANIFEST_PATH",
+                f"/app/data/models/{name}/current/deployment.json",
+            )
+        )
+        if deployment_path.is_file() and not deployment_path.is_symlink():
+            deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+            if (
+                deployment.get("schema_version")
+                != "sensel.edge.verified-model-deployment.v1"
+                or deployment.get("adapter") != name
+                or deployment.get("model_filename") != "model.onnx"
+                or deployment.get("feature_contract_id") != features_raw["contract_id"]
+            ):
+                raise ValueError(f"{name} verified deployment manifest is invalid")
+            model_raw.update(
+                {
+                    "enabled": True,
+                    "model_path": str(deployment_path.parent / "model.onnx"),
+                    "model_version": str(deployment["model_version"]),
+                    "artifact_sha256": str(deployment["artifact_sha256"]),
+                    "output_index": int(deployment["output_index"]),
+                    "anomaly_class_index": int(deployment["anomaly_class_index"]),
+                }
+            )
         enabled = os.environ.get(f"{prefix}_ENABLED", "").strip().lower()
         if enabled in ("1", "true", "yes", "on"):
             model_raw["enabled"] = True

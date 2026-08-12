@@ -250,6 +250,41 @@ services:
       - local-mqtt
       - sensel-edge-agent
 
+  # ---------------------------------------------------------------------------
+  # Signed model manager — one-shot staging/canary/evaluation, no network
+  # ---------------------------------------------------------------------------
+  sensel-model-manager:
+    profiles:
+      - model-rollout
+    build:
+      context: .
+      dockerfile: services/sensel-edge-agent/Dockerfile.model-manager
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:-}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:-}
+      SENSEL_SENSOR_ID: ${SENSEL_SENSOR_ID:-}
+      SENSEL_MODEL_ROOT: /models/xgboost
+      SENSEL_DISTRIBUTION_PUBLIC_KEY_PATH: /run/keys/distribution.pub.pem
+      SENSEL_DISTRIBUTION_SIGNING_KEY_ID: ${SENSEL_DISTRIBUTION_SIGNING_KEY_ID:-}
+      SENSEL_RELEASE_PUBLIC_KEY_PATH: /run/keys/release.pub.pem
+      SENSEL_RELEASE_SIGNING_KEY_ID: ${SENSEL_RELEASE_SIGNING_KEY_ID:-}
+      SENSEL_EDGE_REPORT_SIGNING_KEY_PATH: /run/secrets/edge-report.pem
+      SENSEL_EDGE_REPORT_SIGNING_KEY_ID: ${SENSEL_EDGE_REPORT_SIGNING_KEY_ID:-}
+    volumes:
+      - ./data/models/xgboost:/models/xgboost
+      - ${SENSEL_MODEL_BUNDLE_DIR:-./data/model-rollout/inbox}:/input:ro
+      - ./data/model-rollout/outbox:/output
+      - ${SENSEL_MODEL_PUBLIC_KEY_DIR:-./secrets/model-public}:/run/keys:ro
+      - ${SENSEL_EDGE_REPORT_SIGNING_KEY_FILE:-./secrets/edge-report/signing-key.pem}:/run/secrets/edge-report.pem:ro
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
 networks:
   sensel-edge:
     driver: bridge

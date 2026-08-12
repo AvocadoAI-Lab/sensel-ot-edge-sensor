@@ -1,0 +1,17 @@
+FROM python:3.11-slim-bookworm
+
+RUN groupadd --system --gid 10004 sensel-model \
+    && useradd --system --uid 10004 --gid sensel-model --home /nonexistent sensel-model
+
+WORKDIR /app
+COPY services/sensel-edge-agent/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY services/sensel-edge-agent/src/ ./src/
+COPY services/sensel-edge-agent/sensel/ ./sensel/
+RUN mkdir -p /models/xgboost /input /output \
+    && chown -R sensel-model:sensel-model /models /output
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+USER 10004:10004
+ENTRYPOINT ["python", "-m", "src.model_rollout.cli"]

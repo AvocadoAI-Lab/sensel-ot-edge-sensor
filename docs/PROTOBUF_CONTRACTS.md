@@ -1,6 +1,6 @@
 # SenseL Edge Protobuf Contracts
 
-Tier 1 與 Tier 2 共用此 repository。跨層 canonical `.proto` 由 `AvocadoAI-Lab/AristaConnector` 的 `contracts/proto` 管理；此處的 `sensel` package 是 contract version `0.3.0` 的 Python bindings。
+Tier 1 與 Tier 2 共用此 repository。跨層 canonical `.proto` 由 `AvocadoAI-Lab/AristaConnector` 的 `contracts/proto` 管理；此處的 `sensel` package 是 contract version `0.4.0` 的 Python bindings。
 
 ## 🏗️ P0 整合狀態
 

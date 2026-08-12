@@ -6,3 +6,4 @@ aiosqlite>=0.19
 psutil>=5.9
 paho-mqtt>=2.0
 protobuf>=6.33.6,<7
+cryptography>=43,<47
