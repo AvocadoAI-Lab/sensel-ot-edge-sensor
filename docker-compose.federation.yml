@@ -1,0 +1,60 @@
+name: sensel-site-federation
+
+services:
+  flower-mtls-client:
+    image: haproxy:3.1-alpine@sha256:475863a372c92c3dab3d59eafbbf8019dceebcd0c456594551b160ecdba4bdb9
+    restart: unless-stopped
+    environment:
+      SENSEL_FLOWER_CONTROL_PLANE_HOST: ${SENSEL_FLOWER_CONTROL_PLANE_HOST:?set SENSEL_FLOWER_CONTROL_PLANE_HOST}
+      SENSEL_FLOWER_CONTROL_PLANE_PORT: ${SENSEL_FLOWER_CONTROL_PLANE_PORT:-9442}
+    volumes:
+      - ./services/sensel-site/federation/haproxy-supernode.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ${SENSEL_FLOWER_LOCAL_TLS_DIR:?set SENSEL_FLOWER_LOCAL_TLS_DIR}:/run/local:ro
+      - ${SENSEL_FLOWER_SITE_MTLS_DIR:?set SENSEL_FLOWER_SITE_MTLS_DIR}:/run/mtls:ro
+    read_only: true
+    tmpfs:
+      - /var/lib/haproxy:size=8m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - federation-egress
+
+  flower-supernode:
+    build:
+      context: .
+      dockerfile: services/sensel-site/federation/Dockerfile.supernode
+    image: sensel/flower-supernode:1.33.0-p4b
+    restart: unless-stopped
+    network_mode: service:flower-mtls-client
+    depends_on:
+      - flower-mtls-client
+    command:
+      - --root-certificates=/run/local/ca.crt
+      - --superlink=127.0.0.1:19092
+      - --clientappio-api-address=127.0.0.1:9094
+      - --appio-ssl-ca-certfile=/run/appio/ca.crt
+      - --appio-ssl-certfile=/run/appio/supernode.pem
+      - --appio-ssl-keyfile=/run/appio/supernode.key
+      - --auth-supernode-private-key=/run/auth/supernode.key
+      - --node-config=tenant-id=${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID} site-id=${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+    volumes:
+      - ${SENSEL_FLOWER_LOCAL_TLS_DIR:?set SENSEL_FLOWER_LOCAL_TLS_DIR}:/run/local:ro
+      - ${SENSEL_FLOWER_APPIO_TLS_DIR:?set SENSEL_FLOWER_APPIO_TLS_DIR}:/run/appio:ro
+      - ${SENSEL_FLOWER_SUPERNODE_AUTH_DIR:?set SENSEL_FLOWER_SUPERNODE_AUTH_DIR}:/run/auth:ro
+      - flower-supernode-state:/app/.flwr
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  flower-supernode-state:
+
+networks:
+  federation-egress:
+    driver: bridge

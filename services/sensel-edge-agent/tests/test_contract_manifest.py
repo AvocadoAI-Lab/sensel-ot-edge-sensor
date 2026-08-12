@@ -82,7 +82,7 @@ def _legacy_event() -> dict:
 def test_generated_descriptors_match_canonical_manifest() -> None:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    assert manifest["contract_version"] == "0.5.0"
+    assert manifest["contract_version"] == "0.6.0"
     assert _descriptor_sha256() == manifest["descriptor_sha256"]
 
 
