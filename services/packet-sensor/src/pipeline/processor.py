@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.baseline.collector import BaselineCollector
 from src.coverage.counter import CoverageCounter
@@ -12,6 +17,8 @@ from src.detection.iec61850 import Iec61850Detector
 from src.detection.ioc import IocMatcher
 from src.detection.mvp import MvpDetector
 from src.events.generator import EventStore
+from src.episode.builder import build_trust_episode
+from src.episode.writer import TrustEpisodeWriter
 from src.evidence.ring_buffer import PcapRingBuffer
 from src.features.publisher import FeaturePublisher
 from src.features.contract import (
@@ -40,6 +47,15 @@ from src.policy.detection_policy_store import DetectionPolicyStore
 from src.policy.managed_listfile_enforcement import ManagedListfileEnforcer
 from src.policy.operational_mode_store import OperationalModeStore
 
+if TYPE_CHECKING:
+    from src.config.settings import InferenceConfig
+    from src.inference.pipeline import LocalInferenceOutcome
+
+from src.inference.pipeline import (
+    LocalInferencePipeline,
+    build_local_inference_pipeline,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +74,8 @@ class PacketPipeline:
         site_id: str,
         policy_path: str,
         assets_dir: str,
+        tenant_id: str = "default",
+        producer_version: str = "0.1.0",
         rules_enabled: list[str] | None = None,
         mqtt_host: str = "",
         mqtt_port: int = 1883,
@@ -67,6 +85,7 @@ class PacketPipeline:
         feature_window_sec: int = 60,
         feature_contract_id: str = "ot-window-v1",
         feature_contract_path: str = "/app/config/model/feature-contract.ot-window-v1.json",
+        inference_config: "InferenceConfig | None" = None,
         ring_buffer_max_packets: int = 5000,
         ioc_enabled: bool = True,
         ioc_cache_path: str = "/app/data/agent/ioc-cache.json",
@@ -89,10 +108,21 @@ class PacketPipeline:
         self.state = PipelineState()
         self._sensor_id = sensor_id
         self._site_id = site_id
+        self._tenant_id = tenant_id
+        self._producer_version = producer_version
         self._feature_window_sec = feature_window_sec
         self._feature_sequence_number = 0
         self._latest_feature_sequence: FeatureSequence | None = None
         self._feature_sequence_builder: FeatureSequenceBuilder | None = None
+        self._inference_pipeline: LocalInferencePipeline | None = None
+        self._episode_writer: TrustEpisodeWriter | None = None
+        self._emit_decisions: set[str] = set()
+        self._model_runtime_status_path: Path | None = None
+        self._model_episode_count = 0
+        self._last_model_episode_id = ""
+        self._feature_contract_id = feature_contract_id
+        if inference_config is not None:
+            self._model_runtime_status_path = Path(inference_config.runtime_status_path)
         try:
             feature_contract = FeatureContractSpec.load(feature_contract_path)
             if feature_contract.contract_id != feature_contract_id:
@@ -104,6 +134,20 @@ class PacketPipeline:
                     "feature window interval does not match contract file"
                 )
             self._feature_sequence_builder = FeatureSequenceBuilder(feature_contract)
+            if inference_config is not None and inference_config.enabled:
+                self._inference_pipeline = build_local_inference_pipeline(
+                    inference_config,
+                    feature_contract_id=feature_contract.contract_id,
+                )
+                self._episode_writer = TrustEpisodeWriter(
+                    inference_config.episode_output_path
+                )
+                self._emit_decisions = {
+                    decision.strip().lower()
+                    for decision in inference_config.emit_decisions
+                    if decision.strip()
+                }
+                self._write_model_runtime()
         except (OSError, ValueError, TypeError) as exc:
             logger.warning(
                 "Feature sequence disabled; deterministic detection remains active: %s",
@@ -306,6 +350,7 @@ class PacketPipeline:
                 )
                 if sequence is not None:
                     self._latest_feature_sequence = sequence
+                    self._evaluate_feature_sequence(sequence)
             except (TypeError, ValueError):
                 logger.exception("Feature frame rejected by contract")
         if self._mode_store.alerts_enabled():
@@ -313,6 +358,109 @@ class PacketPipeline:
         reset_l2_window(self.state.l2)
         reset_goose_window(self.state.goose)
         reset_mms_window(self.state.mms)
+
+    def _evaluate_feature_sequence(self, sequence: FeatureSequence) -> None:
+        if self._inference_pipeline is None or self._episode_writer is None:
+            return
+        outcome = self._inference_pipeline.evaluate(sequence)
+        if not outcome.has_available_signal:
+            self._write_model_runtime(outcome)
+            logger.warning("All local model signals unavailable; Trust Episode not emitted")
+            return
+        if outcome.fusion.decision not in self._emit_decisions:
+            self._write_model_runtime(outcome)
+            return
+        episode_uuid = uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"sensel:{self._tenant_id}:{self._site_id}:{self._sensor_id}:"
+            f"{sequence.sequence_sha256}:{outcome.fusion.policy_version}",
+        )
+        operational_artifact = self._mode_store.artifact
+        episode = build_trust_episode(
+            episode_id=f"episode-{episode_uuid}",
+            asset_id=f"sensor:{self._sensor_id}",
+            tenant_id=self._tenant_id,
+            site_id=self._site_id,
+            sensor_id=self._sensor_id,
+            sequence_number=sequence.frames[-1].sequence_number,
+            trace_id=str(episode_uuid),
+            producer_version=self._producer_version,
+            feature_sequence=sequence,
+            detections=outcome.signals,
+            fusion=outcome.fusion,
+            asset_identity={
+                "confidence": 1.0,
+                "attributes": {"identity_source": "sensor-scope"},
+            },
+            policy={
+                "policy_id": "local-detection",
+                "policy_version": outcome.fusion.policy_version,
+                "operational_mode": str(
+                    operational_artifact.get("mode") or "detect"
+                ),
+                "attributes": {"source": "local-cache"},
+            },
+        )
+        self._episode_writer.append(episode)
+        self._model_episode_count += 1
+        self._last_model_episode_id = episode["episode_id"]
+        self._write_model_runtime(outcome, last_episode_id=episode["episode_id"])
+        logger.info(
+            "Trust Episode emitted id=%s score=%.4f severity=%s",
+            episode["episode_id"],
+            outcome.fusion.score,
+            outcome.fusion.severity,
+        )
+
+    def _write_model_runtime(
+        self,
+        outcome: "LocalInferenceOutcome | None" = None,
+        *,
+        last_episode_id: str = "",
+    ) -> None:
+        path = self._model_runtime_status_path
+        pipeline = self._inference_pipeline
+        if path is None or pipeline is None:
+            return
+        results = {
+            result.engine_id: result.to_dict()
+            for result in (outcome.results if outcome is not None else ())
+        }
+        models = []
+        for state in pipeline.states:
+            model = state.to_dict()
+            if state.engine_id in results:
+                model["last_result"] = results[state.engine_id]
+            models.append(model)
+        body = {
+            "enabled": True,
+            "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "feature_contract_id": self._feature_contract_id,
+            "episode_count": self._model_episode_count,
+            "last_episode_id": last_episode_id or self._last_model_episode_id,
+            "models": models,
+            "fusion": (
+                {
+                    "policy_version": outcome.fusion.policy_version,
+                    "score": outcome.fusion.score,
+                    "decision": outcome.fusion.decision,
+                    "severity": outcome.fusion.severity,
+                }
+                if outcome is not None
+                else {}
+            ),
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(f"{path.suffix}.tmp")
+            temporary.write_text(
+                json.dumps(body, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, path)
+        except OSError:
+            logger.exception("Unable to persist model runtime status")
 
     def close(self) -> None:
         self._features.close()

@@ -57,6 +57,7 @@ services:
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets:ro
     depends_on:
       - local-mqtt
       - mock-sensel
@@ -68,6 +69,8 @@ services:
     build:
       context: ./services/packet-sensor
       dockerfile: Dockerfile
+      args:
+        INSTALL_ML_RUNTIME: ${INSTALL_ML_RUNTIME:-false}
     container_name: sensel-packet-sensor
     restart: unless-stopped
     env_file: .env
@@ -81,6 +84,7 @@ services:
       - ./config:/app/config:ro
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
+      - ./data/models:/app/data/models:ro
     network_mode: host
     cap_add:
       - NET_ADMIN

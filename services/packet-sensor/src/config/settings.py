@@ -29,6 +29,7 @@ def _expand_env(value: Any) -> Any:
 class SensorIdentity(BaseModel):
     id: str
     site_id: str
+    tenant_id: str = "default"
     software_version: str = "0.1.0"
 
 
@@ -60,6 +61,33 @@ class FeaturesConfig(BaseModel):
     assets_dir: str = "/app/data/assets"
     contract_id: str = "ot-window-v1"
     contract_path: str = "/app/config/model/feature-contract.ot-window-v1.json"
+
+
+class ModelAdapterConfig(BaseModel):
+    enabled: bool = False
+    model_path: str = ""
+    model_version: str = "unconfigured"
+    artifact_sha256: str = ""
+    calibration_path: str = "/app/config/model/calibration.json"
+    threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    output_index: int = Field(default=0, ge=0)
+    anomaly_class_index: int = Field(default=1, ge=0)
+    class_labels: list[str] = Field(default_factory=lambda: ["normal", "anomaly"])
+
+
+class InferenceConfig(BaseModel):
+    enabled: bool = False
+    episode_output_path: str = "/app/data/assets/trust-episodes.jsonl"
+    runtime_status_path: str = "/app/data/assets/model-runtime.json"
+    emit_decisions: list[str] = Field(default_factory=lambda: ["alert"])
+    fusion_policy_version: str = "fusion-v1"
+    fusion_alert_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    fusion_maximum_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+    isolation_forest: ModelAdapterConfig = Field(default_factory=ModelAdapterConfig)
+    xgboost: ModelAdapterConfig = Field(
+        default_factory=lambda: ModelAdapterConfig(output_index=1)
+    )
+    tiny_lstm: ModelAdapterConfig = Field(default_factory=ModelAdapterConfig)
 
 
 class DetectionConfig(BaseModel):
@@ -109,6 +137,7 @@ class AppConfig(BaseModel):
     sensor: SensorIdentity
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
+    inference: InferenceConfig = Field(default_factory=InferenceConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     ioc: IocConfig = Field(default_factory=IocConfig)
     snort_source: SnortSourceConfig = Field(default_factory=SnortSourceConfig)
@@ -149,6 +178,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         platform_id=load_platform_sensor_id(),
     )
     sensor_raw.setdefault("site_id", os.environ.get("SITE_ID", "factory-lab-001"))
+    sensor_raw.setdefault("tenant_id", os.environ.get("MQTT_TENANT_ID", "default"))
     capture_raw.setdefault("interface", os.environ.get("CAPTURE_INTERFACE", "eth1"))
     capture_raw.setdefault("bpf_filter", os.environ.get("CAPTURE_BPF_FILTER", ""))
     capture_raw.setdefault(
@@ -189,6 +219,82 @@ def load_config(path: Path | None = None) -> AppConfig:
         "contract_id",
         os.environ.get("FEATURE_CONTRACT_ID", "ot-window-v1"),
     )
+
+    inference_raw = expanded.get("inference", {})
+    inference_enabled = os.environ.get("MODEL_INFERENCE_ENABLED", "").strip().lower()
+    if inference_enabled in ("1", "true", "yes", "on"):
+        inference_raw["enabled"] = True
+    elif inference_enabled in ("0", "false", "no", "off"):
+        inference_raw["enabled"] = False
+    inference_raw.setdefault(
+        "episode_output_path",
+        os.environ.get(
+            "TRUST_EPISODE_OUTPUT_PATH",
+            "/app/data/assets/trust-episodes.jsonl",
+        ),
+    )
+    inference_raw.setdefault(
+        "runtime_status_path",
+        os.environ.get(
+            "MODEL_RUNTIME_STATUS_PATH",
+            "/app/data/assets/model-runtime.json",
+        ),
+    )
+    inference_raw.setdefault(
+        "fusion_policy_version",
+        os.environ.get("FUSION_POLICY_VERSION", "fusion-v1"),
+    )
+    inference_raw.setdefault(
+        "fusion_alert_threshold",
+        float(os.environ.get("FUSION_ALERT_THRESHOLD", "0.75")),
+    )
+    inference_raw.setdefault(
+        "fusion_maximum_weight",
+        float(os.environ.get("FUSION_MAXIMUM_WEIGHT", "0.7")),
+    )
+
+    def _model_config(name: str, prefix: str, *, output_index: int = 0) -> dict[str, Any]:
+        model_raw = inference_raw.get(name, {})
+        enabled = os.environ.get(f"{prefix}_ENABLED", "").strip().lower()
+        if enabled in ("1", "true", "yes", "on"):
+            model_raw["enabled"] = True
+        elif enabled in ("0", "false", "no", "off"):
+            model_raw["enabled"] = False
+        model_raw.setdefault("model_path", os.environ.get(f"{prefix}_MODEL_PATH", ""))
+        model_raw.setdefault(
+            "model_version",
+            os.environ.get(f"{prefix}_MODEL_VERSION", "unconfigured"),
+        )
+        model_raw.setdefault(
+            "artifact_sha256",
+            os.environ.get(f"{prefix}_MODEL_SHA256", ""),
+        )
+        model_raw.setdefault(
+            "calibration_path",
+            os.environ.get(
+                f"{prefix}_CALIBRATION_PATH",
+                "/app/config/model/calibration.json",
+            ),
+        )
+        model_raw.setdefault(
+            "threshold",
+            float(os.environ.get(f"{prefix}_THRESHOLD", "0.5")),
+        )
+        model_raw.setdefault(
+            "output_index",
+            int(os.environ.get(f"{prefix}_OUTPUT_INDEX", str(output_index))),
+        )
+        model_raw.setdefault(
+            "anomaly_class_index",
+            int(os.environ.get(f"{prefix}_ANOMALY_CLASS_INDEX", "1")),
+        )
+        return model_raw
+
+    inference_raw["isolation_forest"] = _model_config(
+        "isolation_forest", "IF", output_index=0
+    )
+    inference_raw["xgboost"] = _model_config("xgboost", "XGB", output_index=1)
+    inference_raw["tiny_lstm"] = _model_config("tiny_lstm", "LSTM", output_index=0)
     features_raw.setdefault(
         "contract_path",
         os.environ.get(
@@ -299,6 +405,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         sensor=SensorIdentity(**sensor_raw),
         capture=CaptureConfig(**capture_raw),
         features=FeaturesConfig(**features_raw),
+        inference=InferenceConfig(**inference_raw),
         detection=DetectionConfig(**detection_raw),
         ioc=IocConfig(**ioc_raw),
         snort_source=SnortSourceConfig(**snort_raw),

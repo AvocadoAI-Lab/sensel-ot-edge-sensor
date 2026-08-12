@@ -1,15 +1,15 @@
 # SenseL Edge ARM64 ML Runtime Audit
 
-本次 P0-C audit 的結論很直接：目前 `packet-sensor` 是規則與 signature-based detection pipeline，尚未包含 Isolation Forest、XGBoost 或 Tiny LSTM model runtime。現況沒有「LSTM 載入後回傳 null」的 code path；`null` 代表功能尚未實作或上層規格預留值，而不是現有模型損壞。
+P0-C audit 確認原始 `packet-sensor` 只有規則與 signature-based detection pipeline。P1-B 已加入 Isolation Forest、XGBoost 與 Tiny LSTM 的 ONNX adapters，但 repository 仍沒有 production model artifact、training lineage 或 evaluation report。因此 inference 預設關閉，不可將 smoke fixture 當成正式模型。
 
 ## 🔎 現況證據
 
 | 問題 | Repository 現況 | 結論 |
 |---|---|---|
 | Feature extraction | `FeaturePublisher` 輸出 window summary，但沒有凍結 ML feature vector/order | 需先建立 `FeatureContract` |
-| Isolation Forest | 無 sklearn model、loader 或 artifact | 未實作 |
-| XGBoost | 無 xgboost dependency、model 或 invoke path | 未實作 |
-| Tiny LSTM | 無 PyTorch、ONNX model、sequence builder 或 runtime | 未實作，不是 runtime null bug |
+| Isolation Forest | 已有 ONNX adapter、digest gate、calibration；無 production artifact | Adapter 完成，artifact 待供應 |
+| XGBoost | 已有 ONNX adapter、digest gate、calibration；無 production artifact | Adapter 完成，artifact 待供應 |
+| Tiny LSTM | 已有 60-frame sequence adapter 與 ONNX Runtime；無 production artifact | Adapter 完成，artifact 待供應 |
 | PyTorch runtime | requirements 與 image 均未包含 | Edge 不需要加入 PyTorch |
 | ONNX export | 沒有可匯出的 checkpoint、network definition 或 normalization metadata | 現階段不可聲稱已完成 export |
 | Existing detection | OT-001～019、IEC 61850、IOC、Snort、Suricata | 可保留為 deterministic detection input |
@@ -77,11 +77,12 @@ P0 smoke budget 為 batch 1、shape `[1,8,4]`、p95 ≤ 25 ms、process max RSS 
 
 ---
 
-## 📌 P1-A 完成與後續工作
+## 📌 P1-B 完成與後續工作
 
 1. 已定義 `ot-window-v1` FeatureContract、missing policy、normalization 與 60-frame sequence builder。
 2. 已建立 deterministic `fusion-v1` 及 SLM-independent Trust Episode protobuf/codec。
-3. 下一步取得可重現的 Tiny LSTM training code、checkpoint、dataset lineage 與 evaluation report。
-4. 在 training environment 匯出 ONNX；Edge image 只安裝 ONNX Runtime。
-5. 實作 Isolation Forest、XGBoost、Tiny LSTM adapters 與 calibration；raw logits 不可直接進 fusion。
-6. XGBoost federation 不得套用 FedAvg，需使用 model-specific aggregation 或只共享統計/蒸餾成果。
+3. 已實作 Isolation Forest、XGBoost、Tiny LSTM ONNX adapters、artifact SHA-256 gate 與 versioned Platt/isotonic/identity calibration；raw score 不會直接進 fusion。
+4. 已將 model status、version、calibration version、latency 與 last result 寫入 `model-runtime.json`，並納入 Edge Agent health。
+5. 下一步取得可重現的 training code、checkpoint、dataset lineage 與 evaluation report，再於 training environment 匯出 ONNX；Edge image 只安裝 ONNX Runtime。
+6. Model distribution 尚需補數位簽章、staging health check、atomic activation 與上一版本 artifact rollback；目前可用 `MODEL_INFERENCE_ENABLED=false` 緊急停用。
+7. XGBoost federation 不得套用 FedAvg，需使用 model-specific aggregation 或只共享統計/蒸餾成果。

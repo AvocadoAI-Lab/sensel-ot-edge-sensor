@@ -65,6 +65,13 @@ class EventsConfig(BaseModel):
     suricata_offset_path: str = "/app/data/suricata-events.offset"
 
 
+class EpisodesConfig(BaseModel):
+    watch_path: str = "/app/data/assets/trust-episodes.jsonl"
+    offset_path: str = "/app/data/trust-episodes.offset"
+    spool_db_path: str = "/app/data/trust-episode-spool.db"
+    max_episodes: int = Field(default=2000, ge=1)
+
+
 class NorthboundMqttConfig(BaseModel):
     enabled: bool = False
     host: str = ""
@@ -75,6 +82,14 @@ class NorthboundMqttConfig(BaseModel):
     password: str = ""
     qos_events: int = 1
     tls: bool = False
+    tls_ca_path: str = ""
+    tls_cert_path: str = ""
+    tls_key_path: str = ""
+    tls_insecure: bool = False
+    wire_mode: str = "json"
+    protobuf_failure_threshold: int = Field(default=3, ge=1)
+    rollback_state_path: str = "/app/data/northbound-wire-state.json"
+    rollback_reset: bool = False
 
 
 class SenselConfig(BaseModel):
@@ -85,6 +100,7 @@ class SenselConfig(BaseModel):
     retry: RetryConfig = Field(default_factory=RetryConfig)
     buffer: BufferConfig = Field(default_factory=BufferConfig)
     events: EventsConfig = Field(default_factory=EventsConfig)
+    episodes: EpisodesConfig = Field(default_factory=EpisodesConfig)
     health_interval_sec: int = 30
     register_retry_sec: int = 60
     verify_tls: bool = True
@@ -265,6 +281,33 @@ def load_config(path: Path | None = None) -> AppConfig:
         os.environ.get("SURICATA_EVENTS_OFFSET", "/app/data/suricata-events.offset"),
     )
     sensel_raw["events"] = events_raw
+    episodes_raw = sensel_raw.get("episodes", {})
+    episodes_raw.setdefault(
+        "watch_path",
+        os.environ.get(
+            "TRUST_EPISODES_PATH",
+            "/app/data/assets/trust-episodes.jsonl",
+        ),
+    )
+    episodes_raw.setdefault(
+        "offset_path",
+        os.environ.get(
+            "TRUST_EPISODES_OFFSET",
+            "/app/data/trust-episodes.offset",
+        ),
+    )
+    episodes_raw.setdefault(
+        "spool_db_path",
+        os.environ.get(
+            "TRUST_EPISODE_SPOOL_DB",
+            "/app/data/trust-episode-spool.db",
+        ),
+    )
+    episodes_raw.setdefault(
+        "max_episodes",
+        int(os.environ.get("TRUST_EPISODE_SPOOL_MAX", "2000")),
+    )
+    sensel_raw["episodes"] = episodes_raw
     sensel_raw["health_interval_sec"] = int(
         capture_raw.get("health_check_interval_sec", 30)
     )
@@ -320,6 +363,45 @@ def load_config(path: Path | None = None) -> AppConfig:
     require_tenant_env = os.environ.get("MQTT_REQUIRE_TENANT", "").lower()
     if require_tenant_env in ("1", "true", "yes"):
         nb_raw["require_tenant"] = True
+    tls_env = os.environ.get("CONTROL_PLANE_MQTT_TLS", "").lower()
+    if tls_env in ("1", "true", "yes", "on"):
+        nb_raw["tls"] = True
+    elif tls_env in ("0", "false", "no", "off"):
+        nb_raw["tls"] = False
+    nb_raw.setdefault(
+        "tls_ca_path",
+        os.environ.get("CONTROL_PLANE_MQTT_CA_PATH", ""),
+    )
+    nb_raw.setdefault(
+        "tls_cert_path",
+        os.environ.get("CONTROL_PLANE_MQTT_CERT_PATH", ""),
+    )
+    nb_raw.setdefault(
+        "tls_key_path",
+        os.environ.get("CONTROL_PLANE_MQTT_KEY_PATH", ""),
+    )
+    insecure_env = os.environ.get("CONTROL_PLANE_MQTT_TLS_INSECURE", "").lower()
+    if insecure_env in ("1", "true", "yes", "on"):
+        nb_raw["tls_insecure"] = True
+    nb_raw["wire_mode"] = os.environ.get(
+        "NORTHBOUND_WIRE_MODE",
+        str(nb_raw.get("wire_mode", "json")),
+    ).strip().lower()
+    if nb_raw["wire_mode"] not in {"json", "dual", "protobuf"}:
+        raise ValueError("NORTHBOUND_WIRE_MODE must be json, dual, or protobuf")
+    nb_raw["protobuf_failure_threshold"] = int(
+        os.environ.get(
+            "NORTHBOUND_PROTOBUF_FAILURE_THRESHOLD",
+            str(nb_raw.get("protobuf_failure_threshold", 3)),
+        )
+    )
+    nb_raw["rollback_state_path"] = os.environ.get(
+        "NORTHBOUND_WIRE_STATE_PATH",
+        str(nb_raw.get("rollback_state_path", "/app/data/northbound-wire-state.json")),
+    )
+    reset_env = os.environ.get("NORTHBOUND_WIRE_ROLLBACK_RESET", "").lower()
+    if reset_env in ("1", "true", "yes", "on"):
+        nb_raw["rollback_reset"] = True
 
     policy_raw = expanded.get("policy_sync", {})
     enabled_env = os.environ.get("POLICY_SYNC_ENABLED", "").lower()

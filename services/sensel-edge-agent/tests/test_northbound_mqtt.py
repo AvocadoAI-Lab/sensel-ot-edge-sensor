@@ -153,3 +153,55 @@ def test_update_endpoint_only_bootstraps_when_unset() -> None:
     # Already set -> no override.
     assert nb.update_endpoint_if_unset("other.example", 1883) is False
     assert cfg.host == "broker.example"
+
+
+def test_mqtt_v5_client_configures_mutual_tls() -> None:
+    cfg, sensor = _client_cfg()
+    cfg.tls = True
+    cfg.tls_ca_path = "/certs/ca.pem"
+    cfg.tls_cert_path = "/certs/sensor.pem"
+    cfg.tls_key_path = "/certs/sensor.key"
+    nb = NorthboundMqttClient(cfg, sensor)
+    mock_instance = MagicMock()
+
+    with patch("paho.mqtt.client.Client", return_value=mock_instance) as client_cls:
+        assert nb._ensure_client() is mock_instance
+
+    assert client_cls.call_args.kwargs["protocol"].name == "MQTTv5"
+    mock_instance.tls_set.assert_called_once_with(
+        ca_certs="/certs/ca.pem",
+        certfile="/certs/sensor.pem",
+        keyfile="/certs/sensor.key",
+    )
+    mock_instance.tls_insecure_set.assert_called_once_with(False)
+
+
+def test_protobuf_publish_sets_mqtt_v5_properties() -> None:
+    cfg, sensor = _client_cfg()
+    nb = NorthboundMqttClient(cfg, sensor)
+    mock_instance = MagicMock()
+    mock_info = MagicMock(rc=0)
+    mock_info.is_published.return_value = True
+    mock_instance.publish.return_value = mock_info
+
+    with patch("paho.mqtt.client.Client", return_value=mock_instance), patch(
+        "src.northbound.mqtt.write_agent_runtime"
+    ):
+        nb._ensure_client()
+        nb._on_connect(mock_instance, None, None, 0)
+        assert nb.publish_trust_episode_protobuf(
+            b"protobuf-wire",
+            trace_id="trace-1",
+        ) is True
+
+    args, kwargs = mock_instance.publish.call_args
+    assert args == (
+        "sensel/company-test/site-a/ot-edge-001/episode/v1",
+        b"protobuf-wire",
+    )
+    assert kwargs["qos"] == 1
+    assert kwargs["properties"].PayloadFormatIndicator == 0
+    assert kwargs["properties"].ContentType.endswith(
+        "sensel.episode.v1.TrustEpisode"
+    )
+    assert kwargs["properties"].CorrelationData == b"trace-1"

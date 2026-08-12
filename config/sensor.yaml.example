@@ -21,6 +21,11 @@ sensel:
   events:
     watch_path: /app/data/assets/security-events.jsonl
     offset_path: /app/data/security-events.offset
+  episodes:
+    watch_path: /app/data/assets/trust-episodes.jsonl
+    offset_path: /app/data/trust-episodes.offset
+    spool_db_path: /app/data/trust-episode-spool.db
+    max_episodes: 2000
   upload:
     events_path: /api/v1/ot/security-events
     telemetry_path: /api/v1/ot/telemetry
@@ -39,6 +44,15 @@ northbound_mqtt:
   port: 1883
   tenant_id: default
   qos_events: 1
+  tls: false
+  tls_ca_path: ""
+  tls_cert_path: ""
+  tls_key_path: ""
+  tls_insecure: false
+  # json (default) → dual (shadow protobuf) → protobuf
+  wire_mode: json
+  protobuf_failure_threshold: 3
+  rollback_state_path: /app/data/northbound-wire-state.json
 
 capture:
   interface: ${CAPTURE_INTERFACE}
@@ -65,6 +79,37 @@ features:
     topic_prefix: sensel/ot
     edgex_device_name: packet-sensor-features
     # edgex_data_topic:  # default → incoming/data/packet-sensor-features/FeatureSummary
+
+# P1-B local ML is fail-open and disabled until real ONNX artifacts, exact
+# SHA-256 digests, concrete model versions, and calibration are installed.
+# Build packet-sensor with INSTALL_ML_RUNTIME=true before enabling this block.
+inference:
+  enabled: false
+  episode_output_path: /app/data/assets/trust-episodes.jsonl
+  runtime_status_path: /app/data/assets/model-runtime.json
+  emit_decisions: [alert]
+  fusion_policy_version: fusion-v1
+  fusion_alert_threshold: 0.75
+  fusion_maximum_weight: 0.7
+  isolation_forest:
+    enabled: false
+    model_path: /app/data/models/isolation-forest.onnx
+    model_version: unconfigured
+    artifact_sha256: ""
+    calibration_path: /app/config/model/calibration.json
+  xgboost:
+    enabled: false
+    model_path: /app/data/models/xgboost.onnx
+    model_version: unconfigured
+    artifact_sha256: ""
+    calibration_path: /app/config/model/calibration.json
+    output_index: 1
+  tiny_lstm:
+    enabled: false
+    model_path: /app/data/models/tiny-lstm.onnx
+    model_version: unconfigured
+    artifact_sha256: ""
+    calibration_path: /app/config/model/calibration.json
 
 detection:
   policy_file: /app/config/policy/baseline.json

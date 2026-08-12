@@ -308,3 +308,43 @@ def decode_trust_episode(payload: bytes) -> dict[str, Any]:
     message = trust_episode_pb2.TrustEpisode()
     message.ParseFromString(payload)
     return trust_episode_to_mapping(message)
+
+
+def trust_episode_to_envelope(
+    message: trust_episode_pb2.TrustEpisode,
+) -> dict[str, Any]:
+    """Return the canonical JSON twin used for dual-publish parity checks."""
+
+    episode = trust_episode_to_mapping(message)
+    payload = {
+        key: value
+        for key, value in episode.items()
+        if key
+        not in {
+            "tenant_id",
+            "site_id",
+            "sensor_id",
+            "observed_at",
+            "sequence",
+            "trace_id",
+            "producer_version",
+        }
+    }
+    return {
+        "schema_version": "sensel.episode.v1",
+        "message_type": "trust_episode",
+        "event_id": message.episode_id,
+        "tenant_id": message.meta.tenant_id,
+        "site_id": message.meta.site_id,
+        "sensor_id": message.meta.sensor_id,
+        "observed_at": episode["observed_at"],
+        "sequence": message.meta.sequence,
+        "trace_id": message.meta.trace_id,
+        "producer": {
+            "type": message.meta.producer.type,
+            "version": message.meta.producer.version,
+        },
+        "severity": message.fusion.severity,
+        "dedup_key": f"{message.meta.tenant_id}:{message.episode_id}",
+        "payload": payload,
+    }

@@ -18,6 +18,7 @@ from src.api.client import SenseLClient
 from src.config.settings import load_config
 from src.health.collector import collect_health
 from src.northbound.mqtt import NorthboundMqttClient
+from src.northbound.wire_mode import WireModeController
 from src.northbound.observe_tick_publisher import ObserveTickPublisher
 from src.northbound.topology_snapshot_publisher import TopologySnapshotPublisher
 from src.policy.sync import PolicySync
@@ -44,6 +45,12 @@ from src.runtime.registration import RegistrationState, attempt_registration
 from src.health.engines import engines_runtime_summary
 from src.sighting.reporter import SightingReporter
 from src.upload.buffer import UploadBuffer
+from src.upload.episode_spool import TrustEpisodeSpool
+from src.upload.episodes import (
+    TrustEpisodeTailer,
+    drain_episode_spool,
+    enqueue_pending_episodes,
+)
 from src.upload.events import SecurityEventTailer
 
 logging.basicConfig(
@@ -244,6 +251,20 @@ def main() -> int:
     tailer = SecurityEventTailer(
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
+    )
+    episode_tailer = TrustEpisodeTailer(
+        config.sensel.episodes.watch_path,
+        config.sensel.episodes.offset_path,
+    )
+    episode_spool = TrustEpisodeSpool(
+        config.sensel.episodes.spool_db_path,
+        max_episodes=config.sensel.episodes.max_episodes,
+    )
+    wire_mode = WireModeController(
+        config.northbound_mqtt.wire_mode,
+        failure_threshold=config.northbound_mqtt.protobuf_failure_threshold,
+        state_path=config.northbound_mqtt.rollback_state_path,
+        reset_rollback=config.northbound_mqtt.rollback_reset,
     )
     # Extra sources: external engine events (same upload path, separate JSONL +
     # offset to avoid write contention with the packet-sensor pipeline).
@@ -480,6 +501,27 @@ def main() -> int:
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
+            enqueued_episodes = enqueue_pending_episodes(
+                episode_tailer,
+                episode_spool,
+                tenant_id=(
+                    registration.tenant_id or config.northbound_mqtt.tenant_id
+                ),
+                sensor=config.sensor,
+            )
+            delivered_episodes = drain_episode_spool(
+                episode_spool,
+                mqtt,
+                wire_mode,
+            )
+            if enqueued_episodes or delivered_episodes:
+                logger.info(
+                    "Trust Episode spool enqueued=%s delivered=%s pending=%s mode=%s",
+                    enqueued_episodes,
+                    delivered_episodes,
+                    episode_spool.depth(),
+                    wire_mode.effective_mode,
+                )
 
             if sighting_reporter.enabled:
                 sighting_reporter.run_cycle()
@@ -555,6 +597,8 @@ def main() -> int:
                 # Control-Plane MQTT credentials have landed locally.
                 engines=engines_runtime_summary(health.get("engines") or []),
                 mqtt_credentials=credentials_status(),
+                trust_episode_spool_depth=episode_spool.depth(),
+                northbound_wire=wire_mode.to_dict(),
             )
 
             # Northbound MQTT heartbeat: publish_state lazily (re)connects, so a
@@ -623,6 +667,7 @@ def main() -> int:
             detection_policy_mqtt.stop()
         if policy_mqtt:
             policy_mqtt.stop()
+        episode_spool.close()
         buffer.close()
         mqtt.close()
         client.close()

@@ -90,6 +90,8 @@ class CaptureSession:
         self.pipeline = PacketPipeline(
             sensor_id=config.sensor.id,
             site_id=config.sensor.site_id,
+            tenant_id=config.sensor.tenant_id,
+            producer_version=config.sensor.software_version,
             policy_path=config.detection.policy_file,
             assets_dir=config.features.assets_dir,
             rules_enabled=config.detection.rules_enabled,
@@ -101,6 +103,7 @@ class CaptureSession:
             feature_window_sec=config.features.window_sec,
             feature_contract_id=config.features.contract_id,
             feature_contract_path=config.features.contract_path,
+            inference_config=config.inference,
             ioc_enabled=config.ioc.enabled,
             ioc_cache_path=config.ioc.cache_path,
             ioc_stamp_path=config.ioc.stamp_path,

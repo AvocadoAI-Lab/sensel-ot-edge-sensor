@@ -1,12 +1,39 @@
 """MQTT topic helpers for ot-edge/default/{site}/{sensor}/..."""
 
 
+def _segment(value: str, name: str) -> str:
+    segment = str(value or "").strip()
+    if not segment or any(character in segment for character in "/+#"):
+        raise ValueError(f"MQTT topic {name} is empty or contains a reserved character")
+    return segment
+
+
 def topic_base(tenant_id: str, site_id: str, sensor_id: str) -> str:
-    return f"ot-edge/{tenant_id}/{site_id}/{sensor_id}"
+    return "ot-edge/{}/{}/{}".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
 
 
 def events_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
     return f"{topic_base(tenant_id, site_id, sensor_id)}/events/v1"
+
+
+def trust_episode_json_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:
+    return f"{topic_base(tenant_id, site_id, sensor_id)}/episodes/v1"
+
+
+def trust_episode_protobuf_topic(
+    tenant_id: str,
+    site_id: str,
+    sensor_id: str,
+) -> str:
+    return "sensel/{}/{}/{}/episode/v1".format(
+        _segment(tenant_id, "tenant_id"),
+        _segment(site_id, "site_id"),
+        _segment(sensor_id, "sensor_id"),
+    )
 
 
 def state_topic(tenant_id: str, site_id: str, sensor_id: str) -> str:

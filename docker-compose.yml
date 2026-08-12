@@ -131,6 +131,13 @@ services:
       - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-false}
       - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
       - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+      - CONTROL_PLANE_MQTT_TLS=${CONTROL_PLANE_MQTT_TLS:-false}
+      - CONTROL_PLANE_MQTT_CA_PATH=${CONTROL_PLANE_MQTT_CA_PATH:-}
+      - CONTROL_PLANE_MQTT_CERT_PATH=${CONTROL_PLANE_MQTT_CERT_PATH:-}
+      - CONTROL_PLANE_MQTT_KEY_PATH=${CONTROL_PLANE_MQTT_KEY_PATH:-}
+      - NORTHBOUND_WIRE_MODE=${NORTHBOUND_WIRE_MODE:-json}
+      - NORTHBOUND_PROTOBUF_FAILURE_THRESHOLD=${NORTHBOUND_PROTOBUF_FAILURE_THRESHOLD:-3}
+      - NORTHBOUND_WIRE_ROLLBACK_RESET=${NORTHBOUND_WIRE_ROLLBACK_RESET:-false}
       - PLATFORM_CONFIG_PATH=/app/data/platform.json
       - POLICY_SYNC_ENABLED=${POLICY_SYNC_ENABLED:-true}
       - POLICY_SYNC_INTERVAL_SEC=${POLICY_SYNC_INTERVAL_SEC:-60}
@@ -185,6 +192,8 @@ services:
     build:
       context: ./services/packet-sensor
       dockerfile: Dockerfile
+      args:
+        INSTALL_ML_RUNTIME: ${INSTALL_ML_RUNTIME:-false}
     container_name: sensel-packet-sensor
     restart: unless-stopped
     env_file:
@@ -195,6 +204,7 @@ services:
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
       - ./data/agent:/app/data/agent:ro
+      - ./data/models:/app/data/models:ro
       - /sys/fs/bpf:/sys/fs/bpf
     environment:
       - IOC_MATCH_ENABLED=${IOC_MATCH_ENABLED:-true}
@@ -217,6 +227,10 @@ services:
       - XDP_QUEUE_ID=${XDP_QUEUE_ID:-0}
       - AF_XDP_FRAME_SIZE=${AF_XDP_FRAME_SIZE:-2048}
       - AF_XDP_NUM_FRAMES=${AF_XDP_NUM_FRAMES:-4096}
+      - MODEL_INFERENCE_ENABLED=${MODEL_INFERENCE_ENABLED:-false}
+      - IF_ENABLED=${IF_ENABLED:-false}
+      - XGB_ENABLED=${XGB_ENABLED:-false}
+      - LSTM_ENABLED=${LSTM_ENABLED:-false}
     network_mode: host
     cap_add:
       - NET_ADMIN

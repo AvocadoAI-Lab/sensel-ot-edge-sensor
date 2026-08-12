@@ -17,6 +17,8 @@ from src.northbound.topics import (
     policy_ack_topic,
     state_topic,
     topology_snapshot_topic,
+    trust_episode_json_topic,
+    trust_episode_protobuf_topic,
 )
 from src.runtime.agent_snapshot import write_agent_runtime
 
@@ -152,11 +154,23 @@ class NorthboundMqttClient:
                 client = mqtt.Client(
                     mqtt.CallbackAPIVersion.VERSION2,
                     client_id=client_id,
+                    protocol=mqtt.MQTTv5,
                 )
                 client.on_connect = self._on_connect
                 client.on_disconnect = self._on_disconnect
                 if self._cfg.username:
                     client.username_pw_set(self._cfg.username, self._cfg.password or None)
+                if self._cfg.tls:
+                    if not self._cfg.tls_cert_path or not self._cfg.tls_key_path:
+                        raise ValueError(
+                            "northbound MQTT mTLS requires client certificate and key"
+                        )
+                    client.tls_set(
+                        ca_certs=self._cfg.tls_ca_path or None,
+                        certfile=self._cfg.tls_cert_path,
+                        keyfile=self._cfg.tls_key_path,
+                    )
+                    client.tls_insecure_set(self._cfg.tls_insecure)
                 client.reconnect_delay_set(
                     min_delay=int(_RECONNECT_MIN_SEC),
                     max_delay=int(_RECONNECT_MAX_SEC),
@@ -217,6 +231,81 @@ class NorthboundMqttClient:
         except Exception:
             logger.exception("MQTT publish failed topic=%s", topic)
             return False
+
+    def publish_bytes(
+        self,
+        topic: str,
+        payload: bytes,
+        *,
+        content_type: str,
+        correlation_data: bytes = b"",
+        qos: int = 1,
+    ) -> bool:
+        client = self._ensure_client()
+        if client is None or not self._connected:
+            return False
+        try:
+            from paho.mqtt.packettypes import PacketTypes
+            from paho.mqtt.properties import Properties
+
+            properties = Properties(PacketTypes.PUBLISH)
+            properties.PayloadFormatIndicator = 0
+            properties.ContentType = content_type
+            if correlation_data:
+                properties.CorrelationData = correlation_data
+            info = client.publish(
+                topic,
+                payload,
+                qos=qos,
+                properties=properties,
+            )
+            info.wait_for_publish(timeout=10.0)
+            if info.rc != 0 or (qos > 0 and not info.is_published()):
+                logger.warning("MQTT binary publish not confirmed topic=%s rc=%s", topic, info.rc)
+                return False
+            write_agent_runtime(
+                mqtt_connected=True,
+                tenant_id=self._cfg.tenant_id,
+                last_mqtt_publish_at=_utc_now_iso(),
+            )
+            return True
+        except Exception:
+            logger.exception("MQTT binary publish failed topic=%s", topic)
+            return False
+
+    def publish_trust_episode_json(self, envelope: dict[str, Any]) -> bool:
+        if self._cfg.require_tenant and self._cfg.tenant_id.strip() in ("", "default"):
+            return False
+        topic = trust_episode_json_topic(
+            self._cfg.tenant_id,
+            self._sensor.site_id,
+            self._sensor.id,
+        )
+        return self.publish_json(topic, envelope, qos=1)
+
+    def publish_trust_episode_protobuf(
+        self,
+        payload: bytes,
+        *,
+        trace_id: str,
+    ) -> bool:
+        if self._cfg.require_tenant and self._cfg.tenant_id.strip() in ("", "default"):
+            return False
+        topic = trust_episode_protobuf_topic(
+            self._cfg.tenant_id,
+            self._sensor.site_id,
+            self._sensor.id,
+        )
+        return self.publish_bytes(
+            topic,
+            payload,
+            content_type=(
+                "application/x-protobuf; "
+                "message=sensel.episode.v1.TrustEpisode"
+            ),
+            correlation_data=trace_id.encode("utf-8"),
+            qos=1,
+        )
 
     def publish_security_event(self, event: dict[str, Any]) -> bool:
         if self._cfg.require_tenant and (self._cfg.tenant_id or "").strip() in ("", "default"):

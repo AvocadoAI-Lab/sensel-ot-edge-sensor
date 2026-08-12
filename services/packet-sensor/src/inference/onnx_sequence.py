@@ -9,6 +9,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from src.inference.artifact import verify_artifact_sha256
+from src.inference.calibration import ScoreCalibrator
+
 
 SessionFactory = Callable[[str, Sequence[str]], Any]
 
@@ -20,6 +23,8 @@ class ModelRuntimeState:
     model_path: str
     model_version: str
     feature_contract_id: str
+    artifact_sha256: str = ""
+    calibration_version: str = ""
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,6 +41,8 @@ class InferenceResult:
     label: str
     latency_ms: float
     error: str = ""
+    raw_score: float | None = None
+    calibration_version: str = ""
 
     @property
     def available(self) -> bool:
@@ -61,6 +68,8 @@ class OnnxSequenceRuntime:
         feature_contract_id: str,
         enabled: bool = True,
         threshold: float = 0.5,
+        expected_sha256: str = "",
+        calibrator: ScoreCalibrator | None = None,
         providers: Sequence[str] = ("CPUExecutionProvider",),
         session_factory: SessionFactory | None = None,
     ) -> None:
@@ -75,6 +84,11 @@ class OnnxSequenceRuntime:
         self._model_version = model_version
         self._feature_contract_id = feature_contract_id
         self._threshold = float(threshold)
+        self._expected_sha256 = expected_sha256
+        self._calibrator = calibrator or ScoreCalibrator(
+            version="identity-v1",
+            kind="identity",
+        )
         self._providers = tuple(providers)
         self._session_factory = session_factory
         self._session: Any | None = None
@@ -86,6 +100,8 @@ class OnnxSequenceRuntime:
             model_path=str(self._path),
             model_version=model_version,
             feature_contract_id=feature_contract_id,
+            artifact_sha256=expected_sha256,
+            calibration_version=self._calibrator.version,
         )
         if enabled:
             self._load()
@@ -101,6 +117,8 @@ class OnnxSequenceRuntime:
             model_path=str(self._path),
             model_version=self._model_version,
             feature_contract_id=self._feature_contract_id,
+            artifact_sha256=self._expected_sha256,
+            calibration_version=self._calibrator.version,
             error=error,
         )
 
@@ -110,6 +128,8 @@ class OnnxSequenceRuntime:
             return
 
         try:
+            if self._expected_sha256:
+                verify_artifact_sha256(self._path, self._expected_sha256)
             if self._session_factory is None:
                 import onnxruntime as ort
 
@@ -206,17 +226,18 @@ class OnnxSequenceRuntime:
             score = float(flattened[0])
             if not math.isfinite(score):
                 raise ValueError("model returned a non-finite score")
-            if not 0 <= score <= 1:
-                raise ValueError("model score must be normalized between 0 and 1")
+            calibrated_score = self._calibrator.apply(score)
             latency_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
             return InferenceResult(
                 engine_id=self._engine_id,
                 model_version=self._model_version,
                 feature_contract_id=self._feature_contract_id,
                 status="ok",
-                score=score,
-                label="anomaly" if score >= self._threshold else "normal",
+                score=calibrated_score,
+                label="anomaly" if calibrated_score >= self._threshold else "normal",
                 latency_ms=latency_ms,
+                raw_score=score,
+                calibration_version=self._calibrator.version,
             )
         except Exception as exc:
             latency_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
