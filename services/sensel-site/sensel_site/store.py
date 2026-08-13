@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import threading
@@ -605,6 +606,69 @@ class SiteStore:
                     "trainer_jobs",
                 )
             }
+
+    def production_status(
+        self,
+        *,
+        maximum_database_bytes: int,
+        maximum_wal_bytes: int,
+        verify_integrity: bool = False,
+    ) -> dict[str, Any]:
+        if maximum_database_bytes < 1 or maximum_wal_bytes < 1:
+            raise ValueError("Site storage budgets must be positive")
+        with self._lock:
+            database_bytes = self.path.stat().st_size if self.path.exists() else 0
+            wal_path = Path(f"{self.path}-wal")
+            wal_bytes = wal_path.stat().st_size if wal_path.exists() else 0
+            integrity = "not_checked"
+            foreign_key_violations = 0
+            if verify_integrity:
+                integrity = str(self._conn.execute("PRAGMA quick_check").fetchone()[0])
+                foreign_key_violations = len(
+                    self._conn.execute("PRAGMA foreign_key_check").fetchall()
+                )
+            checks = {
+                "database_budget": database_bytes <= maximum_database_bytes,
+                "wal_budget": wal_bytes <= maximum_wal_bytes,
+                "integrity": integrity in {"ok", "not_checked"},
+                "foreign_keys": foreign_key_violations == 0,
+            }
+            return {
+                "ready": all(checks.values()),
+                "checks": checks,
+                "database_bytes": database_bytes,
+                "wal_bytes": wal_bytes,
+                "maximum_database_bytes": maximum_database_bytes,
+                "maximum_wal_bytes": maximum_wal_bytes,
+                "integrity": integrity,
+                "foreign_key_violations": foreign_key_violations,
+            }
+
+    def create_verified_snapshot(self, destination: str | Path) -> dict[str, Any]:
+        target = Path(destination)
+        if target.exists() or target.is_symlink() or not target.parent.is_dir():
+            raise ValueError("Site snapshot destination must be a new file in an existing directory")
+        temporary = target.with_name(f".{target.name}.tmp-{uuid.uuid4().hex}")
+        try:
+            with self._lock, sqlite3.connect(temporary) as output:
+                self._conn.backup(output)
+            with sqlite3.connect(f"file:{temporary}?mode=ro", uri=True) as verification:
+                integrity = str(verification.execute("PRAGMA integrity_check").fetchone()[0])
+                if integrity != "ok" or verification.execute(
+                    "PRAGMA foreign_key_check"
+                ).fetchone() is not None:
+                    raise ValueError("Site snapshot integrity verification failed")
+            temporary.chmod(0o600)
+            temporary.replace(target)
+            payload = target.read_bytes()
+            return {
+                "path": str(target),
+                "size_bytes": len(payload),
+                "sha256": "sha256:" + hashlib.sha256(payload).hexdigest(),
+                "integrity": "ok",
+            }
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def close(self) -> None:
         with self._lock:

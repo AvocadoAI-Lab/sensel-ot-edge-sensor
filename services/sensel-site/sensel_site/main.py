@@ -53,15 +53,24 @@ def run() -> None:
     )
     try:
         while not stopping.wait(10):
+            storage = store.production_status(
+                maximum_database_bytes=int(
+                    os.getenv("SENSEL_SITE_MAX_DATABASE_BYTES", str(10 * 1024**3))
+                ),
+                maximum_wal_bytes=int(
+                    os.getenv("SENSEL_SITE_MAX_WAL_BYTES", str(512 * 1024**2))
+                ),
+            )
             _atomic_health(
                 config,
                 {
-                    "status": "ok",
+                    "status": "ok" if storage["ready"] else "degraded",
                     "tenant_id": config.tenant_id,
                     "site_id": config.site_id,
                     "node_id": config.node_id,
                     "mqtt_connected": subscriber.connected,
                     "counts": store.counts(),
+                    "storage": storage,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
