@@ -47,6 +47,8 @@ services:
       SENSEL_SITE_MAX_EPISODE_BYTES: ${SENSEL_SITE_MAX_EPISODE_BYTES:-1048576}
       SENSEL_SITE_MAX_DATABASE_BYTES: ${SENSEL_SITE_MAX_DATABASE_BYTES:-10737418240}
       SENSEL_SITE_MAX_WAL_BYTES: ${SENSEL_SITE_MAX_WAL_BYTES:-536870912}
+      SENSEL_DEPLOYMENT_PROFILE_ID: ${SENSEL_DEPLOYMENT_PROFILE_ID:-electric-substation-iec61850}
+      SENSEL_DEPLOYMENT_PROFILE_VERSION: ${SENSEL_DEPLOYMENT_PROFILE_VERSION:-1.0.0}
     volumes:
       - site-data:/var/lib/sensel-site
       - site-trainer-inbox:/var/lib/sensel-trainer-inbox
@@ -97,6 +99,59 @@ services:
     volumes:
       - site-data:/var/lib/sensel-site
       - site-backups:/backups
+    depends_on:
+      sensel-site:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+
+  sensel-site-soak-evidence:
+    profiles:
+      - qualification
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile
+    restart: "no"
+    init: true
+    command:
+      - python
+      - -m
+      - sensel_site.soak_evidence
+      - --database
+      - /var/lib/sensel-site/site.db
+      - --backup-dir
+      - /backups/soak
+      - --duration-seconds
+      - ${SENSEL_SITE_SOAK_DURATION_SECONDS:-259200}
+      - --interval-seconds
+      - ${SENSEL_SITE_SOAK_INTERVAL_SECONDS:-900}
+      - --maximum-database-bytes
+      - ${SENSEL_SITE_MAX_DATABASE_BYTES:-10737418240}
+      - --maximum-wal-bytes
+      - ${SENSEL_SITE_MAX_WAL_BYTES:-536870912}
+      - --profile-id
+      - ${SENSEL_DEPLOYMENT_PROFILE_ID:-electric-substation-iec61850}
+      - --profile-version
+      - ${SENSEL_DEPLOYMENT_PROFILE_VERSION:-1.0.0}
+      - --environment
+      - ${SENSEL_EVIDENCE_ENVIRONMENT:-lab}
+      - --tenant-id
+      - ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      - --site-id
+      - ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      - --output
+      - /evidence/edge-soak.json
+    volumes:
+      - site-data:/var/lib/sensel-site
+      - site-backups:/backups
+      - site-release-evidence:/evidence
     depends_on:
       sensel-site:
         condition: service_healthy
@@ -275,6 +330,7 @@ volumes:
   site-approval-bundles:
   site-release-results:
   site-backups:
+  site-release-evidence:
 
 networks:
   sensel-site:
