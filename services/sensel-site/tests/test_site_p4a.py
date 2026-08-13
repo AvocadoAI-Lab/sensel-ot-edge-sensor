@@ -227,3 +227,67 @@ def test_site_update_attests_signed_identity_and_rate_policy(tmp_path) -> None:
     assert update.site_identity_id == "device-1"
     assert update.trust_domain_id == "operator-1"
     assert update.rate_policy_id == "site-rate-v1"
+
+
+def test_managed_enrollment_is_signed_into_site_update(tmp_path) -> None:
+    key = Ed25519PrivateKey.generate()
+    private = tmp_path / "site.pem"
+    _private(private, key)
+    spec = federation_pb2.FederationRoundSpec(
+        round_id="round-" + "4" * 64,
+        tenant_id="tenant-a",
+        model_id="ot-xgb",
+        base_model_version="0.1.0",
+        feature_contract_id="ot-window-v1",
+        strategy=federation_pb2.AGGREGATION_STRATEGY_FEDXGB_BAGGING,
+        minimum_clients=3,
+        allowed_site_ids=["site-1", "site-2", "site-3"],
+        site_identity=federation_pb2.SiteIdentityPolicy(
+            registry_sha256="sha256:" + "a" * 64,
+            rate_policy_id="site-rate-v1",
+            maximum_updates_per_window=2,
+            rate_window_seconds=3600,
+            require_managed_enrollment=True,
+            maximum_key_age_seconds=86400,
+            enrollment_snapshot_sha256="sha256:" + "b" * 64,
+        ),
+    )
+    wire = build_signed_site_update(
+        spec,
+        site_id="site-1",
+        client_id="client-1",
+        dataset_id="dataset-" + "5" * 64,
+        candidate_id="candidate-" + "6" * 64,
+        sample_count=12,
+        artifact=b'{"learner":"sandbox"}',
+        site_private_key_path=private,
+        site_key_id="site-1-key-2",
+        site_identity_id="device-1",
+        trust_domain_id="operator-1",
+        enrollment_id="enrollment-" + "7" * 64,
+        key_generation=2,
+    )
+    update = federation_pb2.ClientUpdateManifest.FromString(wire)
+    assert update.enrollment_id == "enrollment-" + "7" * 64
+    assert update.key_generation == 2
+
+
+def test_site_rejects_unavailable_secure_aggregation_round(tmp_path) -> None:
+    now = datetime(2026, 8, 13, tzinfo=timezone.utc)
+    coordinator = Ed25519PrivateKey.generate()
+    public = tmp_path / "coordinator.pub.pem"
+    _public(public, coordinator)
+    spec = federation_pb2.FederationRoundSpec.FromString(_spec(coordinator, now))
+    spec.coordinator_signature = b""
+    spec.secure_aggregation.protocol_id = "flower-secaggplus"
+    spec.secure_aggregation.production_ready = False
+    spec.coordinator_signature = coordinator.sign(spec.SerializeToString(deterministic=True))
+    with pytest.raises(ValueError, match="policy is invalid"):
+        verify_round_spec(
+            spec.SerializeToString(deterministic=True),
+            coordinator_public_key_path=public,
+            coordinator_key_id="coordinator-key-1",
+            tenant_id="tenant-a",
+            site_id="site-1",
+            now=now,
+        )

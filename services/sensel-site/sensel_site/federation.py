@@ -54,6 +54,8 @@ def verify_round_spec(
             site_id not in spec.allowed_site_ids,
             spec.strategy != federation_pb2.AGGREGATION_STRATEGY_FEDXGB_BAGGING,
             spec.minimum_clients < 3,
+            spec.secure_aggregation.protocol_id not in {"", "none"},
+            spec.secure_aggregation.production_ready,
             len(set(spec.allowed_site_ids)) != len(spec.allowed_site_ids),
             spec.starts_at.ToDatetime(tzinfo=timezone.utc) > current,
             spec.deadline_at.ToDatetime(tzinfo=timezone.utc) <= current,
@@ -88,6 +90,8 @@ def build_signed_site_update(
     noise_source: Any | None = None,
     site_identity_id: str = "",
     trust_domain_id: str = "",
+    enrollment_id: str = "",
+    key_generation: int = 0,
 ) -> bytes:
     if any(
         (
@@ -103,6 +107,13 @@ def build_signed_site_update(
                 not _ID.fullmatch(site_identity_id)
                 or not _ID.fullmatch(trust_domain_id)
                 or not spec.site_identity.registry_sha256.startswith("sha256:")
+            ),
+            spec.site_identity.require_managed_enrollment
+            and (
+                not enrollment_id.startswith("enrollment-")
+                or len(enrollment_id) != 75
+                or key_generation < 1
+                or not spec.site_identity.enrollment_snapshot_sha256.startswith("sha256:")
             ),
         )
     ):
@@ -137,6 +148,8 @@ def build_signed_site_update(
         site_identity_id=site_identity_id,
         trust_domain_id=trust_domain_id,
         rate_policy_id=spec.site_identity.rate_policy_id,
+        enrollment_id=enrollment_id,
+        key_generation=key_generation,
     )
     if safety is not None:
         update.safety.CopyFrom(safety)

@@ -1,6 +1,6 @@
 {
-  "contract_version": "0.8.0",
-  "descriptor_sha256": "8873ce64a11988a4d48367d7f41e171ac3767fa57512c1744d828a950b60eaec",
+  "contract_version": "0.9.0",
+  "descriptor_sha256": "8e3e1fd8f7ebec50ccfb5ee5aa88c7e443edc11367ea6835c0adb2dedbfa9fd1",
   "generated_with": {
     "grpcio_tools": "1.76.0",
     "protobuf": "6.33.6"
