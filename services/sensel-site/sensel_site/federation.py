@@ -86,6 +86,8 @@ def build_signed_site_update(
     site_key_id: str,
     submitted_at: datetime | None = None,
     noise_source: Any | None = None,
+    site_identity_id: str = "",
+    trust_domain_id: str = "",
 ) -> bytes:
     if any(
         (
@@ -96,6 +98,12 @@ def build_signed_site_update(
             sample_count < 1,
             not artifact,
             len(artifact) > 8 * 1024 * 1024,
+            spec.site_identity.rate_policy_id not in {"", "none"}
+            and (
+                not _ID.fullmatch(site_identity_id)
+                or not _ID.fullmatch(trust_domain_id)
+                or not spec.site_identity.registry_sha256.startswith("sha256:")
+            ),
         )
     ):
         raise ValueError("FL Site update input is invalid")
@@ -126,6 +134,9 @@ def build_signed_site_update(
         candidate_id=candidate_id,
         client_key_id=site_key_id,
         update_artifact=artifact,
+        site_identity_id=site_identity_id,
+        trust_domain_id=trust_domain_id,
+        rate_policy_id=spec.site_identity.rate_policy_id,
     )
     if safety is not None:
         update.safety.CopyFrom(safety)
@@ -222,12 +233,23 @@ def prepare_safe_xgboost_update(
                 not 0 < privacy_policy.delta < 1,
                 privacy_policy.privacy_scope != "leaf_values_only_fixed_topology",
                 privacy_policy.formal_full_model_dp_claim_allowed,
+                privacy_policy.accountant_id != "rdp_gaussian_v1",
+                privacy_policy.adjacency_definition
+                not in {"add_remove_one_window", "replace_one_window"},
+                len(privacy_policy.rdp_orders) < 1,
             )
         ):
             raise ValueError("leaf-vector privacy policy is unsafe or unsupported")
         sensitivity = 2.0 * clip_policy.maximum_leaf_l2_norm
         sigma = sensitivity * math.sqrt(2.0 * math.log(1.25 / privacy_policy.delta))
         sigma /= privacy_policy.epsilon
+        if not math.isclose(
+            privacy_policy.noise_multiplier,
+            sigma / sensitivity,
+            rel_tol=1e-9,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("signed RDP noise multiplier does not match leaf mechanism")
         generator = noise_source or random.SystemRandom().gauss
         clipped = [value + float(generator(0.0, sigma)) for value in clipped]
     elif mechanism != "none":

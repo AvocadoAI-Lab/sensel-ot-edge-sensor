@@ -133,6 +133,10 @@ def test_xgboost_update_is_structurally_clipped_and_leaf_noise_is_attested() -> 
         maximum_cumulative_epsilon=8.0,
         privacy_scope="leaf_values_only_fixed_topology",
         formal_full_model_dp_claim_allowed=False,
+        accountant_id="rdp_gaussian_v1",
+        rdp_orders=[2.0, 4.0, 8.0, 16.0, 32.0],
+        noise_multiplier=math.sqrt(2.0 * math.log(1.25 / 1e-5)) / 2.0,
+        adjacency_definition="add_remove_one_window",
     )
     output, evidence = prepare_safe_xgboost_update(
         artifact,
@@ -183,3 +187,43 @@ def test_xgboost_update_exceeding_structural_policy_is_rejected() -> None:
             ),
             privacy_policy=federation_pb2.PrivacyBudgetPolicy(mechanism_id="none"),
         )
+
+
+def test_site_update_attests_signed_identity_and_rate_policy(tmp_path) -> None:
+    key = Ed25519PrivateKey.generate()
+    private = tmp_path / "site.pem"
+    _private(private, key)
+    spec = federation_pb2.FederationRoundSpec(
+        round_id="round-" + "1" * 64,
+        tenant_id="tenant-a",
+        model_id="ot-xgb",
+        base_model_version="0.1.0",
+        feature_contract_id="ot-window-v1",
+        strategy=federation_pb2.AGGREGATION_STRATEGY_FEDXGB_BAGGING,
+        minimum_clients=3,
+        allowed_site_ids=["site-1", "site-2", "site-3"],
+        site_identity=federation_pb2.SiteIdentityPolicy(
+            registry_sha256="sha256:" + "a" * 64,
+            rate_policy_id="site-rate-v1",
+            maximum_updates_per_window=2,
+            rate_window_seconds=3600,
+            require_unique_trust_domains_for_quorum=True,
+        ),
+    )
+    wire = build_signed_site_update(
+        spec,
+        site_id="site-1",
+        client_id="client-1",
+        dataset_id="dataset-" + "2" * 64,
+        candidate_id="candidate-" + "3" * 64,
+        sample_count=12,
+        artifact=b'{"learner":"sandbox"}',
+        site_private_key_path=private,
+        site_key_id="site-1-key-1",
+        site_identity_id="device-1",
+        trust_domain_id="operator-1",
+    )
+    update = federation_pb2.ClientUpdateManifest.FromString(wire)
+    assert update.site_identity_id == "device-1"
+    assert update.trust_domain_id == "operator-1"
+    assert update.rate_policy_id == "site-rate-v1"
