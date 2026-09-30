@@ -1,0 +1,32 @@
+version: "0.1"
+mode: advisory_only
+network_write_actions: prohibited
+device_isolation: prohibited
+packet_injection: prohibited
+active_scanning: prohibited
+credential_access: prohibited
+external_network_access: denied_by_default
+external_scanning: prohibited
+tools: read_only_allowlist
+max_retrieval_steps: 5
+require_source_for_claims: true
+human_review_required_before_action: true
+rag:
+  orchestrator: deterministic_state_machine
+  tools: read_only_allowlist
+  max_retrieval_steps: 5
+  require_source_for_claims: true
+  tool_timeout_sec: 2.0
+slm:
+  model: HuggingFaceTB/SmolLM2-360M-Instruct
+  may_create_detector_scores: false
+  may_call_tools: false
+  invalid_output: template_fallback
+response:
+  human_approval_required: true
+  mode: advisory_only
+guardrails:
+  validate_input_schema: true
+  filter_prohibited_actions: true
+  treat_logs_as_untrusted_data: true
+  audit_events: true

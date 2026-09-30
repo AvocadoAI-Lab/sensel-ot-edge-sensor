@@ -1,0 +1,70 @@
+%YAML 1.1
+---
+# SenseL NDR Edge — minimal Suricata config for the EVE JSON bridge.
+# The edge bridge (packet-sensor SuricataEveSource) only depends on the
+# eve.json "alert" records, so this file stays intentionally small. Extend
+# vars / app-layer protocols as the OT rule pack grows.
+#
+# Run (inside the suricata container):
+#   suricata -c /etc/suricata/suricata.yaml -i "$SURICATA_INTERFACE"
+#
+# Set HOME_NET to your monitored subnet(s) for tighter scoping (e.g.
+# "[10.10.1.0/24]"); "any" works for an initial passive lab bring-up.
+
+vars:
+  address-groups:
+    HOME_NET: "any"
+    EXTERNAL_NET: "any"
+
+default-log-dir: /var/log/suricata
+
+# Required for `suricatasc -c reload-rules` after Protection Center rule apply.
+unix-command:
+  enabled: yes
+
+# EVE JSON output consumed by the SenseL edge bridge.
+# the only one mapped in v0.1; the field names here are Suricata defaults and
+# form a stable contract with SuricataEveMapper — keep alert metadata enabled.
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert:
+            metadata: yes
+            tagged-packets: no
+
+# Rule sources mounted into the container.
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - suricata.rules
+  - local.rules
+
+# App-layer parsers kept minimal; enable what your OT environment needs so the
+# corresponding signatures can fire and populate app_proto.
+app-layer:
+  protocols:
+    modbus:
+      enabled: yes
+    dnp3:
+      enabled: yes
+    tls:
+      enabled: yes
+    http:
+      enabled: yes
+
+# Multi-interface capture (optional).
+# By default the overlay launches Suricata with a single "-i $SURICATA_INTERFACE".
+# To watch several links at once (e.g. IT traffic on eth0 + OT container traffic
+# on a docker bridge br-xxxx), DROP the "-i" flag from docker-compose.suricata.yml
+# and uncomment the af-packet block below — Suricata then reads interfaces here.
+# Find the OT bridge name with: docker network inspect <net> + `ip -o link`.
+#
+# af-packet:
+#   - interface: eth0
+#     cluster-id: 98
+#     cluster-type: cluster_flow
+#   - interface: br-75a5cad1560a
+#     cluster-id: 99
+#     cluster-type: cluster_flow

@@ -1,0 +1,49 @@
+{
+  "version": "0.2",
+  "schema": "sensel.baseline.template.catalog.v1",
+  "description": "Device-type starter baseline profiles for new asset onboarding, plus a statistics-free fallback for unknown device types.",
+  "common_rules": {
+    "rules_id": "org-common-rules-v1",
+    "file": "common-rules-v1.json"
+  },
+  "fallback": {
+    "profile_id": "generic-observe-only-v1",
+    "file": "generic-observe-only-v1.json",
+    "applies_to": "any device_type without a dedicated template",
+    "uses_device_traffic_statistics": false
+  },
+  "templates": [
+    {
+      "profile_id": "cic-template-medical-camera-v1",
+      "device_type": "medical_camera",
+      "file": "cic-template-medical-camera-v1.json",
+      "cic_reference_device": "Blink Camera / blink mini",
+      "profiling_csv_hint": "Blink_Camera_LAN_WATCH.pcap.csv",
+      "protocols": ["wifi"]
+    },
+    {
+      "profile_id": "cic-template-medical-pager-v1",
+      "device_type": "medical_pager",
+      "file": "cic-template-medical-pager-v1.json",
+      "cic_reference_device": "SOS Multifunctional Pager",
+      "profiling_csv_hint": "Multifunctional_Pager_LAN_PHYSICAL.pcap.csv",
+      "protocols": ["wifi"]
+    },
+    {
+      "profile_id": "cic-template-bp-monitor-v1",
+      "device_type": "bp_monitor",
+      "file": "cic-template-bp-monitor-v1.json",
+      "cic_reference_device": "Withings BPM Connect",
+      "profiling_csv_hint": "",
+      "protocols": ["mqtt"]
+    },
+    {
+      "profile_id": "cic-template-baby-sensor-v1",
+      "device_type": "baby_sensor",
+      "file": "cic-template-baby-sensor-v1.json",
+      "cic_reference_device": "Sense-U Baby Monitor",
+      "profiling_csv_hint": "SenseU_LAN_EMERGENCY.pcap.csv",
+      "protocols": ["wifi"]
+    }
+  ]
+}

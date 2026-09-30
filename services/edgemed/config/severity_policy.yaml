@@ -1,0 +1,34 @@
+version: "0.1"
+policy_id: fusion-policy-0.1
+mode: advisory_only
+human_approval_required: true
+
+# Deterministic severity mapping. No generative model may override these outcomes.
+known_attack:
+  high_probability: 0.85
+  medium_probability: 0.65
+anomaly:
+  # Compare normalized anomaly score against the detector threshold when provided;
+  # otherwise use these absolute normalized-score cutovers.
+  high_score: 0.85
+  medium_score: 0.65
+baseline:
+  high_score: 0.85
+  medium_score: 0.65
+
+criticality_boost:
+  high: 1
+  medium: 0
+  low: 0
+  unknown: 0
+
+severity_order: [low, medium, high, critical]
+
+disagreement:
+  # Flag when one detector is strongly positive and the other is strongly negative.
+  strong_positive: 0.80
+  strong_negative: 0.40
+
+fallback_summary_template: >
+  {device_type} traffic assessed as {verdict} by fusion policy {policy_id}
+  (baseline={baseline_status}, known_attack={known_status}, anomaly={anomaly_status}).

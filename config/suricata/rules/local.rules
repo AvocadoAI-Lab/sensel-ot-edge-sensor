@@ -1,0 +1,11 @@
+# SenseL NDR Edge — local Suricata rules (starter set).
+# Replace / extend with the SenseL OT rule pack or ET/Open rules.
+# SIDs >= 1000000 are reserved for local rules per convention. SIDs in the
+# CTI range (SNORT_CTI_SID_MIN..MAX, shared across engines) are treated as
+# CTI-rule hits and reported as sightings by the edge-agent.
+
+# Detect unauthorized Modbus TCP access (OT example, mirrors PRD §13.1).
+alert tcp any any -> any 502 (msg:"SENSEL Modbus TCP access observed"; flow:to_server; classtype:protocol-command-decode; sid:1000001; rev:1;)
+
+# Detect TCP SYN port-scan-like behavior to common OT ports.
+alert tcp any any -> any [102,502,20000,44818] (msg:"SENSEL OT port probe"; flags:S; classtype:attempted-recon; sid:1000002; rev:1;)

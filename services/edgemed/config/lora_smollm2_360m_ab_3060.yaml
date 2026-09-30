@@ -1,0 +1,48 @@
+# A+B LoRA config for RTX 3060 Laptop 6GB
+base_model: HuggingFaceTB/SmolLM2-360M-Instruct
+output_dir: artifacts/slm/smollm2-360m-lora-ab
+seed: 42
+
+data:
+  train_jsonl: artifacts/slm/sft_ab/train.jsonl
+  validation_jsonl: artifacts/slm/sft_ab/validation.jsonl
+  frozen_test_jsonl: artifacts/slm/sft_ab/test.jsonl
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+train:
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 1.5e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  logging_steps: 5
+  save_strategy: epoch
+  eval_strategy: epoch
+  bf16: false
+  fp16: true
+  max_seq_length: 896
+  packing: false
+
+export:
+  adapter_dir: artifacts/slm/smollm2-360m-lora-ab/adapter
+  gguf_out: artifacts/slm/smollm2-360m-ab.Q4_K_M.gguf
+  gguf_quant: Q4_K_M
+
+hardware_notes:
+  fine_tune_target: RTX 3060 Laptop 6GB
+  inference_target: same host for holdout compare

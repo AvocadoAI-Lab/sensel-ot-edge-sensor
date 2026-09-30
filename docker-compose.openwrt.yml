@@ -1,0 +1,107 @@
+# SenseL NDR Edge — OpenWrt deployment (v0.1 Open Release).
+#
+# Self-contained stack for an OpenWrt host running Docker (x86_64 appliance or
+# capable ARM64 board). Unlike docker-compose.yml / docker-compose.edge-only.yml
+# this file does NOT pull in the heavy EdgeX stack and does NOT require an
+# external edgex-network — a typical router/appliance only runs the three edge
+# services below.
+#
+# Modes (see docs/deployment-openwrt.md):
+#   Mode A — OpenWrt host runs the sensor (this file).
+#   Mode B — OpenWrt is only a SPAN/mirror source for an external sensor.
+#
+# Usage:
+#   cp .env.openwrt.example .env        # fill in SENSEL_* / CONTROL_PLANE_* / CAPTURE_INTERFACE
+#   docker compose -f docker-compose.openwrt.yml up -d --build
+#
+# Optional detection engines (off by default — only enable on x86 appliances
+# with >=4 GB RAM):
+#   docker compose -f docker-compose.openwrt.yml -f docker-compose.snort.yml up -d
+#   docker compose -f docker-compose.openwrt.yml -f docker-compose.suricata.yml up -d
+#
+# IMPORTANT: point DATA_DIR at external storage (USB/SSD via extroot or
+# block-mount). PCAP ring buffer + offsets must NOT live on the router's
+# internal flash (size + write-wear). See the deployment guide.
+
+name: sensel-ot-edge-sensor
+
+services:
+  local-mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sensel-local-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./services/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "127.0.0.1:1884:1883"
+    networks:
+      - sensel-edge
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+
+  sensel-edge-agent:
+    build:
+      context: ./services/sensel-edge-agent
+      dockerfile: Dockerfile
+    container_name: sensel-edge-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # OpenWrt has no EdgeX core-data; the agent runs in NDR-only mode.
+      - SENSEL_API_URL=${SENSEL_API_URL:?Set SENSEL_API_URL}
+      - SENSEL_VERIFY_TLS=${SENSEL_VERIFY_TLS:-true}
+      - DEPLOY_TARGET=openwrt
+    volumes:
+      - ./config:/app/config:ro
+      - ${DATA_DIR:-./data}/agent:/app/data
+    depends_on:
+      - local-mqtt
+    networks:
+      - sensel-edge
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: "0.5"
+
+  packet-sensor:
+    build:
+      context: ./services/packet-sensor
+      dockerfile: Dockerfile
+    container_name: sensel-packet-sensor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - LOCAL_MQTT_HOST=127.0.0.1
+      - LOCAL_MQTT_PORT=1884
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth1}
+      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-}
+      - DEPLOY_TARGET=openwrt
+      # Keep the PCAP ring small on appliances; raise once on external storage.
+      - PCAP_MAX_DISK_MB=${PCAP_MAX_DISK_MB:-512}
+      - PCAP_RETENTION_MINUTES=${PCAP_RETENTION_MINUTES:-30}
+      - CAPTURE_MAX_MBPS=${CAPTURE_MAX_MBPS:-100}
+    volumes:
+      - ./config:/app/config:ro
+      - ${DATA_DIR:-./data}/pcap:/app/data/pcap
+      - ${DATA_DIR:-./data}/assets:/app/data/assets
+    # Host network so the sensor sees the mirror port directly.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      - local-mqtt
+      - sensel-edge-agent
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+networks:
+  sensel-edge:
+    driver: bridge

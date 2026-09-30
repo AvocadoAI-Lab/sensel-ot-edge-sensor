@@ -1,0 +1,37 @@
+{
+  "namespace": "threat",
+  "documents": [
+    {
+      "source_id": "threat:mqtt-publish-flood",
+      "source_type": "threat",
+      "aliases": ["mqtt", "publish_flood", "ddos", "dos"],
+      "title": "MQTT publish/connect flood",
+      "summary": "Flooding MQTT connect or publish can degrade brokers and clinical gateways.",
+      "refs": ["ATT&CK-ICS:Inhibit Response Function"]
+    },
+    {
+      "source_id": "threat:recon-scan",
+      "source_type": "threat",
+      "aliases": ["recon", "scan", "port_scan", "os_scan"],
+      "title": "Reconnaissance scanning",
+      "summary": "Port/OS/vuln scans map exposed IoMT services before follow-on abuse.",
+      "refs": ["ATT&CK:Network Service Discovery"]
+    },
+    {
+      "source_id": "threat:arp-spoofing",
+      "source_type": "threat",
+      "aliases": ["spoofing", "arp"],
+      "title": "ARP spoofing",
+      "summary": "ARP spoofing can redirect medical device traffic for interception or disruption.",
+      "refs": ["ATT&CK:Adversary-in-the-Middle"]
+    },
+    {
+      "source_id": "threat:network-anomaly",
+      "source_type": "threat",
+      "aliases": ["anomaly", "unknown", "network_behavior_anomaly"],
+      "title": "Generic network behavior anomaly",
+      "summary": "Detector anomaly without a precise known-attack family still warrants analyst review.",
+      "refs": ["internal:anomaly-playbook"]
+    }
+  ]
+}

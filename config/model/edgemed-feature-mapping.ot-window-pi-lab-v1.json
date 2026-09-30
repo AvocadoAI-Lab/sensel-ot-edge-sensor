@@ -1,0 +1,20 @@
+{
+  "mapping_id": "ot-window-pi-lab-v1-to-edgemed-demo-v1",
+  "source_contract_id": "ot-window-pi-lab-v1",
+  "target_schema": "edgemed-demo-8",
+  "description": "Pi lab bridge mapping (single-frame OT window to EdgeMed demo features).",
+  "field_mappings": {
+    "packet_rate": "packet_rate",
+    "packet_count": "connection_rate",
+    "unique_mac_count": "syn_count"
+  },
+  "defaults": {
+    "flow_duration": 1.0,
+    "byte_rate": 10000.0,
+    "syn_count": 2.0,
+    "ack_count": 8.0,
+    "connection_rate": 5.0,
+    "mean_packet_size": 300.0,
+    "iat_mean": 0.08
+  }
+}

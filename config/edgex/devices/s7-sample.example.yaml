@@ -1,0 +1,23 @@
+# Example S7 device — copy via Console wizard or rename for manual deploy.
+# Requires: docker compose --profile phase2 up -d device-s7
+
+deviceList:
+  - name: s7-plc-01
+    profileName: S7Sample
+    description: Siemens S7 PLC (ISO-on-TCP)
+    adminState: UNLOCKED
+    operatingState: UP
+    serviceName: device-s7
+    labels: [ot, s7, lab]
+    protocols:
+      s7:
+        Host: "192.168.1.60"
+        Port: "102"
+        Rack: "0"
+        Slot: "1"
+        Timeout: "30"
+        IdleTimeout: "30"
+    autoEvents:
+      - interval: 10s
+        onChange: false
+        sourceName: AllResource

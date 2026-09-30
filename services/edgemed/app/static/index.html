@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Avocdo EdgeMed MVP</title>
+  <style>
+    :root{color-scheme:dark;--bg:#09100f;--panel:#111b19;--line:#29413b;--mint:#62e6b5;--amber:#ffca68;--red:#ff7777;--muted:#92aaa4}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 20% 0,#12332b 0,transparent 35%),var(--bg);font:15px system-ui;color:#edf8f4}
+    main{max-width:1100px;margin:auto;padding:38px 22px}.brand{letter-spacing:.16em;color:var(--mint);font-weight:800}
+    .hero{display:flex;justify-content:space-between;align-items:end;gap:30px;margin:25px 0 30px}
+    h1{font-size:clamp(34px,6vw,66px);line-height:.98;margin:0;max-width:720px}p{color:var(--muted)}
+    button{background:var(--mint);border:0;padding:12px 18px;font-weight:800;cursor:pointer}
+    .notice{border-left:3px solid var(--amber);padding:8px 14px;color:var(--amber);margin-bottom:18px}
+    .stats,.components{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}
+    .card,.event,.chip{background:rgba(17,27,25,.9);border:1px solid var(--line);padding:18px}
+    .value{font-size:30px;font-weight:800}.events{display:grid;gap:10px}
+    .event{display:grid;grid-template-columns:150px 1fr 120px;gap:16px;align-items:center}
+    .score{font:800 22px ui-monospace}.high,.unavailable{color:var(--red)}.medium,.degraded{color:var(--amber)}.low,.ok{color:var(--mint)}
+    .meta{font-size:12px;color:var(--muted)}code{color:var(--mint)}
+    @media(max-width:700px){.hero{display:block}.stats,.components{grid-template-columns:1fr}.event{grid-template-columns:1fr}.hero button{margin-top:15px}}
+  </style>
+</head>
+<body><main>
+  <div class="brand">AVOCDO // EDGEMED</div>
+  <section class="hero">
+    <div>
+      <h1>Medical AIoT anomaly detection, at the edge.</h1>
+      <p>Parallel detectors · fused evidence · template SLM · deterministic RAG</p>
+    </div>
+    <button onclick="boot()">Refresh status + demo</button>
+  </section>
+  <div class="notice">Research preview only — advisory mode; no autonomous containment. Human approval required.</div>
+  <section class="components" id="components"></section>
+  <section class="stats">
+    <div class="card"><div class="value" id="total">–</div><p>Scored flows</p></div>
+    <div class="card"><div class="value" id="alerts">–</div><p>Non-baseline verdicts</p></div>
+    <div class="card"><div class="value" id="health">–</div><p>Service health</p></div>
+  </section>
+  <h2>Latest fused events</h2>
+  <section class="events" id="events"><p>Press the button to load health and demo events.</p></section>
+</main>
+<script>
+function sev(x){return x||'low'}
+function anomalyScore(ev){
+  const a=ev.detection&&ev.detection.anomaly;
+  if(a&&typeof a.score==='number')return a.score;
+  if(typeof ev.detection?.anomaly_score==='number')return ev.detection.anomaly_score;
+  return 0;
+}
+function verdict(ev){
+  return ev.assessment?.verdict || ev.detection?.verdict || 'unknown';
+}
+async function boot(){
+  const box=document.getElementById('events');
+  const comps=document.getElementById('components');
+  box.innerHTML='<p>Loading…</p>';
+  try{
+    const health=await fetch('/health').then(r=>r.json());
+    document.getElementById('health').textContent=health.status;
+    document.getElementById('health').className='value '+health.status;
+    const c=health.components||{};
+    comps.innerHTML=`
+      <div class="chip"><strong>Isolation Forest</strong><p class="${c.isolation_forest?'ok':'unavailable'}">${c.isolation_forest?'ready':'missing'}</p></div>
+      <div class="chip"><strong>LSTM AE</strong><p class="${c.lstm_autoencoder?'ok':'degraded'}">${c.lstm_autoencoder?'ready':'degraded'}</p></div>
+      <div class="chip"><strong>XGBoost</strong><p class="${c.xgboost_category||c.xgboost_binary?'ok':'degraded'}">${c.xgboost_category?'category':(c.xgboost_binary?'binary':'missing')}</p></div>
+      <div class="chip"><strong>SLM</strong><p class="degraded">${c.slm?.fallback||'template_fallback'}</p><p class="meta">${c.slm?.model_id||''}</p></div>
+      <div class="chip"><strong>RAG</strong><p class="ok">${c.rag?.orchestrator||'deterministic'}</p><p class="meta">max ${c.rag?.max_retrieval_steps||5} retrievals</p></div>
+      <div class="chip"><strong>Degraded</strong><p class="${(health.degraded_components||[]).length?'degraded':'ok'}">${(health.degraded_components||[]).join(', ')||'none'}</p></div>`;
+
+    const data=await fetch('/api/demo-events?limit=30').then(r=>{if(!r.ok)throw new Error('Train Isolation Forest first (scripts/train.py)');return r.json()});
+    document.getElementById('total').textContent=data.length;
+    const alerts=data.filter(x=>verdict(x)!=='baseline');
+    document.getElementById('alerts').textContent=alerts.length;
+    box.innerHTML=data.sort((a,b)=>anomalyScore(b)-anomalyScore(a)).slice(0,12).map(x=>`
+      <article class="event">
+        <div><strong>${x.asset.device_id}</strong><p>${x.asset.device_type}</p><p class="meta">${x.detection?.status||''}</p></div>
+        <div>${x.assessment?.summary||''}<p class="meta">${x.detection?.known_attack?.category||''} · ${(x.evidence||[]).map(e=>e.feature).filter(Boolean).slice(0,3).join(' · ')}</p></div>
+        <div class="score ${sev(x.assessment?.severity)}">${anomalyScore(x).toFixed(3)}<div class="meta">${verdict(x)}</div></div>
+      </article>`).join('');
+  }catch(e){box.innerHTML=`<p>${e.message}</p>`}
+}
+boot();
+</script>
+</body></html>

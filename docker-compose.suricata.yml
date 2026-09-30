@@ -1,0 +1,97 @@
+# Suricata NDR engine overlay (v0.1 Open Release — opt-in).
+#
+# Adds a Suricata sidecar that captures mirror traffic and writes EVE JSON
+# (NDJSON) to a shared volume. The packet-sensor SuricataEveSource tails that
+# file, maps each ``alert`` record to a SenseL SecurityEvent, and writes
+# suricata-events.jsonl for the edge-agent to upload north — no changes to the
+# MQTT / buffer / sighting path.
+#
+# This overlay is an alternative to docker-compose.snort.yml; both engines can
+# also run together (each writes a separate *-events.jsonl with its own tailer).
+#
+# Usage:
+#   SURICATA_INTERFACE=eth0 \
+#   docker compose -f docker-compose.yml -f docker-compose.suricata.yml up -d
+#
+# Notes:
+# - Suricata and packet-sensor both run on the host network so they can see the
+#   same SPAN/TAP mirror traffic.
+# - SURICATA_INTERFACE MUST match packet-sensor's CAPTURE_INTERFACE (the iface
+#   that actually carries OT traffic); otherwise Suricata watches an empty link
+#   and never alerts. Default is eth0 to match the common single-NIC setup.
+# - For OT traffic on a docker bridge (container-to-container), list multiple
+#   interfaces in config/suricata/suricata.yaml's af-packet section instead of
+#   the single -i flag below. See docs/deployment-pi4.md.
+# - Suricata's eve.json file lands at ./data/suricata/eve.json on the host.
+
+services:
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: sensel-suricata
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      # rw: the jasonish/suricata entrypoint seeds default config files
+      # (classification.config, reference.config, threshold.config) into
+      # /etc/suricata on startup; a read-only mount makes it crash-loop.
+      - ./config/suricata:/etc/suricata
+      - ./data/suricata:/var/log/suricata
+    command:
+      - -c
+      - /etc/suricata/suricata.yaml
+      - -i
+      - ${SURICATA_INTERFACE:-eth0}
+    depends_on:
+      - packet-sensor
+
+  # Enable the bridge inside the existing packet-sensor service and give it
+  # read access to Suricata's eve.json output.
+  packet-sensor:
+    environment:
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      - SURICATA_EVE_JSON_PATH=/app/data/suricata/eve.json
+      - SURICATA_SOURCE_POLL_SEC=${SURICATA_SOURCE_POLL_SEC:-2}
+    volumes:
+      - ./data/suricata:/app/data/suricata:ro
+
+  edge-console:
+    environment:
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+
+  # Optional: report CTI-origin Suricata alerts as sightings. Off unless a CTI
+  # SID range is provided (SNORT_CTI_SID_MIN/MAX — the range is shared across
+  # engines); a generic Suricata hit is never a sighting. Requires
+  # SMB_INTEL_API_KEY for the sightings ingest endpoint.
+  sensel-edge-agent:
+    environment:
+      - SURICATA_SIGHTING_ENABLED=${SURICATA_SIGHTING_ENABLED:-false}
+      - SNORT_CTI_SID_MIN=${SNORT_CTI_SID_MIN:-0}
+      - SNORT_CTI_SID_MAX=${SNORT_CTI_SID_MAX:-0}
+      # Lets the agent report Suricata as "configured" in engine health / the
+      # Edge Console even before the first alert is produced.
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      # Suricata rule package version surfaced in DMS engine health (FR-008) and
+      # the Edge Console. Set by the Control Plane rule provisioning in v0.2;
+      # static label for v0.1 labs.
+      - SURICATA_RULE_VERSION=${SURICATA_RULE_VERSION:-}
+      - SURICATA_RULES_PATH=/etc/suricata/rules/suricata.rules
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+      # Protection Center rule bundle pull (D4): write into the shared rules dir,
+      # reload Suricata via docker exec, and validate with suricata -T.
+      - IDS_RULE_ENABLED=${IDS_RULE_ENABLED:-true}
+      - IDS_RULE_INTERVAL_SEC=${IDS_RULE_INTERVAL_SEC:-300}
+      - IDS_RULE_ENGINES=${IDS_RULE_ENGINES:-suricata}
+      - IDS_RULE_TARGET_DIR=/etc/suricata/rules
+      - IDS_RULE_STATUS_PATH=/app/data/ids-rule-status.json
+      - IDS_RULE_RELOAD_CMD=docker exec sensel-suricata suricatasc -c reload-rules
+      - IDS_RULE_HEALTHCHECK_CMD=docker exec sensel-suricata suricata -T -c /etc/suricata/suricata.yaml
+      - IDS_RULE_CMD_TIMEOUT_SEC=${IDS_RULE_CMD_TIMEOUT_SEC:-120}
+      - IDS_RULE_MQTT_ENABLED=${IDS_RULE_MQTT_ENABLED:-true}
+    volumes:
+      - ./config/suricata/rules:/etc/suricata/rules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro

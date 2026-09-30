@@ -1,0 +1,89 @@
+{
+  "schema": "sensel.baseline.profile.v1",
+  "profile_id": "cic-template-bp-monitor-v1",
+  "version": "2026.08.17.1",
+  "stats_source": "cic_benign_fallback",
+  "device_template": {
+    "device_type": "bp_monitor",
+    "cic_reference_device": "Withings BPM Connect",
+    "cic_alternate_devices": [
+      "Qardio Base 2",
+      "Checkme BP2A"
+    ],
+    "protocols": [
+      "mqtt",
+      "ble"
+    ],
+    "default_operating_state": "idle",
+    "criticality": "medium",
+    "learning_days": 7
+  },
+  "observed": {
+    "iomt": {
+      "normal_destinations": [
+        "mqtt-broker",
+        "phone-gateway"
+      ],
+      "publish_pattern": "short_periodic_mqtt",
+      "forbidden_patterns": [
+        "mqtt_connect_flood",
+        "mqtt_publish_flood",
+        "malformed_mqtt"
+      ]
+    },
+    "thresholds": {
+      "packet_rate_baseline": "very_low",
+      "max_publish_burst_sec": 5,
+      "expected_broker_only": true,
+      "rate_p50_hint": 1.7213569266010225,
+      "rate_p95_hint": 7771.936909782538,
+      "duration_p50_hint": 64.0,
+      "duration_p95_hint": 83.1
+    },
+    "cic_profiling_stats": {
+      "source_csv": "D:\\實習\\資料集\\WiFI_and_MQTTattacksCSVtest\\Benign_test.pcap.csv",
+      "rows": 37607,
+      "rate": {
+        "p50": 1.7213569266010225,
+        "p95": 7771.936909782538,
+        "max": 203846.796130816
+      },
+      "duration": {
+        "p50": 64.0,
+        "p95": 83.1,
+        "max": 248.0
+      },
+      "syn_count": {
+        "p50": 0.0,
+        "p95": 0.2,
+        "max": 2.7
+      },
+      "ack_count": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 4.0
+      },
+      "header_length": {
+        "p50": 192146.8,
+        "p95": 4337458.599999991,
+        "max": 9896704.0
+      }
+    }
+  },
+  "edgemed": {
+    "asset_profile_ref": "asset-profile:bp_monitor",
+    "behavior_refs": {
+      "idle": "behavior:bp_monitor:idle",
+      "active": "behavior:bp_monitor:active"
+    },
+    "xgboost_model_ref": "xgboost_category@v1",
+    "preferred_attack_families": [
+      "mqtt"
+    ]
+  },
+  "onboarding": {
+    "initial_mode": "learning",
+    "detect_after_learning": true,
+    "demo_preset_id": "demo-bpm-mqtt"
+  }
+}

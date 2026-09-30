@@ -1,0 +1,23 @@
+# EdgeMed HTTP bridge overlay (local lab)
+#
+# Start EdgeMed on the host first, e.g.:
+#   cd services/edgemed
+#   python -m venv .venv && .venv/Scripts/activate  # Windows
+#   pip install -r requirements.txt
+#   uvicorn app.main:app --host 0.0.0.0 --port 8000
+#
+# Then:
+#   docker compose -f docker-compose.yml -f docker-compose.edgemed.yml up -d packet-sensor
+
+services:
+  packet-sensor:
+    environment:
+      - MODEL_INFERENCE_ENABLED=true
+      - INFERENCE_BACKEND=edgemed
+      - EDGEMED_ENABLED=true
+      - EDGEMED_BASE_URL=http://host.docker.internal:8000
+      - IF_ENABLED=false
+      - XGB_ENABLED=false
+      - LSTM_ENABLED=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

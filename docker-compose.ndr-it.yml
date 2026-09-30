@@ -1,0 +1,153 @@
+# IT NDR overlay — Ubuntu amd64 lab sensors (e.g. ndr-198 @ 192.168.1.198).
+# No EdgeX. Adds Edge Console + full agent/sensor env on top of the NDR base.
+# SPDX-License-Identifier: Apache-2.0 (see LICENSE in repo root)
+#
+#   docker compose -f docker-compose.openwrt.yml \
+#     -f docker-compose.ndr-it.yml \
+#     -f docker-compose.suricata.yml up -d --build
+#
+# Resource caps target 4 GB / 2 vCPU hosts (swap as cushion).
+
+services:
+  edge-console:
+    build:
+      context: ./services/edge-console
+      dockerfile: Dockerfile
+    container_name: sensel-edge-console
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+      - "8443:8443"
+    environment:
+      - PLATFORM_CONFIG_PATH=/data/agent/platform.json
+      - ASSETS_DIR=/data/assets
+      - CONSOLE_TLS_HOSTS=${CONSOLE_TLS_HOSTS:-sensel.local,localhost,127.0.0.1}
+      - DEFAULT_SENSEL_API_KEY=${SENSEL_API_KEY:-sensel-ot-ingest-lab-2026}
+      - EDGE_CONSOLE_PASSWORD=${EDGE_CONSOLE_PASSWORD:-}
+      - EDGE_CONSOLE_DOCKER_RESTART=${EDGE_CONSOLE_DOCKER_RESTART:-true}
+      - EDGE_CONSOLE_AUTO_RESTART_AGENT=${EDGE_CONSOLE_AUTO_RESTART_AGENT:-true}
+      - EDGE_CONSOLE_NET_ADMIN=${EDGE_CONSOLE_NET_ADMIN:-true}
+      - EDGE_CONSOLE_WIFI_ADMIN=${EDGE_CONSOLE_WIFI_ADMIN:-false}
+      - EDGE_CONSOLE_VPN_ADMIN=${EDGE_CONSOLE_VPN_ADMIN:-false}
+      - NDR_PROFILE=${NDR_PROFILE:-it}
+      - EDGE_AGENT_CONTAINER=sensel-edge-agent
+      - PACKET_SENSOR_CONTAINER=sensel-packet-sensor
+      - EDGE_CONSOLE_AUDIT_LOG=/data/agent/console-audit.jsonl
+      - DETECTION_POLICY_PATH=/data/agent/detection-policy.json
+      - DETECTION_POLICY_STAMP_PATH=/data/agent/detection-policy.stamp
+      - OPERATIONAL_MODE_PATH=/data/agent/operational-mode.json
+      - LEARNING_SESSION_PATH=/data/agent/learning-session.json
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+    volumes:
+      - ./data/agent:/data/agent
+      - ./data/assets:/data/assets
+      - ./:/project:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+    networks:
+      - sensel-edge
+    depends_on:
+      - local-mqtt
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  sensel-edge-agent:
+    environment:
+      - DEPLOY_TARGET=ubuntu
+      - SENSEL_API_URL=${SENSEL_API_URL:?Set SENSEL_API_URL}
+      - SENSEL_VERIFY_TLS=${SENSEL_VERIFY_TLS:-false}
+      - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-true}
+      - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
+      - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+      - PLATFORM_CONFIG_PATH=/app/data/platform.json
+      - POLICY_SYNC_ENABLED=${POLICY_SYNC_ENABLED:-true}
+      - POLICY_SYNC_INTERVAL_SEC=${POLICY_SYNC_INTERVAL_SEC:-60}
+      - SMB_INTEL_API_KEY=${SMB_INTEL_API_KEY:-}
+      - POLICY_SYNC_TENANT_ID=${POLICY_SYNC_TENANT_ID:-}
+      - IOC_CACHE_PATH=/app/data/ioc-cache.json
+      - SIGHTING_REPORT_ENABLED=${SIGHTING_REPORT_ENABLED:-true}
+      - SIGHTING_REPORT_INTERVAL_SEC=${SIGHTING_REPORT_INTERVAL_SEC:-10}
+      - SIGHTING_QUEUE_PATH=/app/data/sighting-queue.jsonl
+      - POLICY_SYNC_MQTT_ENABLED=${POLICY_SYNC_MQTT_ENABLED:-false}
+      - POLICY_SYNC_MQTT_HOST=${POLICY_SYNC_MQTT_HOST:-${CONTROL_PLANE_MQTT_HOST:-}}
+      - POLICY_SYNC_MQTT_PORT=${POLICY_SYNC_MQTT_PORT:-${CONTROL_PLANE_MQTT_PORT:-1883}}
+      - POLICY_SYNC_MQTT_TOPIC=${POLICY_SYNC_MQTT_TOPIC:-sensel/{tenant_id}/policy/blacklist}
+      - DETECTION_POLICY_MQTT_TOPIC=${DETECTION_POLICY_MQTT_TOPIC:-sensel/{tenant_id}/policy/ot-detection}
+      - IDS_RULE_ENABLED=${IDS_RULE_ENABLED:-true}
+      - IDS_RULE_INTERVAL_SEC=${IDS_RULE_INTERVAL_SEC:-300}
+      - IDS_RULE_ENGINES=${IDS_RULE_ENGINES:-suricata}
+      - NDR_PROFILE=${NDR_PROFILE:-it_ndr}
+      - IDS_RULE_FEED_PROFILE=${IDS_RULE_FEED_PROFILE:-it_ndr}
+      - IDS_RULE_TARGET_DIR=/etc/suricata/rules
+      - IDS_RULE_STATUS_PATH=/app/data/ids-rule-status.json
+      - IDS_RULE_RELOAD_CMD=docker exec sensel-suricata suricatasc -c reload-rules
+      - IDS_RULE_HEALTHCHECK_CMD=docker exec sensel-suricata suricata -T -c /etc/suricata/suricata.yaml
+      - IDS_RULE_CMD_TIMEOUT_SEC=${IDS_RULE_CMD_TIMEOUT_SEC:-120}
+      - IDS_RULE_MQTT_ENABLED=${IDS_RULE_MQTT_ENABLED:-true}
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      - SURICATA_RULE_VERSION=${SURICATA_RULE_VERSION:-}
+      - SURICATA_RULES_PATH=/etc/suricata/rules/suricata.rules
+      - DISK_ALERT_THRESHOLD_PCT=${DISK_ALERT_THRESHOLD_PCT:-85}
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets:ro
+      - ./config/suricata/rules:/etc/suricata/rules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+    depends_on:
+      - local-mqtt
+    networks:
+      - sensel-edge
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  packet-sensor:
+    env_file:
+      - .env
+      - ./data/agent/capture.env
+    environment:
+      - DEPLOY_TARGET=ubuntu
+      - LOCAL_MQTT_HOST=127.0.0.1
+      - LOCAL_MQTT_PORT=1884
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - CAPTURE_BPF_FILTER=${CAPTURE_BPF_FILTER:-}
+      - PCAP_MAX_DISK_MB=${PCAP_MAX_DISK_MB:-1024}
+      - PCAP_RETENTION_MINUTES=${PCAP_RETENTION_MINUTES:-60}
+      - CAPTURE_MAX_MBPS=${CAPTURE_MAX_MBPS:-100}
+      - IOC_MATCH_ENABLED=${IOC_MATCH_ENABLED:-true}
+      - IOC_CACHE_PATH=/app/data/agent/ioc-cache.json
+      - IOC_CACHE_STAMP_PATH=/app/data/agent/ioc-cache.stamp
+      - IOC_MATCH_COOLDOWN_SEC=${IOC_MATCH_COOLDOWN_SEC:-300}
+      - DETECTION_POLICY_PATH=/app/data/agent/detection-policy.json
+      - DETECTION_POLICY_STAMP_PATH=/app/data/agent/detection-policy.stamp
+      - DETECTION_POLICY_RELOAD_SEC=5
+      - OPERATIONAL_MODE_PATH=/app/data/agent/operational-mode.json
+      - OPERATIONAL_MODE_STAMP_PATH=/app/data/agent/operational-mode.stamp
+      - SURICATA_SOURCE_ENABLED=${SURICATA_SOURCE_ENABLED:-true}
+      - SURICATA_EVE_JSON_PATH=/app/data/suricata/eve.json
+      - SURICATA_SOURCE_POLL_SEC=${SURICATA_SOURCE_POLL_SEC:-2}
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/pcap:/app/data/pcap
+      - ./data/assets:/app/data/assets
+      - ./data/agent:/app/data/agent:ro
+      - ./data/suricata:/app/data/suricata:ro
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.0"
+
+  local-mqtt:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"

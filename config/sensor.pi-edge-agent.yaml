@@ -1,0 +1,83 @@
+# Pi 4 native edge-agent — northbound MQTT to PC Control Plane EMQX
+# Used with deploy/pi4/start-edge-agent.sh
+
+sensor:
+  id: ot-edge-pi4
+  site_id: factory-lab-pi
+  type: ot-edge-sensor
+  hardware: raspberry-pi-4
+  software_version: "0.2.0-edgemed"
+  capabilities:
+    - packet-capture
+    - mqtt
+
+sensel:
+  api_url: http://192.168.50.134:8088
+  api_key: pi-lab-mqtt-only
+  events:
+    watch_path: /home/fju/sensel-ot-edge-sensor/data/assets/security-events.jsonl
+    offset_path: /home/fju/sensel-ot-edge-sensor/data/security-events.offset
+    snort_watch_path: /home/fju/sensel-ot-edge-sensor/data/assets/snort-events.jsonl
+    snort_offset_path: /home/fju/sensel-ot-edge-sensor/data/snort-events.offset
+    suricata_watch_path: /home/fju/sensel-ot-edge-sensor/data/assets/suricata-events.jsonl
+    suricata_offset_path: /home/fju/sensel-ot-edge-sensor/data/suricata-events.offset
+  episodes:
+    watch_path: /home/fju/sensel-ot-edge-sensor/data/assets/trust-episodes.jsonl
+    offset_path: /home/fju/sensel-ot-edge-sensor/data/trust-episodes.offset
+    spool_db_path: /home/fju/sensel-ot-edge-sensor/data/trust-episode-spool.db
+    max_episodes: 2000
+  upload:
+    events_path: /api/v1/ot/security-events
+    telemetry_path: /api/v1/ot/telemetry
+    health_path: /api/v1/edge-sensors/health
+    register_path: /api/v1/edge-sensors/register
+  retry:
+    max_attempts: 5
+    backoff_sec: 30
+  buffer:
+    max_events: 500
+    db_path: /home/fju/sensel-ot-edge-sensor/data/event-buffer.db
+
+northbound_mqtt:
+  enabled: true
+  host: ${CONTROL_PLANE_MQTT_HOST}
+  port: 1883
+  tenant_id: default
+  require_tenant: false
+  qos_events: 1
+  wire_mode: json
+
+sighting_report:
+  enabled: false
+  queue_path: /home/fju/sensel-ot-edge-sensor/data/sighting-queue.jsonl
+  events_offset_path: /home/fju/sensel-ot-edge-sensor/data/sighting-events.offset
+
+policy_sync:
+  mqtt_enabled: true
+  mqtt_host: ${CONTROL_PLANE_MQTT_HOST}
+  mqtt_port: 1883
+  baseline_profile_enabled: true
+  baseline_profile_path: /home/fju/sensel-ot-edge-sensor/data/agent/baseline-profile.json
+  baseline_profile_stamp_path: /home/fju/sensel-ot-edge-sensor/data/agent/baseline-profile.stamp
+  baseline_profile_mqtt_enabled: true
+  baseline_profile_mqtt_topic_template: sensel/{tenant_id}/baseline/+
+  detection_policy_mqtt_enabled: false
+  operational_mode_enabled: true
+  operational_mode_mqtt_enabled: true
+  operational_mode_mqtt_topic_template: sensel/{tenant_id}/cmd/{sensor_id}/operational
+  operational_mode_path: /home/fju/sensel-ot-edge-sensor/data/agent/operational-mode.json
+  operational_mode_stamp_path: /home/fju/sensel-ot-edge-sensor/data/agent/operational-mode.stamp
+  learning_session_path: /home/fju/sensel-ot-edge-sensor/data/agent/learning-session.json
+  live_observed_path: /home/fju/sensel-ot-edge-sensor/data/assets/baseline/live-observed.json
+  topology_override_mqtt_enabled: false
+  listfile_mqtt_enabled: false
+  policy_cache_path: /home/fju/sensel-ot-edge-sensor/data/policy-cache.json
+  listfile_cache_path: /home/fju/sensel-ot-edge-sensor/data/managed-listfiles.json
+  listfile_stamp_path: /home/fju/sensel-ot-edge-sensor/data/managed-listfiles.stamp
+
+edgex_device_management:
+  enabled: false
+
+logging:
+  level: info
+  format: text

@@ -1,0 +1,26 @@
+name: FeatureSummary
+manufacturer: SenseL
+model: OT-Feature-Summary
+labels:
+  - ot
+  - packet-sensor
+description: Packet Sensor 1-minute feature summary (MQTT bridge)
+
+deviceResources:
+  - name: PacketRate
+    description: Observed packet rate (packets/sec)
+    properties:
+      valueType: Float32
+      readWrite: R
+  - name: UniqueMacCount
+    description: Unique source MAC addresses in window
+    properties:
+      valueType: Int32
+      readWrite: R
+
+deviceCommands:
+  - name: FeatureSummary
+    readWrite: R
+    resourceOperations:
+      - deviceResource: PacketRate
+      - deviceResource: UniqueMacCount

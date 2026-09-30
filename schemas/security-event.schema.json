@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sensel.io/schemas/ot/security-event.json",
+  "title": "OT Security Event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "site_id",
+    "sensor_id",
+    "event_type",
+    "severity",
+    "timestamp"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "site_id": { "type": "string" },
+    "sensor_id": { "type": "string" },
+    "asset_id": { "type": "string" },
+    "event_type": { "type": "string" },
+    "severity": { "enum": ["low", "medium", "high", "critical"] },
+    "risk_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "protocol": { "type": "string" },
+    "src_ip": { "type": "string" },
+    "dst_ip": { "type": "string" },
+    "dst_port": { "type": "integer" },
+    "description": { "type": "string" },
+    "rule_id": { "type": "string" },
+    "evidence": { "type": "object" },
+    "evidence_ref": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,16 @@
+# EdgeX App Service — SenseL Exporter configuration (example)
+Writable:
+  LogLevel: INFO
+  StoreAndForward:
+    Enabled: true
+    MaxCap: 1000
+
+Clients:
+  core-data:
+    Protocol: http
+    Host: edgex-core-data
+    Port: 59880
+
+Trigger:
+  Type: edgex-messagebus
+  SubscribeTopics: events/device/#

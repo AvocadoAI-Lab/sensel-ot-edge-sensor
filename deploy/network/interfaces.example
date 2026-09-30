@@ -1,0 +1,17 @@
+# Netplan / ifupdown example — dual NIC edge sensor
+# Management: eth0 — DHCP or static, SenseL egress
+# Mirror: eth1 — no IP required, promiscuous for SPAN
+
+# netplan example (Ubuntu):
+# network:
+#   version: 2
+#   ethernets:
+#     eth0:
+#       dhcp4: true
+#     eth1:
+#       dhcp4: false
+#       optional: true
+
+# After boot:
+# sudo ip link set eth1 up
+# sudo ip link set eth1 promisc on

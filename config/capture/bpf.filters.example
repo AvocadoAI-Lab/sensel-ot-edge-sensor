@@ -1,0 +1,27 @@
+# Example BPF filters for mirror NIC
+# Apply via CAPTURE_BPF_FILTER or config/sensor.yaml capture.bpf_filter
+# IEC 61850 details: docs/sprint-s1-02b-iec61850.md
+
+# Modbus TCP only
+# port 502
+
+# IEC 61850 — GOOSE (L2) + MMS (TCP/102)  [S1-02b lab default]
+# (ether proto 0x88b8) or (tcp port 102)
+
+# IEC 61850 — GOOSE only
+# ether proto 0x88b8
+
+# IEC 61850 — MMS only
+# tcp port 102
+
+# Exclude SV (not in S1-02b scope) while keeping GOOSE + MMS
+# (ether proto 0x88b8 or tcp port 102) and not ether proto 0x88ba
+
+# OT lab mixed: 61850 + Modbus (higher CPU on Pi4)
+# (ether proto 0x88b8) or (tcp port 102) or (tcp port 502)
+
+# OT subnet only
+# net 192.168.10.0/24
+
+# Exclude broadcast noise (avoid on GOOSE-heavy capture — GOOSE uses L2 multicast)
+# not broadcast

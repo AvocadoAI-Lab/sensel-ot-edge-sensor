@@ -1,0 +1,157 @@
+dataset: CICIoMT2024
+version: "0.1"
+description: >
+  Canonical feature names used by Avocdo EdgeMed after column normalization.
+  Raw CICIoMT2024 headers are mapped via config/ciciomt2024_column_map.yaml.
+
+features:
+  header_length:
+    dtype: float
+    description: Aggregated header length statistics for the flow/window.
+  protocol_type:
+    dtype: float
+    description: Encoded protocol type indicator.
+  duration:
+    dtype: float
+    description: Flow or window duration.
+  rate:
+    dtype: float
+    description: Packet transmission rate.
+  srate:
+    dtype: float
+    description: Source-to-destination rate.
+  drate:
+    dtype: float
+    description: Destination-to-source rate.
+  fin_flag_number:
+    dtype: float
+    description: Count/ratio of FIN flags.
+  syn_flag_number:
+    dtype: float
+    description: Count/ratio of SYN flags.
+  rst_flag_number:
+    dtype: float
+    description: Count/ratio of RST flags.
+  psh_flag_number:
+    dtype: float
+    description: Count/ratio of PSH flags.
+  ack_flag_number:
+    dtype: float
+    description: Count/ratio of ACK flags.
+  ece_flag_number:
+    dtype: float
+    description: Count/ratio of ECE flags.
+  cwr_flag_number:
+    dtype: float
+    description: Count/ratio of CWR flags.
+  ack_count:
+    dtype: float
+    description: ACK-related packet count.
+  syn_count:
+    dtype: float
+    description: SYN-related packet count.
+  fin_count:
+    dtype: float
+    description: FIN-related packet count.
+  urg_count:
+    dtype: float
+    description: URG-related packet count.
+  rst_count:
+    dtype: float
+    description: RST-related packet count.
+  http:
+    dtype: float
+    description: HTTP protocol indicator/ratio.
+  https:
+    dtype: float
+    description: HTTPS protocol indicator/ratio.
+  dns:
+    dtype: float
+    description: DNS protocol indicator/ratio.
+  telnet:
+    dtype: float
+    description: Telnet protocol indicator/ratio.
+  smtp:
+    dtype: float
+    description: SMTP protocol indicator/ratio.
+  ssh:
+    dtype: float
+    description: SSH protocol indicator/ratio.
+  irc:
+    dtype: float
+    description: IRC protocol indicator/ratio.
+  tcp:
+    dtype: float
+    description: TCP protocol indicator/ratio.
+  udp:
+    dtype: float
+    description: UDP protocol indicator/ratio.
+  dhcp:
+    dtype: float
+    description: DHCP protocol indicator/ratio.
+  arp:
+    dtype: float
+    description: ARP protocol indicator/ratio.
+  icmp:
+    dtype: float
+    description: ICMP protocol indicator/ratio.
+  ipv:
+    dtype: float
+    description: IP version indicator.
+  llc:
+    dtype: float
+    description: LLC indicator.
+  tot_sum:
+    dtype: float
+    description: Total packet size sum.
+  min_packet_size:
+    dtype: float
+    description: Minimum packet size.
+  max_packet_size:
+    dtype: float
+    description: Maximum packet size.
+  avg_packet_size:
+    dtype: float
+    description: Average packet size.
+  std_packet_size:
+    dtype: float
+    description: Packet size standard deviation.
+  tot_size:
+    dtype: float
+    description: Total size.
+  iat:
+    dtype: float
+    description: Inter-arrival time statistic.
+  number:
+    dtype: float
+    description: Packet/number count in window.
+  magnitude:
+    dtype: float
+    description: Magnitude feature from CICIoMT extraction.
+  radius:
+    dtype: float
+    description: Radius feature from CICIoMT extraction.
+  covariance:
+    dtype: float
+    description: Covariance feature from CICIoMT extraction.
+  variance:
+    dtype: float
+    description: Variance feature from CICIoMT extraction.
+  weight:
+    dtype: float
+    description: Weight feature from CICIoMT extraction.
+
+# Local synthetic / EdgeMed sample aliases retained for MVP continuity.
+local_sample_features:
+  flow_duration: {dtype: float, description: Flow duration seconds}
+  packet_rate: {dtype: float, description: Packets per second}
+  byte_rate: {dtype: float, description: Bytes per second}
+  connection_rate: {dtype: float, description: Connection attempts rate}
+  mean_packet_size: {dtype: float, description: Mean packet size}
+  iat_mean: {dtype: float, description: Mean inter-arrival time}
+
+labels:
+  binary: ["Benign", "Attack"]
+  category_families: ["benign", "ddos", "dos", "recon", "mqtt", "spoofing", "other"]
+
+leakage_policy: config referenced via app.data.leakage

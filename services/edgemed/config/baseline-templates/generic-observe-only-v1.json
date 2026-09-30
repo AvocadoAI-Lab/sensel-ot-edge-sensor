@@ -1,0 +1,40 @@
+{
+  "schema": "sensel.baseline.profile.v1",
+  "profile_id": "generic-observe-only-v1",
+  "version": "2026.08.18.1",
+  "stats_source": "none_observe_only",
+  "device_template": {
+    "device_type": "unknown_device",
+    "cic_reference_device": "",
+    "cic_alternate_devices": [],
+    "protocols": [],
+    "default_operating_state": "unknown",
+    "criticality": "unknown",
+    "learning_days": 7
+  },
+  "observed": {
+    "iomt": {
+      "normal_destinations": [],
+      "allowed_destination_categories": [],
+      "forbidden_patterns": []
+    },
+    "thresholds": {
+      "packet_rate_baseline": "unknown",
+      "assert_rate_thresholds": false
+    }
+  },
+  "edgemed": {
+    "asset_profile_ref": "asset-profile:unknown_device",
+    "behavior_refs": {
+      "unknown": "behavior:unknown_device:unknown"
+    },
+    "xgboost_model_ref": "xgboost_category@v1",
+    "preferred_attack_families": []
+  },
+  "onboarding": {
+    "initial_mode": "learning",
+    "detect_after_learning": true,
+    "require_learned_baseline_before_detect": true,
+    "demo_preset_id": ""
+  }
+}

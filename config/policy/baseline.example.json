@@ -1,0 +1,52 @@
+{
+  "policy_version": "2026.05.30.001",
+  "site_id": "factory-lab-001",
+  "assets": [
+    {
+      "asset_id": "relay-01",
+      "addresses": ["192.168.10.20", "127.0.0.1"],
+      "allowed_peers": ["192.168.10.10", "192.168.10.11"],
+      "allowed_protocols": ["modbus-tcp", "opc-ua"],
+      "allowed_ports": [502, 4840],
+      "allowed_modbus_function_codes": [3, 4],
+      "normal_packet_rate_per_min": { "min": 100, "max": 500 },
+      "normal_write_count_per_hour": 0
+    }
+  ],
+  "global_allowlists": {
+    "mac": [],
+    "ip": [],
+    "communication_pairs": [],
+    "ports": [],
+    "protocols": []
+  },
+  "thresholds": {
+    "port_scan_unique_ports": 10,
+    "port_scan_window_sec": 60,
+    "traffic_rate_multiplier": 3.0
+  },
+  "iec61850": {
+    "goose_publishers": [
+      {
+        "asset_id": "ied-01",
+        "publisher_mac": "00:11:22:33:44:55",
+        "appid": 1000,
+        "gocb_ref": "simpleIOGenericIO/LLN0.gcbEvents",
+        "production": true,
+        "max_silence_sec": 30
+      }
+    ],
+    "mms_ieds": [
+      {
+        "asset_id": "ied-01",
+        "ied_ip": "192.168.10.50",
+        "allowed_mms_clients": ["192.168.10.10", "192.168.10.11"]
+      }
+    ],
+    "thresholds": {
+      "goose_stnum_jump_max": 100,
+      "mms_new_sessions_per_min": 20
+    }
+  },
+  "ioc": []
+}

@@ -1,0 +1,85 @@
+{
+  "schema": "sensel.baseline.profile.v1",
+  "profile_id": "cic-template-medical-pager-v1",
+  "version": "2026.08.17.1",
+  "stats_source": "cic_profiling",
+  "device_template": {
+    "device_type": "medical_pager",
+    "cic_reference_device": "SOS Multifunctional Pager",
+    "cic_alternate_devices": [
+      "SINGCALL SOS Button"
+    ],
+    "protocols": [
+      "wifi"
+    ],
+    "default_operating_state": "idle",
+    "criticality": "high",
+    "learning_days": 7
+  },
+  "observed": {
+    "iomt": {
+      "normal_destinations": [
+        "base-station",
+        "companion-app"
+      ],
+      "interaction_modes": [
+        "LAN_PHYSICAL",
+        "APP_PROFILE_CHANGE"
+      ],
+      "forbidden_patterns": [
+        "ddos",
+        "sustained_flood",
+        "port_scan"
+      ]
+    },
+    "thresholds": {
+      "packet_rate_baseline": "low",
+      "burst_allowed_on_button_press": true,
+      "max_connections_per_minute": 30,
+      "rate_p50_hint": 0.7719019776889016,
+      "rate_p95_hint": 5.791433745428737
+    },
+    "cic_profiling_stats": {
+      "source_csv": "D:\\實習\\資料集\\WiFI_and_MQTTprofilingCSV\\Multifunctional_Pager_LAN_PHYSICAL.pcap.csv",
+      "rows": 21,
+      "rate": {
+        "p50": 0.7719019776889016,
+        "p95": 5.791433745428737,
+        "max": 10.726969313730882
+      },
+      "syn_count": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "ack_count": {
+        "p50": 8.0,
+        "p95": 10.0,
+        "max": 10.0
+      },
+      "header_length": {
+        "p50": 16.4,
+        "p95": 20.0,
+        "max": 20.0
+      }
+    }
+  },
+  "edgemed": {
+    "asset_profile_ref": "asset-profile:medical_pager",
+    "behavior_refs": {
+      "idle": "behavior:medical_pager:idle",
+      "interaction": "behavior:medical_pager:interaction",
+      "power": "behavior:medical_pager:power"
+    },
+    "xgboost_model_ref": "xgboost_category@v1",
+    "preferred_attack_families": [
+      "ddos",
+      "dos"
+    ]
+  },
+  "onboarding": {
+    "initial_mode": "learning",
+    "detect_after_learning": true,
+    "demo_preset_id": "demo-pager-ddos"
+  }
+}

@@ -1,0 +1,16 @@
+# EdgeX Device Profile — Modbus Relay (example)
+# Rename and customize per site; register with device-modbus
+#
+# name: modbus-relay-profile
+# manufacturer: SenseL
+# model: OT-Relay-Generic
+#
+# deviceResources:
+#   - name: BreakerStatus
+#     properties: { valueType: String, readWrite: R }
+#   - name: Voltage
+#     properties: { valueType: Float32, readWrite: R }
+#   - name: AlarmStatus
+#     properties: { valueType: Bool, readWrite: R }
+#
+# See EdgeX device profile spec for full YAML structure.

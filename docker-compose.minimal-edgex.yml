@@ -1,0 +1,99 @@
+# Minimal EdgeX + resource-capped overlay — 4GB / 2 vCPU host (192.168.1.198).
+#
+# - Keeps EdgeX core (postgres/keeper/metadata/data/mqtt-broker) + device-mqtt.
+# - Drops the Modbus demo path (gated behind opt-in `modbus-demo` profile).
+# - Caps memory per service so the whole stack fits in ~2.8GB (swap as cushion).
+#
+# Self-contained: does NOT require docker-compose.pi4.yml (that overlay also
+# carries a `suricata` block which is invalid unless the suricata overlay is
+# included). Use:
+#   docker compose -f docker-compose.yml -f docker-compose.minimal-edgex.yml up -d --build
+#
+# Re-enable Modbus demo later with:  --profile modbus-demo
+services:
+  # --- EdgeX core ---
+  database:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  mqtt-broker:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  core-keeper:
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  core-metadata:
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  core-data:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  device-mqtt:
+    # Minimal mode runs ONLY device-mqtt (no device-modbus/opc-ua/s7). The
+    # shared devices dir also holds modbus/opcua/s7 device files which device-mqtt
+    # would try to register and crash-loop on ("'mqtt' protocol properties is not
+    # defined"). EdgeX caches DevicesDir in keeper so the env override is ignored;
+    # instead we override the mount SOURCE at the same /custom-config/devices path
+    # with a dir that contains ONLY the mqtt device. (device-modbus, when enabled
+    # via the modbus-demo profile, still mounts the full dir from the base file.)
+    volumes:
+      - ./config/edgex/devices-mqtt:/custom-config/devices:ro
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  # --- Modbus demo path: disabled by default (opt-in profile) ---
+  modbus-simulator:
+    profiles: ["modbus-demo"]
+
+  device-modbus:
+    profiles: ["modbus-demo"]
+
+  # --- SenseL services ---
+  local-mqtt:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  edge-console:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  vpn-client:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  sensel-edge-agent:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  packet-sensor:
+    environment:
+      - DEPLOY_TARGET=ubuntu
+      - CAPTURE_MAX_MBPS=100
+    deploy:
+      resources:
+        limits:
+          memory: 768M

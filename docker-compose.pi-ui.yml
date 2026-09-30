@@ -1,0 +1,10 @@
+# Pi lab — expose EdgeX UI on LAN (port 4000)
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.pi4.yml \
+#     -f docker-compose.pi-lab.yml -f docker-compose.pi-ui.yml \
+#     --profile lab-ui up -d
+
+services:
+  ui:
+    ports: !override
+      - "4000:4000"

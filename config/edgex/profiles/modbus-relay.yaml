@@ -1,0 +1,44 @@
+name: ModbusRelay
+manufacturer: SenseL
+model: OT-Relay-Generic
+labels:
+  - ot
+  - modbus
+description: Lab Modbus relay profile (aligned with iotechsys/modbus-sim register map)
+
+deviceResources:
+  - name: BreakerClosed
+    description: Breaker state from discrete input (simulator coil/input map)
+    attributes:
+      primaryTable: DISCRETE_INPUTS
+      startingAddress: 1
+    properties:
+      valueType: Bool
+      readWrite: R
+
+  - name: Voltage
+    description: Line voltage (Float32 input register on simulator)
+    attributes:
+      primaryTable: INPUT_REGISTERS
+      startingAddress: 5
+    properties:
+      valueType: Float32
+      readWrite: R
+
+  - name: AlarmStatus
+    description: Alarm flag (INT16 input register, non-zero = alarm)
+    attributes:
+      primaryTable: INPUT_REGISTERS
+      startingAddress: 21
+      rawType: Int16
+    properties:
+      valueType: Int16
+      readWrite: R
+
+deviceCommands:
+  - name: Status
+    readWrite: R
+    resourceOperations:
+      - deviceResource: BreakerClosed
+      - deviceResource: Voltage
+      - deviceResource: AlarmStatus
