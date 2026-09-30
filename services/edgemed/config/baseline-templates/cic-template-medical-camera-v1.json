@@ -1,0 +1,91 @@
+{
+  "schema": "sensel.baseline.profile.v1",
+  "profile_id": "cic-template-medical-camera-v1",
+  "version": "2026.08.17.1",
+  "stats_source": "cic_profiling",
+  "device_template": {
+    "device_type": "medical_camera",
+    "cic_reference_device": "Blink Camera / blink mini",
+    "cic_alternate_devices": [
+      "Ecobee Camera",
+      "M1T Laxihub Camera",
+      "Owltron Camera"
+    ],
+    "protocols": [
+      "wifi"
+    ],
+    "default_operating_state": "idle",
+    "criticality": "high",
+    "learning_days": 7
+  },
+  "observed": {
+    "iomt": {
+      "normal_destinations": [
+        "companion-app",
+        "cloud-vendor"
+      ],
+      "interaction_modes": [
+        "LAN_WATCH",
+        "WAN_WATCH",
+        "LAN_MIC",
+        "LAN_PHOTO",
+        "LAN_RECORDING"
+      ],
+      "forbidden_patterns": [
+        "sustained_flood",
+        "icmp_storm",
+        "port_scan"
+      ]
+    },
+    "thresholds": {
+      "packet_rate_baseline": "low_to_medium",
+      "burst_allowed_on_interaction": true,
+      "max_sustained_syn_ratio": 0.15,
+      "rate_p50_hint": 90.44789379935564,
+      "rate_p95_hint": 1339.9830374037836
+    },
+    "cic_profiling_stats": {
+      "source_csv": "D:\\實習\\資料集\\WiFI_and_MQTTprofilingCSV\\Blink_Camera_LAN_WATCH.pcap.csv",
+      "rows": 1883,
+      "rate": {
+        "p50": 90.44789379935564,
+        "p95": 1339.9830374037836,
+        "max": Infinity
+      },
+      "syn_count": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 1.0
+      },
+      "ack_count": {
+        "p50": 10.0,
+        "p95": 10.0,
+        "max": 10.0
+      },
+      "header_length": {
+        "p50": 20.0,
+        "p95": 20.0,
+        "max": 20.8
+      }
+    }
+  },
+  "edgemed": {
+    "asset_profile_ref": "asset-profile:medical_camera",
+    "behavior_refs": {
+      "idle": "behavior:medical_camera:idle",
+      "interaction": "behavior:medical_camera:interaction",
+      "active": "behavior:medical_camera:active"
+    },
+    "xgboost_model_ref": "xgboost_category@v1",
+    "preferred_attack_families": [
+      "dos",
+      "ddos",
+      "recon"
+    ]
+  },
+  "onboarding": {
+    "initial_mode": "learning",
+    "detect_after_learning": true,
+    "demo_preset_id": "demo-blink-dos"
+  }
+}

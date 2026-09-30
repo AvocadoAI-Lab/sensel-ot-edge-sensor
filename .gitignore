@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.lab
+.env.site
 *.local
 
 # Secrets
@@ -48,3 +49,9 @@ Thumbs.db
 
 # Docker volumes (local dev)
 docker-volumes/
+
+# EdgeMed runtime artifacts (trained models, FL outputs)
+services/edgemed/artifacts/*
+!services/edgemed/artifacts/.gitkeep
+services/edgemed/data/*
+!services/edgemed/data/.gitkeep

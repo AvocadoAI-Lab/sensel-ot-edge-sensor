@@ -1,0 +1,4 @@
+# Optional Tier 1 inference runtime. Keep training/export dependencies off the sensor.
+numpy==2.4.6
+onnxruntime==1.28.0
+protobuf==6.33.6

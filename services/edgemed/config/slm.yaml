@@ -1,0 +1,52 @@
+model_id: HuggingFaceTB/SmolLM2-360M-Instruct
+license: Apache-2.0
+language: en
+role: evidence_grounded_event_formatter
+may_create_detector_scores: false
+may_call_tools: false
+invalid_output: template_fallback
+# Reject summary IOCs (IPv4/CVE) not present in the fused event corpus.
+reject_ungrounded_ioc: true
+# Hard grounding failures (unknown evidence_id, ungrounded IOC, conflict mismatch)
+# always force template_fallback — never patch-and-publish.
+
+taxonomy_allowlist:
+  - network_behavior_anomaly
+  - known_attack_suspected
+  - detector_conflict
+  - baseline_traffic
+  - unknown
+  - insufficient_evidence
+
+retrieval_intent_allowlist:
+  - asset_context
+  - behavior_baseline
+  - threat_context
+  - playbook_lookup
+  - related_events
+  - none
+
+status_allowlist:
+  - ok
+  - insufficient_evidence
+  - conflict
+  - invalid
+
+output_fields:
+  - summary_en
+  - taxonomy
+  - evidence_ids
+  - retrieval_intents
+  - status
+
+max_summary_chars: 400
+max_tokens: 160
+
+# Optional Pi-class backend (GGUF + llama.cpp). Env vars override these:
+#   EDGEMED_LLAMA_BIN, EDGEMED_LLAMA_MODEL, EDGEMED_LLAMA_THREADS
+llama_bin: null
+llama_model: null
+llama_server: null
+llama_threads: 4
+llama_ctx: 512
+llama_timeout_sec: 90

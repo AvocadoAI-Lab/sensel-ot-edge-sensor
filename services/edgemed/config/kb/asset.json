@@ -1,0 +1,141 @@
+{
+  "namespace": "asset",
+  "documents": [
+    {
+      "source_id": "asset-profile:patient_monitor",
+      "source_type": "asset",
+      "device_type": "patient_monitor",
+      "protocols": ["wifi", "hl7"],
+      "normal_destinations": ["nurse-station", "ehr-gateway"],
+      "notes": "Typical idle telemetry to nurse station; firmware updates are scheduled."
+    },
+    {
+      "source_id": "asset-profile:infusion_pump",
+      "source_type": "asset",
+      "device_type": "infusion_pump",
+      "protocols": ["wifi", "mqtt"],
+      "normal_destinations": ["pump-controller", "pharmacy-gateway"],
+      "notes": "Burst traffic may occur during drug library sync."
+    },
+    {
+      "source_id": "asset-profile:medical_gateway",
+      "source_type": "asset",
+      "device_type": "medical_gateway",
+      "protocols": ["wifi", "mqtt", "tcp"],
+      "normal_destinations": ["hospital-core", "mqtt-broker"],
+      "notes": "Aggregates multiple IoMT flows; watch for fan-out anomalies."
+    },
+    {
+      "source_id": "asset-profile:medical_aiot",
+      "source_type": "asset",
+      "device_type": "medical_aiot",
+      "protocols": ["wifi", "mqtt"],
+      "normal_destinations": ["unknown"],
+      "notes": "Generic medical AIoT profile used when device type is unspecified."
+    },
+    {
+      "source_id": "asset-profile:medical_camera",
+      "source_type": "asset",
+      "device_type": "medical_camera",
+      "protocols": ["wifi"],
+      "normal_destinations": ["companion-app", "cloud-vendor"],
+      "notes": "CICIoMT-style camera (Blink/Ecobee/M1T/Owltron). LAN/WAN watch/mic/photo/recording are normal interaction modes; floods are not."
+    },
+    {
+      "source_id": "asset-profile:medical_pager",
+      "source_type": "asset",
+      "device_type": "medical_pager",
+      "protocols": ["wifi"],
+      "normal_destinations": ["base-station", "companion-app"],
+      "notes": "SOS multifunctional pager / SINGCALL. Physical button and app profile changes (Home/Armed/Away) are expected; sustained DoS/DDoS is not."
+    },
+    {
+      "source_id": "asset-profile:unknown_device",
+      "source_type": "asset",
+      "device_type": "unknown_device",
+      "protocols": [],
+      "normal_destinations": [],
+      "notes": "Placeholder profile for an asset whose device type has no dedicated template. Only organisation-wide common rules apply until a local baseline is learned; absence of a rate baseline is not an anomaly."
+    },
+    {
+      "source_id": "asset-profile:baby_sensor",
+      "source_type": "asset",
+      "device_type": "baby_sensor",
+      "protocols": ["wifi"],
+      "normal_destinations": ["base-station", "companion-app"],
+      "notes": "Sense-U baby monitor style sensor. Emergency orientation events are rare; correlate with physical handling."
+    },
+    {
+      "source_id": "asset-profile:emergency_sensor",
+      "source_type": "asset",
+      "device_type": "emergency_sensor",
+      "protocols": ["wifi"],
+      "normal_destinations": ["base-station", "companion-app"],
+      "notes": "Emergency-oriented sensor profile for triage enrichment."
+    },
+    {
+      "source_id": "asset-profile:bp_monitor",
+      "source_type": "asset",
+      "device_type": "bp_monitor",
+      "protocols": ["mqtt", "ble"],
+      "normal_destinations": ["mqtt-broker", "phone-gateway"],
+      "notes": "Blood-pressure style IoMT (e.g. Withings BPM / Checkme BP2A). Periodic short uploads expected."
+    },
+    {
+      "source_id": "asset-profile:thermometer",
+      "source_type": "asset",
+      "device_type": "thermometer",
+      "protocols": ["mqtt", "ble"],
+      "normal_destinations": ["mqtt-broker", "phone-gateway"],
+      "notes": "Thermometer IoMT (Withings / Kinsa). Low-volume periodic telemetry."
+    },
+    {
+      "source_id": "asset-profile:sleep_monitor",
+      "source_type": "asset",
+      "device_type": "sleep_monitor",
+      "protocols": ["mqtt", "ble"],
+      "normal_destinations": ["mqtt-broker", "phone-gateway"],
+      "notes": "Sleep monitor / ring class device. Nightly continuous but patterned traffic."
+    },
+    {
+      "source_id": "asset-profile:glucose_monitor",
+      "source_type": "asset",
+      "device_type": "glucose_monitor",
+      "protocols": ["mqtt"],
+      "normal_destinations": ["mqtt-broker"],
+      "notes": "Glucose monitoring IoMT. Short periodic MQTT publishes expected."
+    },
+    {
+      "source_id": "asset-profile:pulse_oximeter",
+      "source_type": "asset",
+      "device_type": "pulse_oximeter",
+      "protocols": ["mqtt", "ble"],
+      "normal_destinations": ["mqtt-broker", "phone-gateway"],
+      "notes": "Pulse oximeter / O2 ring class. SpO2 style periodic readings."
+    },
+    {
+      "source_id": "asset-profile:hr_monitor",
+      "source_type": "asset",
+      "device_type": "hr_monitor",
+      "protocols": ["ble"],
+      "normal_destinations": ["phone-gateway"],
+      "notes": "Heart-rate band/chest strap. BLE bursts during wear sessions."
+    },
+    {
+      "source_id": "asset-profile:ekg_monitor",
+      "source_type": "asset",
+      "device_type": "ekg_monitor",
+      "protocols": ["mqtt"],
+      "normal_destinations": ["mqtt-broker"],
+      "notes": "EKG-style simulated MQTT device. Higher-rate medical telemetry than thermometer."
+    },
+    {
+      "source_id": "asset-profile:mqtt_sensor",
+      "source_type": "asset",
+      "device_type": "mqtt_sensor",
+      "protocols": ["mqtt"],
+      "normal_destinations": ["mqtt-broker"],
+      "notes": "Generic MQTT medical sensor (airflow/EMG/GSR). Periodic publishes to broker."
+    }
+  ]
+}

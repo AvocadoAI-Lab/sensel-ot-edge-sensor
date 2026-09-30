@@ -1,0 +1,84 @@
+{
+  "schema": "sensel.baseline.profile.v1",
+  "profile_id": "cic-template-baby-sensor-v1",
+  "version": "2026.08.18.1",
+  "stats_source": "cic_profiling",
+  "device_template": {
+    "device_type": "baby_sensor",
+    "cic_reference_device": "Sense-U Baby Monitor",
+    "cic_alternate_devices": [],
+    "protocols": [
+      "wifi"
+    ],
+    "default_operating_state": "idle",
+    "criticality": "high",
+    "learning_days": 7
+  },
+  "observed": {
+    "iomt": {
+      "normal_destinations": [
+        "base-station",
+        "companion-app"
+      ],
+      "interaction_modes": [
+        "LAN_EMERGENCY",
+        "WAN_EMERGENCY"
+      ],
+      "forbidden_patterns": [
+        "sustained_flood",
+        "port_scan",
+        "spoofed_emergency_burst"
+      ]
+    },
+    "thresholds": {
+      "packet_rate_baseline": "very_low",
+      "burst_allowed_on_emergency": true,
+      "max_connections_per_minute": 20,
+      "rate_p50_hint": 1.104510042884657,
+      "rate_p95_hint": 2.128851472763044
+    },
+    "cic_profiling_stats": {
+      "source_csv": "D:\\實習\\資料集\\WiFI_and_MQTTprofilingCSV\\SenseU_LAN_EMERGENCY.pcap.csv",
+      "rows": 22,
+      "rate": {
+        "p50": 1.104510042884657,
+        "p95": 2.128851472763044,
+        "max": 10.6623236367904
+      },
+      "syn_count": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "ack_count": {
+        "p50": 9.0,
+        "p95": 10.0,
+        "max": 10.0
+      },
+      "header_length": {
+        "p50": 18.0,
+        "p95": 20.0,
+        "max": 20.0
+      }
+    }
+  },
+  "edgemed": {
+    "asset_profile_ref": "asset-profile:baby_sensor",
+    "behavior_refs": {
+      "idle": "behavior:baby_sensor:idle",
+      "interaction": "behavior:baby_sensor:interaction",
+      "power": "behavior:baby_sensor:power"
+    },
+    "xgboost_model_ref": "xgboost_category@v1",
+    "preferred_attack_families": [
+      "mqtt",
+      "dos",
+      "recon"
+    ]
+  },
+  "onboarding": {
+    "initial_mode": "learning",
+    "detect_after_learning": true,
+    "demo_preset_id": "demo-senseu-mqtt"
+  }
+}

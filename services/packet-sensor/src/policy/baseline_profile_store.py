@@ -94,3 +94,7 @@ class BaselineProfileStore:
     def baseline(self) -> dict[str, Any]:
         self.maybe_reload()
         return dict(self._baseline)
+
+    def artifact(self) -> dict[str, Any]:
+        self.maybe_reload()
+        return dict(self._artifact)

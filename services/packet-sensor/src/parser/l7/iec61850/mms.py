@@ -97,3 +97,12 @@ def record_mms(stats: MmsStats, obs: MmsObservation) -> None:
         stats.report_count += 1
     else:
         stats.other_count += 1
+
+
+def reset_mms_window(stats: MmsStats) -> None:
+    stats.session_keys.clear()
+    stats.read_count = 0
+    stats.write_count = 0
+    stats.report_count = 0
+    stats.other_count = 0
+    stats.observations.clear()

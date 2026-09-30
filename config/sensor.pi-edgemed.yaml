@@ -1,0 +1,78 @@
+# Pi 4 native deployment — packet-sensor + EdgeMed HTTP bridge (no Docker)
+# Paths are host paths under /home/fju/sensel-ot-edge-sensor
+
+sensor:
+  id: ot-edge-pi4
+  site_id: factory-lab-pi
+  tenant_id: default
+  software_version: "0.2.0-edgemed"
+
+capture:
+  interface: eth0
+  promiscuous: true
+  bpf_filter: ""
+  backend: scapy
+
+features:
+  window_sec: 60
+  contract_id: ot-window-pi-lab-v1
+  contract_path: /home/fju/sensel-ot-edge-sensor/config/model/feature-contract.ot-window-pi-lab-v1.json
+  assets_dir: /home/fju/sensel-ot-edge-sensor/data/assets
+  mqtt:
+    host: ""
+    port: 1883
+    topic_prefix: sensel/ot
+    edgex_device_name: packet-sensor-features
+    edgex_data_topic: ""
+
+inference:
+  enabled: true
+  backend: edgemed
+  episode_output_path: /home/fju/sensel-ot-edge-sensor/data/assets/trust-episodes.jsonl
+  runtime_status_path: /home/fju/sensel-ot-edge-sensor/data/assets/model-runtime.json
+  emit_decisions: [alert, observe]
+  fusion_policy_version: edgemed-bridge-v1
+  fusion_alert_threshold: 0.75
+  fusion_maximum_weight: 0.7
+  isolation_forest:
+    enabled: false
+  xgboost:
+    enabled: false
+  tiny_lstm:
+    enabled: false
+  edgemed:
+    enabled: true
+    base_url: http://127.0.0.1:8000
+    timeout_sec: 30.0
+    mapping_path: /home/fju/sensel-ot-edge-sensor/config/model/edgemed-feature-mapping.ot-window-pi-lab-v1.json
+    device_type: medical_aiot
+    operating_state: idle
+    criticality: high
+    investigate_enabled: true
+    investigate_on_decisions: [alert]
+    investigate_timeout_sec: 120.0
+
+detection:
+  policy_file: /home/fju/sensel-ot-edge-sensor/config/policy/baseline.json
+  rules_enabled:
+    - OT-001
+    - OT-005
+    - OT-010
+  policy_path: /home/fju/sensel-ot-edge-sensor/data/agent/detection-policy.json
+  policy_stamp_path: /home/fju/sensel-ot-edge-sensor/data/agent/detection-policy.stamp
+  operational_mode_path: /home/fju/sensel-ot-edge-sensor/data/agent/operational-mode.json
+  operational_mode_stamp_path: /home/fju/sensel-ot-edge-sensor/data/agent/operational-mode.stamp
+  baseline_profile_path: /home/fju/sensel-ot-edge-sensor/data/agent/baseline-profile.json
+  baseline_profile_stamp_path: /home/fju/sensel-ot-edge-sensor/data/agent/baseline-profile.stamp
+
+ioc:
+  enabled: false
+
+suricata_source:
+  enabled: true
+  eve_json_path: /home/fju/sensel-ot-edge-sensor/data/suricata/eve.json
+  offset_path: /home/fju/sensel-ot-edge-sensor/data/assets/.suricata-source.offset
+  poll_interval_sec: 2
+
+logging:
+  level: info

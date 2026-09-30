@@ -1,0 +1,181 @@
+{
+  "pc_health": {
+    "status": "ok",
+    "mode": "advisory_only",
+    "degraded_components": [],
+    "policy_version": "0.1",
+    "components": {
+      "isolation_forest": true,
+      "lstm_autoencoder": true,
+      "xgboost_category": true,
+      "xgboost_binary": true,
+      "slm": {
+        "model_id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "runtime_loaded": true,
+        "backend": "transformers",
+        "fallback": "template_fallback"
+      },
+      "rag": {
+        "orchestrator": "deterministic_state_machine",
+        "max_retrieval_steps": 5,
+        "tools": "read_only_allowlist"
+      },
+      "event_store": true
+    }
+  },
+  "pi_health": {
+    "status": "ok",
+    "mode": "advisory_only",
+    "degraded_components": [],
+    "policy_version": "0.1",
+    "components": {
+      "isolation_forest": true,
+      "lstm_autoencoder": true,
+      "xgboost_category": true,
+      "xgboost_binary": true,
+      "slm": {
+        "model_id": "llama-server:http://127.0.0.1:8081",
+        "runtime_loaded": true,
+        "backend": "llama_cpp_server",
+        "fallback": "template_fallback"
+      },
+      "rag": {
+        "orchestrator": "deterministic_state_machine",
+        "max_retrieval_steps": 5,
+        "tools": "read_only_allowlist"
+      },
+      "event_store": true
+    }
+  },
+  "pc_cold": {
+    "event_id": "evt_f42b4a5028bb9f79",
+    "detection_status": "partial_detection",
+    "if_score": 0.311513,
+    "if_anomalous": false,
+    "primary_anomaly": {
+      "detector": "isolation_forest",
+      "score": 0.311513,
+      "anomalous": false
+    },
+    "lstm": {
+      "status": "warming",
+      "score": null,
+      "ticks": 1,
+      "anomalous": null
+    },
+    "known_attack": null,
+    "verdict": "anomalous",
+    "severity": "high",
+    "taxonomy": "network_behavior_anomaly",
+    "generation_status": "template_fallback",
+    "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+    "enrichment_status": "unavailable",
+    "response_mode": "advisory_only"
+  },
+  "pi_cold": {
+    "event_id": "evt_f42b4a5028bb9f79",
+    "detection_status": "partial_detection",
+    "if_score": 0.311513,
+    "if_anomalous": false,
+    "primary_anomaly": {
+      "detector": "isolation_forest",
+      "score": 0.311513,
+      "anomalous": false
+    },
+    "lstm": {
+      "status": "warming",
+      "score": null,
+      "ticks": 1,
+      "anomalous": null
+    },
+    "known_attack": null,
+    "verdict": "anomalous",
+    "severity": "high",
+    "taxonomy": "network_behavior_anomaly",
+    "generation_status": "template_fallback",
+    "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+    "enrichment_status": "unavailable",
+    "response_mode": "advisory_only"
+  },
+  "pc_score": {
+    "event_id": "evt_f42b4a5028bb9f79",
+    "detection_status": "partial_detection",
+    "if_score": 0.311513,
+    "if_anomalous": false,
+    "primary_anomaly": {
+      "detector": "isolation_forest",
+      "score": 0.311513,
+      "anomalous": false
+    },
+    "lstm": {
+      "status": "warming",
+      "score": null,
+      "ticks": 2,
+      "anomalous": null
+    },
+    "known_attack": null,
+    "verdict": "anomalous",
+    "severity": "high",
+    "taxonomy": "network_behavior_anomaly",
+    "generation_status": "template_fallback",
+    "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+    "enrichment_status": "unavailable",
+    "response_mode": "advisory_only"
+  },
+  "pi_score": {
+    "event_id": "evt_f42b4a5028bb9f79",
+    "detection_status": "partial_detection",
+    "if_score": 0.311513,
+    "if_anomalous": false,
+    "primary_anomaly": {
+      "detector": "isolation_forest",
+      "score": 0.311513,
+      "anomalous": false
+    },
+    "lstm": {
+      "status": "warming",
+      "score": null,
+      "ticks": 2,
+      "anomalous": null
+    },
+    "known_attack": null,
+    "verdict": "anomalous",
+    "severity": "high",
+    "taxonomy": "network_behavior_anomaly",
+    "generation_status": "template_fallback",
+    "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+    "enrichment_status": "unavailable",
+    "response_mode": "advisory_only"
+  },
+  "pc_inv": {
+    "enrichment_status": "available",
+    "sources": 8,
+    "generation_status": "generated",
+    "summary": "anomaly",
+    "recommended_actions": [
+      "verify_device_state",
+      "review_evidence_window",
+      "preserve_flow_metadata"
+    ],
+    "slm_meta": {
+      "status": "runtime_loaded",
+      "model_id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "generation_status": "generated"
+    }
+  },
+  "pi_inv": {
+    "error": "timed out"
+  },
+  "pc_lstm": {
+    "status": "ok",
+    "score": 0.997258,
+    "ticks": 12,
+    "anomalous": true
+  },
+  "pi_lstm": {
+    "status": "ok",
+    "score": 0.997258,
+    "ticks": 12,
+    "anomalous": true
+  }
+}

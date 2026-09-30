@@ -2,7 +2,8 @@
 # D4: 72-hour lab soak — periodic health + E2E pipeline checks (Pi → 203 → 108).
 #
 # Usage:
-#   export SSHPASS='avocado@@'   # 108 / 203 self-checks use curl; Pi uses edgex pass below
+#   export SSHPASS='...'         # 108 / 203 SSH credential
+#   export PI_SSHPASS='...'      # Pi SSH credential
 #   ./scripts/soak-72h.sh                    # foreground, 72h
 #   ./scripts/soak-72h.sh --background       # nohup on current host
 #   ./scripts/soak-72h.sh --interval 900     # seconds between probes (default 900 = 15m)
@@ -17,7 +18,8 @@ INTERVAL_SEC="${SOAK_INTERVAL_SEC:-900}"      # 15m
 BACKGROUND=0
 
 PI_TARGET="${PI_TARGET:-edgex@192.168.1.123}"
-PI_SSHPASS="${PI_SSHPASS:-edgex}"
+: "${PI_SSHPASS:?set PI_SSHPASS for the Pi validation identity}"
+: "${SSHPASS:?set SSHPASS for the Control Plane/portal validation identity}"
 CP203_HOST="${CP203_HOST:-192.168.1.203}"
 PORTAL108_URL="${PORTAL108_URL:-http://192.168.1.108:8081}"
 LAYERC_URL="${LAYERC_URL:-http://${CP203_HOST}:8001}"
@@ -63,7 +65,7 @@ ssh_pi() {
 }
 
 ssh_108() {
-  SSHPASS="${SSHPASS:-avocado@@}" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ubuntu@192.168.1.108 "$@"
+  SSHPASS="$SSHPASS" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ubuntu@192.168.1.108 "$@"
 }
 
 probe_curl() {
@@ -113,7 +115,7 @@ probe_203_local() {
 }
 
 probe_203_remote() {
-  SSHPASS="${SSHPASS:-avocado@@}" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "avocado.ai@${CP203_HOST}" '
+  SSHPASS="$SSHPASS" sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "avocado.ai@${CP203_HOST}" '
     h=$(curl -sf --max-time 10 http://127.0.0.1:8001/health >/dev/null && echo ok || echo fail)
     d=$(/usr/local/bin/docker ps --format "{{.Names}}" 2>/dev/null | grep -cE "layera-mqtt-bridge|layera-layerc-bridge|layera-layerc-api|layerb-worker|layera-emqx" || echo 0)
     ot=$(/usr/local/bin/docker logs layera-mqtt-bridge --since 15m 2>&1 | grep -c "ot-edge/" || echo 0)

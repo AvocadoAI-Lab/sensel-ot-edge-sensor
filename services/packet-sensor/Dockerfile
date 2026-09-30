@@ -30,6 +30,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY requirements-ml.txt .
+ARG INSTALL_ML_RUNTIME=false
+RUN if [ "${INSTALL_ML_RUNTIME}" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-ml.txt; \
+    fi
+
 COPY src/ ./src/
 COPY --from=bpf-builder /build/bpf/xdp_redirect.bpf.o /app/bpf/xdp_redirect.bpf.o
 COPY --from=native-builder /build/native/libxdp_capture.so /app/lib/libxdp_capture.so

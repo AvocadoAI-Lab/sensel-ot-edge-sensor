@@ -1,0 +1,10 @@
+# Explicit denylist additions beyond app.data.leakage defaults.
+extra_denylist:
+  - flow_id
+  - src_port
+  - dst_port
+  - source_port
+  - destination_port
+  - unixtime
+  - date
+  - time

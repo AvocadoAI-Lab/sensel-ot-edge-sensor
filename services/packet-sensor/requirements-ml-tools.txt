@@ -1,0 +1,2 @@
+# Development-only model fixture/export tooling. Never install on Tier 1 runtime.
+onnx==1.22.0
