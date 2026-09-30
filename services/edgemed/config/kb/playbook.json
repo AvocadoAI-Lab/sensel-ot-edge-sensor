@@ -1,0 +1,37 @@
+{
+  "namespace": "playbook",
+  "documents": [
+    {
+      "source_id": "playbook:verify-device-state",
+      "source_type": "playbook",
+      "applies_to": ["suspected_attack", "anomalous", "known_attack_suspected", "detector_conflict"],
+      "title": "Verify device operating state",
+      "steps": [
+        "Confirm whether the device is idle, active, updating, or under maintenance",
+        "Compare observed destinations with the asset profile",
+        "Preserve flow metadata for later review"
+      ]
+    },
+    {
+      "source_id": "playbook:mqtt-flood-review",
+      "source_type": "playbook",
+      "applies_to": ["mqtt", "ddos", "dos"],
+      "title": "MQTT flood investigation",
+      "steps": [
+        "Check broker connection counts around the event window",
+        "Identify whether traffic matches scheduled drug-library or firmware sync",
+        "Escalate only after human approval; do not isolate automatically"
+      ]
+    },
+    {
+      "source_id": "playbook:baseline-only",
+      "source_type": "playbook",
+      "applies_to": ["baseline", "baseline_traffic"],
+      "title": "Baseline confirmation",
+      "steps": [
+        "No immediate escalation",
+        "Keep advisory monitoring enabled"
+      ]
+    }
+  ]
+}

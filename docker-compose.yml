@@ -128,9 +128,20 @@ services:
     env_file: .env
     environment:
       - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - EDGEX_CORE_METADATA_URL=http://edgex-core-metadata:59881
+      - EDGEX_DEVICE_MANAGEMENT_ENABLED=${EDGEX_DEVICE_MANAGEMENT_ENABLED:-true}
+      - EDGEX_INVENTORY_INTERVAL_SEC=${EDGEX_INVENTORY_INTERVAL_SEC:-60}
+      - EDGEX_DESIRED_MQTT_ENABLED=${EDGEX_DESIRED_MQTT_ENABLED:-true}
       - NORTHBOUND_MQTT_ENABLED=${NORTHBOUND_MQTT_ENABLED:-false}
       - CONTROL_PLANE_MQTT_HOST=${CONTROL_PLANE_MQTT_HOST:-}
       - CONTROL_PLANE_MQTT_PORT=${CONTROL_PLANE_MQTT_PORT:-1883}
+      - CONTROL_PLANE_MQTT_TLS=${CONTROL_PLANE_MQTT_TLS:-false}
+      - CONTROL_PLANE_MQTT_CA_PATH=${CONTROL_PLANE_MQTT_CA_PATH:-}
+      - CONTROL_PLANE_MQTT_CERT_PATH=${CONTROL_PLANE_MQTT_CERT_PATH:-}
+      - CONTROL_PLANE_MQTT_KEY_PATH=${CONTROL_PLANE_MQTT_KEY_PATH:-}
+      - NORTHBOUND_WIRE_MODE=${NORTHBOUND_WIRE_MODE:-json}
+      - NORTHBOUND_PROTOBUF_FAILURE_THRESHOLD=${NORTHBOUND_PROTOBUF_FAILURE_THRESHOLD:-3}
+      - NORTHBOUND_WIRE_ROLLBACK_RESET=${NORTHBOUND_WIRE_ROLLBACK_RESET:-false}
       - PLATFORM_CONFIG_PATH=/app/data/platform.json
       - POLICY_SYNC_ENABLED=${POLICY_SYNC_ENABLED:-true}
       - POLICY_SYNC_INTERVAL_SEC=${POLICY_SYNC_INTERVAL_SEC:-60}
@@ -174,6 +185,8 @@ services:
         condition: service_started
       core-data:
         condition: service_started
+      core-metadata:
+        condition: service_started
     networks:
       - sensel-edge
       - edgex-network
@@ -185,6 +198,8 @@ services:
     build:
       context: ./services/packet-sensor
       dockerfile: Dockerfile
+      args:
+        INSTALL_ML_RUNTIME: ${INSTALL_ML_RUNTIME:-false}
     container_name: sensel-packet-sensor
     restart: unless-stopped
     env_file:
@@ -195,6 +210,7 @@ services:
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
       - ./data/agent:/app/data/agent:ro
+      - ./data/models:/app/data/models:ro
       - /sys/fs/bpf:/sys/fs/bpf
     environment:
       - IOC_MATCH_ENABLED=${IOC_MATCH_ENABLED:-true}
@@ -217,6 +233,10 @@ services:
       - XDP_QUEUE_ID=${XDP_QUEUE_ID:-0}
       - AF_XDP_FRAME_SIZE=${AF_XDP_FRAME_SIZE:-2048}
       - AF_XDP_NUM_FRAMES=${AF_XDP_NUM_FRAMES:-4096}
+      - MODEL_INFERENCE_ENABLED=${MODEL_INFERENCE_ENABLED:-false}
+      - IF_ENABLED=${IF_ENABLED:-false}
+      - XGB_ENABLED=${XGB_ENABLED:-false}
+      - LSTM_ENABLED=${LSTM_ENABLED:-false}
     network_mode: host
     cap_add:
       - NET_ADMIN
@@ -229,6 +249,41 @@ services:
     depends_on:
       - local-mqtt
       - sensel-edge-agent
+
+  # ---------------------------------------------------------------------------
+  # Signed model manager — one-shot staging/canary/evaluation, no network
+  # ---------------------------------------------------------------------------
+  sensel-model-manager:
+    profiles:
+      - model-rollout
+    build:
+      context: .
+      dockerfile: services/sensel-edge-agent/Dockerfile.model-manager
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:-}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:-}
+      SENSEL_SENSOR_ID: ${SENSEL_SENSOR_ID:-}
+      SENSEL_MODEL_ROOT: /models/xgboost
+      SENSEL_DISTRIBUTION_PUBLIC_KEY_PATH: /run/keys/distribution.pub.pem
+      SENSEL_DISTRIBUTION_SIGNING_KEY_ID: ${SENSEL_DISTRIBUTION_SIGNING_KEY_ID:-}
+      SENSEL_RELEASE_PUBLIC_KEY_PATH: /run/keys/release.pub.pem
+      SENSEL_RELEASE_SIGNING_KEY_ID: ${SENSEL_RELEASE_SIGNING_KEY_ID:-}
+      SENSEL_EDGE_REPORT_SIGNING_KEY_PATH: /run/secrets/edge-report.pem
+      SENSEL_EDGE_REPORT_SIGNING_KEY_ID: ${SENSEL_EDGE_REPORT_SIGNING_KEY_ID:-}
+    volumes:
+      - ./data/models/xgboost:/models/xgboost
+      - ${SENSEL_MODEL_BUNDLE_DIR:-./data/model-rollout/inbox}:/input:ro
+      - ./data/model-rollout/outbox:/output
+      - ${SENSEL_MODEL_PUBLIC_KEY_DIR:-./secrets/model-public}:/run/keys:ro
+      - ${SENSEL_EDGE_REPORT_SIGNING_KEY_FILE:-./secrets/edge-report/signing-key.pem}:/run/secrets/edge-report.pem:ro
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 networks:
   sensel-edge:

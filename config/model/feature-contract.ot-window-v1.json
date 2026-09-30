@@ -1,0 +1,109 @@
+{
+  "contract_id": "ot-window-v1",
+  "version": "1.0.0",
+  "entity_scope": "sensor",
+  "sequence_length": 60,
+  "frame_interval_seconds": 60,
+  "features": [
+    {
+      "name": "packet_count",
+      "index": 0,
+      "data_type": "int64",
+      "missing_value_policy": "reject",
+      "normalization": "log1p",
+      "unit": "packets",
+      "description": "Packets observed in the feature window"
+    },
+    {
+      "name": "packet_rate",
+      "index": 1,
+      "data_type": "float64",
+      "missing_value_policy": "reject",
+      "normalization": "log1p",
+      "unit": "packets_per_second",
+      "description": "Average packet rate in the feature window"
+    },
+    {
+      "name": "unique_mac_count",
+      "index": 2,
+      "data_type": "int64",
+      "missing_value_policy": "reject",
+      "normalization": "log1p",
+      "unit": "count",
+      "description": "Unique source MAC addresses in the window"
+    },
+    {
+      "name": "goose_message_count",
+      "index": 3,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "messages",
+      "description": "IEC 61850 GOOSE messages in the window"
+    },
+    {
+      "name": "goose_stnum_changes",
+      "index": 4,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "changes",
+      "description": "GOOSE state number changes in the window"
+    },
+    {
+      "name": "goose_test_flag_count",
+      "index": 5,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "messages",
+      "description": "GOOSE messages carrying the test flag"
+    },
+    {
+      "name": "goose_unique_publishers",
+      "index": 6,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "count",
+      "description": "Unique GOOSE publishers in the window"
+    },
+    {
+      "name": "mms_session_count",
+      "index": 7,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "sessions",
+      "description": "IEC 61850 MMS sessions in the window"
+    },
+    {
+      "name": "mms_read_count",
+      "index": 8,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "operations",
+      "description": "MMS read operations in the window"
+    },
+    {
+      "name": "mms_write_count",
+      "index": 9,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "operations",
+      "description": "MMS write operations in the window"
+    },
+    {
+      "name": "mms_report_count",
+      "index": 10,
+      "data_type": "int64",
+      "missing_value_policy": "zero",
+      "normalization": "log1p",
+      "unit": "reports",
+      "description": "MMS reports in the window"
+    }
+  ],
+  "definition_sha256": "d73760ca607432c50ac43576ee536df8166ff1116f914da533bae190240fd81e"
+}

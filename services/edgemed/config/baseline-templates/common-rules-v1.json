@@ -1,0 +1,37 @@
+{
+  "schema": "sensel.baseline.common_rules.v1",
+  "rules_id": "org-common-rules-v1",
+  "version": "2026.08.18.1",
+  "description": "Cross-device behavioural rules that hold regardless of device type. Contains no per-device traffic magnitudes, so it can seed an unknown asset without borrowing another device's statistics.",
+  "derivation": {
+    "method": "device_type_independent_norms",
+    "uses_device_traffic_statistics": false,
+    "notes": "Destination categories and forbidden patterns are shared across IoMT classes. Rate/duration magnitudes are deliberately excluded because they differ by orders of magnitude between device types."
+  },
+  "allowed_destination_categories": [
+    "vendor-cloud",
+    "dns",
+    "ntp",
+    "mqtt-broker",
+    "companion-app",
+    "local-gateway",
+    "base-station"
+  ],
+  "forbidden_patterns": [
+    "internal_port_scan",
+    "lateral_host_sweep",
+    "syn_flood",
+    "sustained_flood",
+    "icmp_storm",
+    "malformed_mqtt",
+    "dns_tunneling_pattern",
+    "ot_control_write_from_iomt",
+    "plaintext_credential_exchange"
+  ],
+  "guardrails": {
+    "assert_rate_thresholds": false,
+    "alerting_scope": "forbidden_patterns_only",
+    "requires_local_learning": true,
+    "notes": "Until a learned baseline exists, only forbidden-pattern violations may alert. Absence of a rate baseline must not be treated as an anomaly."
+  }
+}

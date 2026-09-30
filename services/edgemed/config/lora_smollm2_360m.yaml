@@ -1,0 +1,51 @@
+# LoRA / PEFT configuration for Apple M2 Pro 16GB (Q3 starting SLM).
+# This file is the training contract; actual weights are not committed.
+
+base_model: HuggingFaceTB/SmolLM2-360M-Instruct
+output_dir: artifacts/slm/smollm2-360m-lora
+seed: 42
+
+data:
+  train_jsonl: artifacts/slm/sft/train.jsonl
+  validation_jsonl: artifacts/slm/sft/validation.jsonl
+  frozen_test_jsonl: artifacts/slm/sft/test.jsonl
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+train:
+  num_train_epochs: 2
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  logging_steps: 10
+  save_strategy: epoch
+  eval_strategy: epoch
+  bf16: false
+  fp16: false
+  max_seq_length: 1024
+  packing: false
+
+export:
+  adapter_dir: artifacts/slm/smollm2-360m-lora/adapter
+  gguf_out: artifacts/slm/smollm2-360m.Q4_K_M.gguf
+  gguf_quant: Q4_K_M
+
+hardware_notes:
+  fine_tune_target: Apple M2 Pro 16GB unified memory
+  inference_target: Raspberry Pi 5 8GB with llama.cpp
+  peak_memory_must_be_recorded: true

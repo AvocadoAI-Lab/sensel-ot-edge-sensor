@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 import psutil
@@ -51,6 +53,23 @@ def _disk_alert_threshold_pct() -> float:
         return 85.0
 
 
+def _model_inference_status(config: AppConfig) -> dict:
+    default_path = (
+        Path(config.sensel.episodes.watch_path).parent / "model-runtime.json"
+    )
+    path = Path(os.environ.get("MODEL_RUNTIME_STATUS_PATH", str(default_path)))
+    if not path.is_file():
+        return {"enabled": False, "status": "not_reported", "models": []}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"enabled": False, "status": "invalid", "models": []}
+    if not isinstance(value, dict):
+        return {"enabled": False, "status": "invalid", "models": []}
+    value["status"] = "reported"
+    return value
+
+
 def collect_health(config: AppConfig) -> dict:
     cpu = psutil.cpu_percent(interval=0.1)
     mem = psutil.virtual_memory().percent
@@ -79,6 +98,7 @@ def collect_health(config: AppConfig) -> dict:
         "engine": _primary_engine(engines),
         # Full per-engine status incl. Snort and Suricata.
         "engines": engines,
+        "model_inference": _model_inference_status(config),
         "policy_version": "",
         "timestamp": _utc_now_iso(),
     }

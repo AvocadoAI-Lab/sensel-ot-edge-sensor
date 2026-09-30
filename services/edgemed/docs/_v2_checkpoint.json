@@ -1,0 +1,3215 @@
+{
+  "pc": {
+    "label": "PC",
+    "base": "http://127.0.0.1:8000",
+    "health": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 20.3,
+      "body": {
+        "status": "ok",
+        "mode": "advisory_only",
+        "degraded_components": [],
+        "policy_version": "0.1",
+        "components": {
+          "isolation_forest": true,
+          "lstm_autoencoder": true,
+          "xgboost_category": true,
+          "xgboost_binary": true,
+          "slm": {
+            "model_id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+            "runtime_loaded": true,
+            "fallback": "template_fallback"
+          },
+          "rag": {
+            "orchestrator": "deterministic_state_machine",
+            "max_retrieval_steps": 5,
+            "tools": "read_only_allowlist"
+          },
+          "event_store": true
+        }
+      },
+      "error": null
+    },
+    "model": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 66.6,
+      "body": {
+        "isolation_forest": {
+          "features": [
+            "flow_duration",
+            "packet_rate",
+            "byte_rate",
+            "syn_count",
+            "ack_count",
+            "connection_rate",
+            "mean_packet_size",
+            "iat_mean"
+          ],
+          "threshold": 0.06501238953706455,
+          "metadata": {
+            "artifact_version": "0.1.0",
+            "trained_at": "2026-08-03T11:39:08.150087+00:00",
+            "training_rows": 1200,
+            "total_rows": 1320,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "threshold_quantile": 0.99,
+            "feature_medians": {
+              "flow_duration": 1.1207580614336017,
+              "packet_rate": 24.290636604700584,
+              "byte_rate": 9642.3670010942,
+              "syn_count": 2.0,
+              "ack_count": 8.0,
+              "connection_rate": 3.709493411425619,
+              "mean_packet_size": 339.7808571264138,
+              "iat_mean": 0.11107750086119615
+            },
+            "feature_iqrs": {
+              "flow_duration": 1.040094479605371,
+              "packet_rate": 14.121889924589894,
+              "byte_rate": 7930.423779362106,
+              "syn_count": 2.0,
+              "ack_count": 4.0,
+              "connection_rate": 1.9952021228547885,
+              "mean_packet_size": 58.236159370301664,
+              "iat_mean": 0.07687118925589474
+            }
+          }
+        },
+        "xgboost_category": {
+          "features": [
+            "header_length",
+            "protocol_type",
+            "duration",
+            "rate",
+            "srate",
+            "drate",
+            "fin_flag_number",
+            "syn_flag_number",
+            "rst_flag_number",
+            "psh_flag_number",
+            "ack_flag_number",
+            "ece_flag_number",
+            "cwr_flag_number",
+            "ack_count",
+            "syn_count",
+            "fin_count",
+            "rst_count",
+            "http",
+            "https",
+            "dns",
+            "telnet",
+            "smtp",
+            "ssh",
+            "irc",
+            "tcp",
+            "udp",
+            "dhcp",
+            "arp",
+            "icmp",
+            "igmp",
+            "ipv",
+            "llc",
+            "tot_sum",
+            "min_packet_size",
+            "max_packet_size",
+            "avg_packet_size",
+            "std_packet_size",
+            "tot_size",
+            "iat",
+            "number",
+            "magnitue",
+            "radius",
+            "covariance",
+            "variance",
+            "weight"
+          ],
+          "classes": [
+            "benign",
+            "ddos",
+            "dos",
+            "mqtt",
+            "recon"
+          ],
+          "task": "category",
+          "metadata": {
+            "artifact_version": "0.1.0-xgb",
+            "trained_at": "2026-08-03T15:50:22.979894+00:00",
+            "model_name": "xgboost",
+            "task": "category",
+            "classes": [
+              "benign",
+              "ddos",
+              "dos",
+              "mqtt",
+              "recon"
+            ],
+            "training_rows": 34340,
+            "features": [
+              "header_length",
+              "protocol_type",
+              "duration",
+              "rate",
+              "srate",
+              "drate",
+              "fin_flag_number",
+              "syn_flag_number",
+              "rst_flag_number",
+              "psh_flag_number",
+              "ack_flag_number",
+              "ece_flag_number",
+              "cwr_flag_number",
+              "ack_count",
+              "syn_count",
+              "fin_count",
+              "rst_count",
+              "http",
+              "https",
+              "dns",
+              "telnet",
+              "smtp",
+              "ssh",
+              "irc",
+              "tcp",
+              "udp",
+              "dhcp",
+              "arp",
+              "icmp",
+              "igmp",
+              "ipv",
+              "llc",
+              "tot_sum",
+              "min_packet_size",
+              "max_packet_size",
+              "avg_packet_size",
+              "std_packet_size",
+              "tot_size",
+              "iat",
+              "number",
+              "magnitue",
+              "radius",
+              "covariance",
+              "variance",
+              "weight"
+            ],
+            "calibrated": false,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "label_encoder_classes": [
+              "benign",
+              "ddos",
+              "dos",
+              "mqtt",
+              "recon"
+            ]
+          }
+        },
+        "xgboost_binary": {
+          "features": [
+            "header_length",
+            "protocol_type",
+            "duration",
+            "rate",
+            "srate",
+            "drate",
+            "fin_flag_number",
+            "syn_flag_number",
+            "rst_flag_number",
+            "psh_flag_number",
+            "ack_flag_number",
+            "ece_flag_number",
+            "cwr_flag_number",
+            "ack_count",
+            "syn_count",
+            "fin_count",
+            "rst_count",
+            "http",
+            "https",
+            "dns",
+            "telnet",
+            "smtp",
+            "ssh",
+            "irc",
+            "tcp",
+            "udp",
+            "dhcp",
+            "arp",
+            "icmp",
+            "igmp",
+            "ipv",
+            "llc",
+            "tot_sum",
+            "min_packet_size",
+            "max_packet_size",
+            "avg_packet_size",
+            "std_packet_size",
+            "tot_size",
+            "iat",
+            "number",
+            "magnitue",
+            "radius",
+            "covariance",
+            "variance",
+            "weight"
+          ],
+          "classes": [
+            "Benign",
+            "Attack"
+          ],
+          "task": "binary",
+          "metadata": {
+            "artifact_version": "0.1.0-xgb",
+            "trained_at": "2026-08-03T15:50:21.867486+00:00",
+            "model_name": "xgboost",
+            "task": "binary",
+            "classes": [
+              "Benign",
+              "Attack"
+            ],
+            "training_rows": 34340,
+            "features": [
+              "header_length",
+              "protocol_type",
+              "duration",
+              "rate",
+              "srate",
+              "drate",
+              "fin_flag_number",
+              "syn_flag_number",
+              "rst_flag_number",
+              "psh_flag_number",
+              "ack_flag_number",
+              "ece_flag_number",
+              "cwr_flag_number",
+              "ack_count",
+              "syn_count",
+              "fin_count",
+              "rst_count",
+              "http",
+              "https",
+              "dns",
+              "telnet",
+              "smtp",
+              "ssh",
+              "irc",
+              "tcp",
+              "udp",
+              "dhcp",
+              "arp",
+              "icmp",
+              "igmp",
+              "ipv",
+              "llc",
+              "tot_sum",
+              "min_packet_size",
+              "max_packet_size",
+              "avg_packet_size",
+              "std_packet_size",
+              "tot_size",
+              "iat",
+              "number",
+              "magnitue",
+              "radius",
+              "covariance",
+              "variance",
+              "weight"
+            ],
+            "calibrated": true,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "label_encoder_classes": null
+          }
+        },
+        "lstm_autoencoder": {
+          "features": [
+            "flow_duration",
+            "packet_rate",
+            "byte_rate",
+            "syn_count",
+            "ack_count",
+            "connection_rate",
+            "mean_packet_size",
+            "iat_mean"
+          ],
+          "seq_len": 10,
+          "tick_seconds": 60,
+          "threshold": 0.685308567231849,
+          "metadata": {
+            "artifact_version": "0.1.0-lstm-ae",
+            "trained_at": "2026-08-03T11:39:57.985428+00:00",
+            "training_sequences": 63,
+            "validation_sequences": 21,
+            "benign_sequences": 84,
+            "tick_count": 136,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "threshold_quantile": 0.99,
+            "final_train_loss": 0.6052424609661102,
+            "epochs": 10,
+            "hidden_size": 32,
+            "latent_size": 16
+          }
+        }
+      },
+      "error": null
+    },
+    "score_cold": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 155.1,
+      "body": {
+        "schema_version": "0.1",
+        "event_id": "evt_f42b4a5028bb9f79",
+        "timestamp": "2026-08-12T05:21:10.518562+00:00",
+        "asset": {
+          "device_id": "monitor-07",
+          "device_type": "patient_monitor",
+          "operating_state": "idle",
+          "criticality": "high",
+          "session_id": "sess-v2-pc-1786512070-cold-if"
+        },
+        "detection": {
+          "status": "partial_detection",
+          "disagreement": false,
+          "known_attack": null,
+          "anomaly": {
+            "score": 0.311513,
+            "threshold": 0.065012,
+            "anomalous": false,
+            "model_version": "0.1.0",
+            "detector": "isolation_forest"
+          },
+          "anomalies": {
+            "isolation_forest": {
+              "score": 0.311513,
+              "threshold": 0.065012,
+              "anomalous": false,
+              "model_version": "0.1.0",
+              "detector": "isolation_forest"
+            },
+            "lstm_autoencoder": {
+              "score": null,
+              "threshold": 0.685309,
+              "anomalous": null,
+              "status": "warming",
+              "ticks": 1,
+              "seq_len": 10,
+              "model_version": "0.1.0-lstm-ae",
+              "detector": "lstm_autoencoder"
+            }
+          },
+          "fallback_reason": null
+        },
+        "evidence": [
+          {
+            "evidence_id": "ev_1",
+            "feature": "packet_rate",
+            "observed": 84.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_2",
+            "feature": "byte_rate",
+            "observed": 25000.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_3",
+            "feature": "connection_rate",
+            "observed": 6.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_4",
+            "feature": "anomaly_score:isolation_forest",
+            "observed": 0.311513,
+            "baseline": 0.065012,
+            "source": "detector:0.1.0"
+          },
+          {
+            "evidence_id": "ev_5",
+            "feature": "anomaly_status:lstm_autoencoder",
+            "observed": "warming:1/10",
+            "baseline": 0.685309,
+            "source": "detector:0.1.0-lstm-ae"
+          }
+        ],
+        "enrichment": {
+          "status": "unavailable",
+          "retrieval_intents": [],
+          "sources": []
+        },
+        "assessment": {
+          "verdict": "anomalous",
+          "severity": "high",
+          "severity_source": "fusion-policy-0.1",
+          "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+          "summary_source": "template_fallback",
+          "evidence_ids": [
+            "ev_1",
+            "ev_2",
+            "ev_3",
+            "ev_4",
+            "ev_5"
+          ],
+          "taxonomy": "network_behavior_anomaly",
+          "generation_status": "template_fallback"
+        },
+        "response": {
+          "mode": "advisory_only",
+          "human_approval_required": true,
+          "recommended_actions": [
+            "verify_device_state",
+            "review_evidence_window",
+            "preserve_flow_metadata"
+          ]
+        }
+      },
+      "error": null
+    },
+    "score_cold_summary": {
+      "event_id": "evt_f42b4a5028bb9f79",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "isolation_forest",
+        "score": 0.311513,
+        "anomalous": false
+      },
+      "lstm": {
+        "status": "warming",
+        "score": null,
+        "ticks": 1,
+        "anomalous": null
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "high",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "score": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 160.5,
+      "body": {
+        "schema_version": "0.1",
+        "event_id": "evt_f42b4a5028bb9f79",
+        "timestamp": "2026-08-12T05:21:10.840461+00:00",
+        "asset": {
+          "device_id": "monitor-07",
+          "device_type": "patient_monitor",
+          "operating_state": "idle",
+          "criticality": "high",
+          "session_id": "sess-v2-pc-1786512070"
+        },
+        "detection": {
+          "status": "partial_detection",
+          "disagreement": false,
+          "known_attack": null,
+          "anomaly": {
+            "score": 0.311513,
+            "threshold": 0.065012,
+            "anomalous": false,
+            "model_version": "0.1.0",
+            "detector": "isolation_forest"
+          },
+          "anomalies": {
+            "isolation_forest": {
+              "score": 0.311513,
+              "threshold": 0.065012,
+              "anomalous": false,
+              "model_version": "0.1.0",
+              "detector": "isolation_forest"
+            },
+            "lstm_autoencoder": {
+              "score": null,
+              "threshold": 0.685309,
+              "anomalous": null,
+              "status": "warming",
+              "ticks": 2,
+              "seq_len": 10,
+              "model_version": "0.1.0-lstm-ae",
+              "detector": "lstm_autoencoder"
+            }
+          },
+          "fallback_reason": null
+        },
+        "evidence": [
+          {
+            "evidence_id": "ev_1",
+            "feature": "packet_rate",
+            "observed": 84.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_2",
+            "feature": "byte_rate",
+            "observed": 25000.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_3",
+            "feature": "connection_rate",
+            "observed": 6.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_4",
+            "feature": "anomaly_score:isolation_forest",
+            "observed": 0.311513,
+            "baseline": 0.065012,
+            "source": "detector:0.1.0"
+          },
+          {
+            "evidence_id": "ev_5",
+            "feature": "anomaly_status:lstm_autoencoder",
+            "observed": "warming:2/10",
+            "baseline": 0.685309,
+            "source": "detector:0.1.0-lstm-ae"
+          }
+        ],
+        "enrichment": {
+          "status": "unavailable",
+          "retrieval_intents": [],
+          "sources": []
+        },
+        "assessment": {
+          "verdict": "anomalous",
+          "severity": "high",
+          "severity_source": "fusion-policy-0.1",
+          "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+          "summary_source": "template_fallback",
+          "evidence_ids": [
+            "ev_1",
+            "ev_2",
+            "ev_3",
+            "ev_4",
+            "ev_5"
+          ],
+          "taxonomy": "network_behavior_anomaly",
+          "generation_status": "template_fallback"
+        },
+        "response": {
+          "mode": "advisory_only",
+          "human_approval_required": true,
+          "recommended_actions": [
+            "verify_device_state",
+            "review_evidence_window",
+            "preserve_flow_metadata"
+          ]
+        }
+      },
+      "error": null
+    },
+    "score_summary": {
+      "event_id": "evt_f42b4a5028bb9f79",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "isolation_forest",
+        "score": 0.311513,
+        "anomalous": false
+      },
+      "lstm": {
+        "status": "warming",
+        "score": null,
+        "ticks": 2,
+        "anomalous": null
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "high",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "lstm_trace": [
+      {
+        "i": 1,
+        "latency_ms": 171.5,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 3,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 2,
+        "latency_ms": 166.0,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 4,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 3,
+        "latency_ms": 171.5,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 5,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 4,
+        "latency_ms": 158.0,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 6,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 5,
+        "latency_ms": 155.9,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 7,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 6,
+        "latency_ms": 153.1,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 8,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 7,
+        "latency_ms": 152.3,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 9,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 8,
+        "latency_ms": 183.1,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 10,
+          "anomalous": true
+        }
+      },
+      {
+        "i": 9,
+        "latency_ms": 224.3,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 11,
+          "anomalous": true
+        }
+      },
+      {
+        "i": 10,
+        "latency_ms": 201.1,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 12,
+          "anomalous": true
+        }
+      }
+    ],
+    "lstm_final": {
+      "status": "ok",
+      "score": 0.997258,
+      "ticks": 12,
+      "anomalous": true
+    },
+    "lstm_final_score_summary": {
+      "event_id": "evt_44c696d4996f2bb6",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "lstm_autoencoder",
+        "score": 0.997258,
+        "anomalous": true
+      },
+      "lstm": {
+        "status": "ok",
+        "score": 0.997258,
+        "ticks": 12,
+        "anomalous": true
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "critical",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "lstm_final_latency_ms": 201.1,
+    "investigate": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 7118.6,
+      "body": {
+        "event": {
+          "schema_version": "0.1",
+          "event_id": "evt_f42b4a5028bb9f79",
+          "timestamp": "2026-08-10T06:26:20.191244+00:00",
+          "asset": {
+            "device_id": "monitor-07",
+            "device_type": "patient_monitor",
+            "operating_state": "idle",
+            "criticality": "high",
+            "session_id": null
+          },
+          "detection": {
+            "status": "partial_detection",
+            "disagreement": false,
+            "known_attack": null,
+            "anomaly": {
+              "score": 0.311513,
+              "threshold": 0.065012,
+              "anomalous": false,
+              "model_version": "0.1.0",
+              "detector": "isolation_forest"
+            },
+            "anomalies": {
+              "isolation_forest": {
+                "score": 0.311513,
+                "threshold": 0.065012,
+                "anomalous": false,
+                "model_version": "0.1.0",
+                "detector": "isolation_forest"
+              },
+              "lstm_autoencoder": {
+                "score": null,
+                "threshold": 0.685309,
+                "anomalous": null,
+                "status": "warming",
+                "ticks": 1,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              }
+            },
+            "fallback_reason": null
+          },
+          "evidence": [
+            {
+              "evidence_id": "ev_1",
+              "feature": "packet_rate",
+              "observed": 84.0,
+              "baseline": null,
+              "source": "detector:isolation_forest"
+            },
+            {
+              "evidence_id": "ev_2",
+              "feature": "byte_rate",
+              "observed": 25000.0,
+              "baseline": null,
+              "source": "detector:isolation_forest"
+            },
+            {
+              "evidence_id": "ev_3",
+              "feature": "connection_rate",
+              "observed": 6.0,
+              "baseline": null,
+              "source": "detector:isolation_forest"
+            },
+            {
+              "evidence_id": "ev_4",
+              "feature": "anomaly_score:isolation_forest",
+              "observed": 0.311513,
+              "baseline": 0.065012,
+              "source": "detector:0.1.0"
+            },
+            {
+              "evidence_id": "ev_5",
+              "feature": "anomaly_status:lstm_autoencoder",
+              "observed": "warming:1/10",
+              "baseline": 0.685309,
+              "source": "detector:0.1.0-lstm-ae"
+            }
+          ],
+          "enrichment": {
+            "status": "available",
+            "retrieval_intents": [
+              "asset_context",
+              "behavior_baseline"
+            ],
+            "sources": [
+              {
+                "source_id": "asset-profile:patient_monitor",
+                "source_type": "asset-profile"
+              },
+              {
+                "source_id": "behavior:patient_monitor:idle",
+                "source_type": "behavior"
+              },
+              {
+                "source_id": "threat:network-anomaly",
+                "source_type": "threat"
+              },
+              {
+                "source_id": "evidence-event:evt_f42b4a5028bb9f79",
+                "source_type": "evidence-event"
+              },
+              {
+                "source_id": "evidence-event:evt_d6a259a86d1244c3",
+                "source_type": "evidence-event"
+              },
+              {
+                "source_id": "evidence-event:evt_b1699526f7eed578",
+                "source_type": "evidence-event"
+              },
+              {
+                "source_id": "evidence-event:evt_44c696d4996f2bb6",
+                "source_type": "evidence-event"
+              },
+              {
+                "source_id": "playbook:verify-device-state",
+                "source_type": "playbook"
+              }
+            ],
+            "claims": [
+              {
+                "claim": "Typical idle telemetry to nurse station; firmware updates are scheduled.",
+                "source_id": "asset-profile:patient_monitor",
+                "tool": "get_asset_profile"
+              },
+              {
+                "claim": "Low sustained packet rate with periodic keepalives.",
+                "source_id": "behavior:patient_monitor:idle",
+                "tool": "get_behavior_baseline"
+              },
+              {
+                "claim": "Detector anomaly without a precise known-attack family still warrants analyst review.",
+                "source_id": "threat:network-anomaly",
+                "tool": "search_threat_knowledge"
+              },
+              {
+                "claim": "Related historical events available for device under evidence-event:evt_f42b4a5028bb9f79",
+                "source_id": "evidence-event:evt_f42b4a5028bb9f79",
+                "tool": "get_related_events"
+              },
+              {
+                "claim": "Related historical events available for device under evidence-event:evt_d6a259a86d1244c3",
+                "source_id": "evidence-event:evt_d6a259a86d1244c3",
+                "tool": "get_related_events"
+              },
+              {
+                "claim": "Related historical events available for device under evidence-event:evt_b1699526f7eed578",
+                "source_id": "evidence-event:evt_b1699526f7eed578",
+                "tool": "get_related_events"
+              },
+              {
+                "claim": "Related historical events available for device under evidence-event:evt_44c696d4996f2bb6",
+                "source_id": "evidence-event:evt_44c696d4996f2bb6",
+                "tool": "get_related_events"
+              },
+              {
+                "claim": "Verify device operating state",
+                "source_id": "playbook:verify-device-state",
+                "tool": "search_playbook"
+              }
+            ],
+            "audit": [
+              {
+                "step": 1,
+                "tool": "get_asset_profile",
+                "ok": true,
+                "source_ids": [
+                  "asset-profile:patient_monitor"
+                ],
+                "error": null,
+                "elapsed_ms": 0.013
+              },
+              {
+                "step": 2,
+                "tool": "get_behavior_baseline",
+                "ok": true,
+                "source_ids": [
+                  "behavior:patient_monitor:idle"
+                ],
+                "error": null,
+                "elapsed_ms": 0.007
+              },
+              {
+                "step": 3,
+                "tool": "search_threat_knowledge",
+                "ok": true,
+                "source_ids": [
+                  "threat:network-anomaly"
+                ],
+                "error": null,
+                "elapsed_ms": 0.018
+              },
+              {
+                "step": 4,
+                "tool": "get_related_events",
+                "ok": true,
+                "source_ids": [
+                  "evidence-event:evt_f42b4a5028bb9f79",
+                  "evidence-event:evt_f42b4a5028bb9f79",
+                  "evidence-event:evt_d6a259a86d1244c3",
+                  "evidence-event:evt_b1699526f7eed578",
+                  "evidence-event:evt_44c696d4996f2bb6"
+                ],
+                "error": null,
+                "elapsed_ms": 2.534
+              },
+              {
+                "step": 5,
+                "tool": "search_playbook",
+                "ok": true,
+                "source_ids": [
+                  "playbook:verify-device-state"
+                ],
+                "error": null,
+                "elapsed_ms": 0.018
+              }
+            ],
+            "retrieval_count": 5,
+            "related_event_ids": [
+              "evt_864d47e06488ae2e",
+              "evt_9e6fd38fe0190922",
+              "evt_9aaa1cfd76e0dc9b",
+              "evt_79e2b72d6a948739",
+              "evt_6516c9b3098c4488",
+              "evt_6c11872ef5bd7057",
+              "evt_f5bb31408745837c",
+              "evt_d6a259a86d1244c3",
+              "evt_b1699526f7eed578",
+              "evt_44c696d4996f2bb6"
+            ]
+          },
+          "assessment": {
+            "verdict": "anomalous",
+            "severity": "high",
+            "severity_source": "fusion-policy-0.1",
+            "summary": "Anomaly detected in isolation forest.",
+            "summary_source": "HuggingFaceTB/SmolLM2-360M-Instruct",
+            "evidence_ids": [
+              "ev_1",
+              "ev_2",
+              "ev_3",
+              "ev_4",
+              "ev_5"
+            ],
+            "taxonomy": "insufficient_evidence",
+            "generation_status": "generated",
+            "slm_status": "insufficient_evidence",
+            "slm_validation_errors": []
+          },
+          "response": {
+            "mode": "advisory_only",
+            "human_approval_required": true,
+            "recommended_actions": [
+              "verify_device_state",
+              "review_evidence_window",
+              "preserve_flow_metadata"
+            ]
+          }
+        },
+        "related_events": [
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_864d47e06488ae2e",
+            "timestamp": "2026-08-12T04:56:46.519346+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 31,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 31,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_9e6fd38fe0190922",
+            "timestamp": "2026-08-12T04:56:46.695001+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 32,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 32,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_9aaa1cfd76e0dc9b",
+            "timestamp": "2026-08-12T04:56:46.867631+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 33,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 33,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_79e2b72d6a948739",
+            "timestamp": "2026-08-12T04:56:47.041241+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 34,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 34,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_6516c9b3098c4488",
+            "timestamp": "2026-08-12T04:56:47.214877+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 35,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 35,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_6c11872ef5bd7057",
+            "timestamp": "2026-08-12T04:56:47.389711+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 36,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 36,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_f5bb31408745837c",
+            "timestamp": "2026-08-12T04:56:45.624569+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-compare"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 26,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 26,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "available",
+              "retrieval_intents": [
+                "asset_context",
+                "behavior_baseline"
+              ],
+              "sources": [
+                {
+                  "source_id": "asset-profile:patient_monitor",
+                  "source_type": "asset-profile"
+                },
+                {
+                  "source_id": "behavior:patient_monitor:idle",
+                  "source_type": "behavior"
+                },
+                {
+                  "source_id": "threat:network-anomaly",
+                  "source_type": "threat"
+                },
+                {
+                  "source_id": "evidence-event:evt_9e6fd38fe0190922",
+                  "source_type": "evidence-event"
+                },
+                {
+                  "source_id": "evidence-event:evt_9aaa1cfd76e0dc9b",
+                  "source_type": "evidence-event"
+                },
+                {
+                  "source_id": "evidence-event:evt_79e2b72d6a948739",
+                  "source_type": "evidence-event"
+                },
+                {
+                  "source_id": "evidence-event:evt_6516c9b3098c4488",
+                  "source_type": "evidence-event"
+                },
+                {
+                  "source_id": "evidence-event:evt_6c11872ef5bd7057",
+                  "source_type": "evidence-event"
+                },
+                {
+                  "source_id": "playbook:verify-device-state",
+                  "source_type": "playbook"
+                }
+              ],
+              "claims": [
+                {
+                  "claim": "Typical idle telemetry to nurse station; firmware updates are scheduled.",
+                  "source_id": "asset-profile:patient_monitor",
+                  "tool": "get_asset_profile"
+                },
+                {
+                  "claim": "Low sustained packet rate with periodic keepalives.",
+                  "source_id": "behavior:patient_monitor:idle",
+                  "tool": "get_behavior_baseline"
+                },
+                {
+                  "claim": "Detector anomaly without a precise known-attack family still warrants analyst review.",
+                  "source_id": "threat:network-anomaly",
+                  "tool": "search_threat_knowledge"
+                },
+                {
+                  "claim": "Related historical events available for device under evidence-event:evt_9e6fd38fe0190922",
+                  "source_id": "evidence-event:evt_9e6fd38fe0190922",
+                  "tool": "get_related_events"
+                },
+                {
+                  "claim": "Related historical events available for device under evidence-event:evt_9aaa1cfd76e0dc9b",
+                  "source_id": "evidence-event:evt_9aaa1cfd76e0dc9b",
+                  "tool": "get_related_events"
+                },
+                {
+                  "claim": "Related historical events available for device under evidence-event:evt_79e2b72d6a948739",
+                  "source_id": "evidence-event:evt_79e2b72d6a948739",
+                  "tool": "get_related_events"
+                },
+                {
+                  "claim": "Related historical events available for device under evidence-event:evt_6516c9b3098c4488",
+                  "source_id": "evidence-event:evt_6516c9b3098c4488",
+                  "tool": "get_related_events"
+                },
+                {
+                  "claim": "Related historical events available for device under evidence-event:evt_6c11872ef5bd7057",
+                  "source_id": "evidence-event:evt_6c11872ef5bd7057",
+                  "tool": "get_related_events"
+                },
+                {
+                  "claim": "Verify device operating state",
+                  "source_id": "playbook:verify-device-state",
+                  "tool": "search_playbook"
+                }
+              ],
+              "audit": [
+                {
+                  "step": 1,
+                  "tool": "get_asset_profile",
+                  "ok": true,
+                  "source_ids": [
+                    "asset-profile:patient_monitor"
+                  ],
+                  "error": null,
+                  "elapsed_ms": 0.012
+                },
+                {
+                  "step": 2,
+                  "tool": "get_behavior_baseline",
+                  "ok": true,
+                  "source_ids": [
+                    "behavior:patient_monitor:idle"
+                  ],
+                  "error": null,
+                  "elapsed_ms": 0.006
+                },
+                {
+                  "step": 3,
+                  "tool": "search_threat_knowledge",
+                  "ok": true,
+                  "source_ids": [
+                    "threat:network-anomaly"
+                  ],
+                  "error": null,
+                  "elapsed_ms": 0.017
+                },
+                {
+                  "step": 4,
+                  "tool": "get_related_events",
+                  "ok": true,
+                  "source_ids": [
+                    "evidence-event:evt_9e6fd38fe0190922",
+                    "evidence-event:evt_9aaa1cfd76e0dc9b",
+                    "evidence-event:evt_79e2b72d6a948739",
+                    "evidence-event:evt_6516c9b3098c4488",
+                    "evidence-event:evt_6c11872ef5bd7057"
+                  ],
+                  "error": null,
+                  "elapsed_ms": 1.772
+                },
+                {
+                  "step": 5,
+                  "tool": "search_playbook",
+                  "ok": true,
+                  "source_ids": [
+                    "playbook:verify-device-state"
+                  ],
+                  "error": null,
+                  "elapsed_ms": 0.013
+                }
+              ],
+              "retrieval_count": 5,
+              "related_event_ids": [
+                "evt_756473970c1510cd",
+                "evt_4a5c31d28459e476",
+                "evt_9d2732970f234375",
+                "evt_3d3c1fc746eddd5f",
+                "evt_864d47e06488ae2e",
+                "evt_9e6fd38fe0190922",
+                "evt_9aaa1cfd76e0dc9b",
+                "evt_79e2b72d6a948739",
+                "evt_6516c9b3098c4488",
+                "evt_6c11872ef5bd7057"
+              ]
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "Network behavior anomaly",
+              "summary_source": "HuggingFaceTB/SmolLM2-360M-Instruct",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "insufficient_evidence",
+              "generation_status": "generated",
+              "slm_status": "insufficient_evidence",
+              "slm_validation_errors": []
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_d6a259a86d1244c3",
+            "timestamp": "2026-08-12T05:21:12.150914+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-pc-1786512070"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 10,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 10,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_b1699526f7eed578",
+            "timestamp": "2026-08-12T05:21:12.375951+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-pc-1786512070"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 11,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 11,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          },
+          {
+            "schema_version": "0.1",
+            "event_id": "evt_44c696d4996f2bb6",
+            "timestamp": "2026-08-12T05:21:12.577982+00:00",
+            "asset": {
+              "device_id": "monitor-07",
+              "device_type": "patient_monitor",
+              "operating_state": "idle",
+              "criticality": "high",
+              "session_id": "sess-v2-pc-1786512070"
+            },
+            "detection": {
+              "status": "partial_detection",
+              "disagreement": false,
+              "known_attack": null,
+              "anomaly": {
+                "score": 0.997258,
+                "raw_error": 4.726054,
+                "threshold": 0.685309,
+                "anomalous": true,
+                "status": "ok",
+                "ticks": 12,
+                "seq_len": 10,
+                "model_version": "0.1.0-lstm-ae",
+                "detector": "lstm_autoencoder"
+              },
+              "anomalies": {
+                "isolation_forest": {
+                  "score": 0.311513,
+                  "threshold": 0.065012,
+                  "anomalous": false,
+                  "model_version": "0.1.0",
+                  "detector": "isolation_forest"
+                },
+                "lstm_autoencoder": {
+                  "score": 0.997258,
+                  "raw_error": 4.726054,
+                  "threshold": 0.685309,
+                  "anomalous": true,
+                  "status": "ok",
+                  "ticks": 12,
+                  "seq_len": 10,
+                  "model_version": "0.1.0-lstm-ae",
+                  "detector": "lstm_autoencoder"
+                }
+              },
+              "fallback_reason": null
+            },
+            "evidence": [
+              {
+                "evidence_id": "ev_1",
+                "feature": "packet_rate",
+                "observed": 84.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_2",
+                "feature": "byte_rate",
+                "observed": 25000.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_3",
+                "feature": "connection_rate",
+                "observed": 6.0,
+                "baseline": null,
+                "source": "detector:isolation_forest"
+              },
+              {
+                "evidence_id": "ev_4",
+                "feature": "anomaly_score:isolation_forest",
+                "observed": 0.311513,
+                "baseline": 0.065012,
+                "source": "detector:0.1.0"
+              },
+              {
+                "evidence_id": "ev_5",
+                "feature": "anomaly_score:lstm_autoencoder",
+                "observed": 0.997258,
+                "baseline": 0.685309,
+                "source": "detector:0.1.0-lstm-ae"
+              }
+            ],
+            "enrichment": {
+              "status": "unavailable",
+              "retrieval_intents": [],
+              "sources": []
+            },
+            "assessment": {
+              "verdict": "anomalous",
+              "severity": "critical",
+              "severity_source": "fusion-policy-0.1",
+              "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+              "summary_source": "template_fallback",
+              "evidence_ids": [
+                "ev_1",
+                "ev_2",
+                "ev_3",
+                "ev_4",
+                "ev_5"
+              ],
+              "taxonomy": "network_behavior_anomaly",
+              "generation_status": "template_fallback"
+            },
+            "response": {
+              "mode": "advisory_only",
+              "human_approval_required": true,
+              "recommended_actions": [
+                "verify_device_state",
+                "review_evidence_window",
+                "preserve_flow_metadata"
+              ]
+            }
+          }
+        ],
+        "rag": {
+          "status": "available",
+          "retrieval_count": 5,
+          "sources": [
+            {
+              "source_id": "asset-profile:patient_monitor",
+              "source_type": "asset-profile"
+            },
+            {
+              "source_id": "behavior:patient_monitor:idle",
+              "source_type": "behavior"
+            },
+            {
+              "source_id": "threat:network-anomaly",
+              "source_type": "threat"
+            },
+            {
+              "source_id": "evidence-event:evt_f42b4a5028bb9f79",
+              "source_type": "evidence-event"
+            },
+            {
+              "source_id": "evidence-event:evt_d6a259a86d1244c3",
+              "source_type": "evidence-event"
+            },
+            {
+              "source_id": "evidence-event:evt_b1699526f7eed578",
+              "source_type": "evidence-event"
+            },
+            {
+              "source_id": "evidence-event:evt_44c696d4996f2bb6",
+              "source_type": "evidence-event"
+            },
+            {
+              "source_id": "playbook:verify-device-state",
+              "source_type": "playbook"
+            }
+          ]
+        },
+        "slm": {
+          "status": "runtime_loaded",
+          "model_id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+          "generation_status": "generated"
+        }
+      },
+      "error": null
+    },
+    "investigate_summary": {
+      "enrichment_status": null,
+      "sources": 0,
+      "generation_status": null,
+      "summary": "",
+      "recommended_actions": null
+    }
+  },
+  "pi": {
+    "label": "Pi",
+    "base": "http://192.168.50.90:8000",
+    "health": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 30.6,
+      "body": {
+        "status": "ok",
+        "mode": "advisory_only",
+        "degraded_components": [],
+        "policy_version": "0.1",
+        "components": {
+          "isolation_forest": true,
+          "lstm_autoencoder": true,
+          "xgboost_category": true,
+          "xgboost_binary": true,
+          "slm": {
+            "model_id": "gguf:SmolLM2-360M-Instruct-Q4_K_M.gguf",
+            "runtime_loaded": true,
+            "backend": "llama_cpp",
+            "fallback": "template_fallback"
+          },
+          "rag": {
+            "orchestrator": "deterministic_state_machine",
+            "max_retrieval_steps": 5,
+            "tools": "read_only_allowlist"
+          },
+          "event_store": true
+        }
+      },
+      "error": null
+    },
+    "model": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 5811.8,
+      "body": {
+        "isolation_forest": {
+          "features": [
+            "flow_duration",
+            "packet_rate",
+            "byte_rate",
+            "syn_count",
+            "ack_count",
+            "connection_rate",
+            "mean_packet_size",
+            "iat_mean"
+          ],
+          "threshold": 0.06501238953706455,
+          "metadata": {
+            "artifact_version": "0.1.0",
+            "trained_at": "2026-08-03T11:39:08.150087+00:00",
+            "training_rows": 1200,
+            "total_rows": 1320,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "threshold_quantile": 0.99,
+            "feature_medians": {
+              "flow_duration": 1.1207580614336017,
+              "packet_rate": 24.290636604700584,
+              "byte_rate": 9642.3670010942,
+              "syn_count": 2.0,
+              "ack_count": 8.0,
+              "connection_rate": 3.709493411425619,
+              "mean_packet_size": 339.7808571264138,
+              "iat_mean": 0.11107750086119615
+            },
+            "feature_iqrs": {
+              "flow_duration": 1.040094479605371,
+              "packet_rate": 14.121889924589894,
+              "byte_rate": 7930.423779362106,
+              "syn_count": 2.0,
+              "ack_count": 4.0,
+              "connection_rate": 1.9952021228547885,
+              "mean_packet_size": 58.236159370301664,
+              "iat_mean": 0.07687118925589474
+            }
+          }
+        },
+        "xgboost_category": {
+          "features": [
+            "header_length",
+            "protocol_type",
+            "duration",
+            "rate",
+            "srate",
+            "drate",
+            "fin_flag_number",
+            "syn_flag_number",
+            "rst_flag_number",
+            "psh_flag_number",
+            "ack_flag_number",
+            "ece_flag_number",
+            "cwr_flag_number",
+            "ack_count",
+            "syn_count",
+            "fin_count",
+            "rst_count",
+            "http",
+            "https",
+            "dns",
+            "telnet",
+            "smtp",
+            "ssh",
+            "irc",
+            "tcp",
+            "udp",
+            "dhcp",
+            "arp",
+            "icmp",
+            "igmp",
+            "ipv",
+            "llc",
+            "tot_sum",
+            "min_packet_size",
+            "max_packet_size",
+            "avg_packet_size",
+            "std_packet_size",
+            "tot_size",
+            "iat",
+            "number",
+            "magnitue",
+            "radius",
+            "covariance",
+            "variance",
+            "weight"
+          ],
+          "classes": [
+            "benign",
+            "ddos",
+            "dos",
+            "mqtt",
+            "recon"
+          ],
+          "task": "category",
+          "metadata": {
+            "artifact_version": "0.1.0-xgb",
+            "trained_at": "2026-08-03T15:50:22.979894+00:00",
+            "model_name": "xgboost",
+            "task": "category",
+            "classes": [
+              "benign",
+              "ddos",
+              "dos",
+              "mqtt",
+              "recon"
+            ],
+            "training_rows": 34340,
+            "features": [
+              "header_length",
+              "protocol_type",
+              "duration",
+              "rate",
+              "srate",
+              "drate",
+              "fin_flag_number",
+              "syn_flag_number",
+              "rst_flag_number",
+              "psh_flag_number",
+              "ack_flag_number",
+              "ece_flag_number",
+              "cwr_flag_number",
+              "ack_count",
+              "syn_count",
+              "fin_count",
+              "rst_count",
+              "http",
+              "https",
+              "dns",
+              "telnet",
+              "smtp",
+              "ssh",
+              "irc",
+              "tcp",
+              "udp",
+              "dhcp",
+              "arp",
+              "icmp",
+              "igmp",
+              "ipv",
+              "llc",
+              "tot_sum",
+              "min_packet_size",
+              "max_packet_size",
+              "avg_packet_size",
+              "std_packet_size",
+              "tot_size",
+              "iat",
+              "number",
+              "magnitue",
+              "radius",
+              "covariance",
+              "variance",
+              "weight"
+            ],
+            "calibrated": false,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "label_encoder_classes": [
+              "benign",
+              "ddos",
+              "dos",
+              "mqtt",
+              "recon"
+            ]
+          }
+        },
+        "xgboost_binary": {
+          "features": [
+            "header_length",
+            "protocol_type",
+            "duration",
+            "rate",
+            "srate",
+            "drate",
+            "fin_flag_number",
+            "syn_flag_number",
+            "rst_flag_number",
+            "psh_flag_number",
+            "ack_flag_number",
+            "ece_flag_number",
+            "cwr_flag_number",
+            "ack_count",
+            "syn_count",
+            "fin_count",
+            "rst_count",
+            "http",
+            "https",
+            "dns",
+            "telnet",
+            "smtp",
+            "ssh",
+            "irc",
+            "tcp",
+            "udp",
+            "dhcp",
+            "arp",
+            "icmp",
+            "igmp",
+            "ipv",
+            "llc",
+            "tot_sum",
+            "min_packet_size",
+            "max_packet_size",
+            "avg_packet_size",
+            "std_packet_size",
+            "tot_size",
+            "iat",
+            "number",
+            "magnitue",
+            "radius",
+            "covariance",
+            "variance",
+            "weight"
+          ],
+          "classes": [
+            "Benign",
+            "Attack"
+          ],
+          "task": "binary",
+          "metadata": {
+            "artifact_version": "0.1.0-xgb",
+            "trained_at": "2026-08-03T15:50:21.867486+00:00",
+            "model_name": "xgboost",
+            "task": "binary",
+            "classes": [
+              "Benign",
+              "Attack"
+            ],
+            "training_rows": 34340,
+            "features": [
+              "header_length",
+              "protocol_type",
+              "duration",
+              "rate",
+              "srate",
+              "drate",
+              "fin_flag_number",
+              "syn_flag_number",
+              "rst_flag_number",
+              "psh_flag_number",
+              "ack_flag_number",
+              "ece_flag_number",
+              "cwr_flag_number",
+              "ack_count",
+              "syn_count",
+              "fin_count",
+              "rst_count",
+              "http",
+              "https",
+              "dns",
+              "telnet",
+              "smtp",
+              "ssh",
+              "irc",
+              "tcp",
+              "udp",
+              "dhcp",
+              "arp",
+              "icmp",
+              "igmp",
+              "ipv",
+              "llc",
+              "tot_sum",
+              "min_packet_size",
+              "max_packet_size",
+              "avg_packet_size",
+              "std_packet_size",
+              "tot_size",
+              "iat",
+              "number",
+              "magnitue",
+              "radius",
+              "covariance",
+              "variance",
+              "weight"
+            ],
+            "calibrated": true,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "label_encoder_classes": null
+          }
+        },
+        "lstm_autoencoder": {
+          "features": [
+            "flow_duration",
+            "packet_rate",
+            "byte_rate",
+            "syn_count",
+            "ack_count",
+            "connection_rate",
+            "mean_packet_size",
+            "iat_mean"
+          ],
+          "seq_len": 10,
+          "tick_seconds": 60,
+          "threshold": 0.685308567231849,
+          "metadata": {
+            "artifact_version": "0.1.0-lstm-ae",
+            "trained_at": "2026-08-03T11:39:57.985428+00:00",
+            "training_sequences": 63,
+            "validation_sequences": 21,
+            "benign_sequences": 84,
+            "tick_count": 136,
+            "label_column": "label",
+            "benign_value": "Benign",
+            "threshold_quantile": 0.99,
+            "final_train_loss": 0.6052424609661102,
+            "epochs": 10,
+            "hidden_size": 32,
+            "latent_size": 16
+          }
+        }
+      },
+      "error": null
+    },
+    "score_cold": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 476.9,
+      "body": {
+        "schema_version": "0.1",
+        "event_id": "evt_f42b4a5028bb9f79",
+        "timestamp": "2026-08-12T05:21:26.918051+00:00",
+        "asset": {
+          "device_id": "monitor-07",
+          "device_type": "patient_monitor",
+          "operating_state": "idle",
+          "criticality": "high",
+          "session_id": "sess-v2-pi-1786512085-cold-if"
+        },
+        "detection": {
+          "status": "partial_detection",
+          "disagreement": false,
+          "known_attack": null,
+          "anomaly": {
+            "score": 0.311513,
+            "threshold": 0.065012,
+            "anomalous": false,
+            "model_version": "0.1.0",
+            "detector": "isolation_forest"
+          },
+          "anomalies": {
+            "isolation_forest": {
+              "score": 0.311513,
+              "threshold": 0.065012,
+              "anomalous": false,
+              "model_version": "0.1.0",
+              "detector": "isolation_forest"
+            },
+            "lstm_autoencoder": {
+              "score": null,
+              "threshold": 0.685309,
+              "anomalous": null,
+              "status": "warming",
+              "ticks": 1,
+              "seq_len": 10,
+              "model_version": "0.1.0-lstm-ae",
+              "detector": "lstm_autoencoder"
+            }
+          },
+          "fallback_reason": null
+        },
+        "evidence": [
+          {
+            "evidence_id": "ev_1",
+            "feature": "packet_rate",
+            "observed": 84.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_2",
+            "feature": "byte_rate",
+            "observed": 25000.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_3",
+            "feature": "connection_rate",
+            "observed": 6.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_4",
+            "feature": "anomaly_score:isolation_forest",
+            "observed": 0.311513,
+            "baseline": 0.065012,
+            "source": "detector:0.1.0"
+          },
+          {
+            "evidence_id": "ev_5",
+            "feature": "anomaly_status:lstm_autoencoder",
+            "observed": "warming:1/10",
+            "baseline": 0.685309,
+            "source": "detector:0.1.0-lstm-ae"
+          }
+        ],
+        "enrichment": {
+          "status": "unavailable",
+          "retrieval_intents": [],
+          "sources": []
+        },
+        "assessment": {
+          "verdict": "anomalous",
+          "severity": "high",
+          "severity_source": "fusion-policy-0.1",
+          "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+          "summary_source": "template_fallback",
+          "evidence_ids": [
+            "ev_1",
+            "ev_2",
+            "ev_3",
+            "ev_4",
+            "ev_5"
+          ],
+          "taxonomy": "network_behavior_anomaly",
+          "generation_status": "template_fallback"
+        },
+        "response": {
+          "mode": "advisory_only",
+          "human_approval_required": true,
+          "recommended_actions": [
+            "verify_device_state",
+            "review_evidence_window",
+            "preserve_flow_metadata"
+          ]
+        }
+      },
+      "error": null
+    },
+    "score_cold_summary": {
+      "event_id": "evt_f42b4a5028bb9f79",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "isolation_forest",
+        "score": 0.311513,
+        "anomalous": false
+      },
+      "lstm": {
+        "status": "warming",
+        "score": null,
+        "ticks": 1,
+        "anomalous": null
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "high",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "score": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 1272.6,
+      "body": {
+        "schema_version": "0.1",
+        "event_id": "evt_f42b4a5028bb9f79",
+        "timestamp": "2026-08-12T05:21:28.663862+00:00",
+        "asset": {
+          "device_id": "monitor-07",
+          "device_type": "patient_monitor",
+          "operating_state": "idle",
+          "criticality": "high",
+          "session_id": "sess-v2-pi-1786512085"
+        },
+        "detection": {
+          "status": "partial_detection",
+          "disagreement": false,
+          "known_attack": null,
+          "anomaly": {
+            "score": 0.311513,
+            "threshold": 0.065012,
+            "anomalous": false,
+            "model_version": "0.1.0",
+            "detector": "isolation_forest"
+          },
+          "anomalies": {
+            "isolation_forest": {
+              "score": 0.311513,
+              "threshold": 0.065012,
+              "anomalous": false,
+              "model_version": "0.1.0",
+              "detector": "isolation_forest"
+            },
+            "lstm_autoencoder": {
+              "score": null,
+              "threshold": 0.685309,
+              "anomalous": null,
+              "status": "warming",
+              "ticks": 2,
+              "seq_len": 10,
+              "model_version": "0.1.0-lstm-ae",
+              "detector": "lstm_autoencoder"
+            }
+          },
+          "fallback_reason": null
+        },
+        "evidence": [
+          {
+            "evidence_id": "ev_1",
+            "feature": "packet_rate",
+            "observed": 84.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_2",
+            "feature": "byte_rate",
+            "observed": 25000.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_3",
+            "feature": "connection_rate",
+            "observed": 6.0,
+            "baseline": null,
+            "source": "detector:isolation_forest"
+          },
+          {
+            "evidence_id": "ev_4",
+            "feature": "anomaly_score:isolation_forest",
+            "observed": 0.311513,
+            "baseline": 0.065012,
+            "source": "detector:0.1.0"
+          },
+          {
+            "evidence_id": "ev_5",
+            "feature": "anomaly_status:lstm_autoencoder",
+            "observed": "warming:2/10",
+            "baseline": 0.685309,
+            "source": "detector:0.1.0-lstm-ae"
+          }
+        ],
+        "enrichment": {
+          "status": "unavailable",
+          "retrieval_intents": [],
+          "sources": []
+        },
+        "assessment": {
+          "verdict": "anomalous",
+          "severity": "high",
+          "severity_source": "fusion-policy-0.1",
+          "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+          "summary_source": "template_fallback",
+          "evidence_ids": [
+            "ev_1",
+            "ev_2",
+            "ev_3",
+            "ev_4",
+            "ev_5"
+          ],
+          "taxonomy": "network_behavior_anomaly",
+          "generation_status": "template_fallback"
+        },
+        "response": {
+          "mode": "advisory_only",
+          "human_approval_required": true,
+          "recommended_actions": [
+            "verify_device_state",
+            "review_evidence_window",
+            "preserve_flow_metadata"
+          ]
+        }
+      },
+      "error": null
+    },
+    "score_summary": {
+      "event_id": "evt_f42b4a5028bb9f79",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "isolation_forest",
+        "score": 0.311513,
+        "anomalous": false
+      },
+      "lstm": {
+        "status": "warming",
+        "score": null,
+        "ticks": 2,
+        "anomalous": null
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "high",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=medium).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "lstm_trace": [
+      {
+        "i": 1,
+        "latency_ms": 1307.7,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 3,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 2,
+        "latency_ms": 948.6,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 4,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 3,
+        "latency_ms": 459.2,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 5,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 4,
+        "latency_ms": 463.4,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 6,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 5,
+        "latency_ms": 1304.8,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 7,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 6,
+        "latency_ms": 1735.3,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 8,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 7,
+        "latency_ms": 639.3,
+        "lstm": {
+          "status": "warming",
+          "score": null,
+          "ticks": 9,
+          "anomalous": null
+        }
+      },
+      {
+        "i": 8,
+        "latency_ms": 485.3,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 10,
+          "anomalous": true
+        }
+      },
+      {
+        "i": 9,
+        "latency_ms": 658.8,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 11,
+          "anomalous": true
+        }
+      },
+      {
+        "i": 10,
+        "latency_ms": 1332.4,
+        "lstm": {
+          "status": "ok",
+          "score": 0.997258,
+          "ticks": 12,
+          "anomalous": true
+        }
+      }
+    ],
+    "lstm_final": {
+      "status": "ok",
+      "score": 0.997258,
+      "ticks": 12,
+      "anomalous": true
+    },
+    "lstm_final_score_summary": {
+      "event_id": "evt_44c696d4996f2bb6",
+      "detection_status": "partial_detection",
+      "if_score": 0.311513,
+      "if_anomalous": false,
+      "primary_anomaly": {
+        "detector": "lstm_autoencoder",
+        "score": 0.997258,
+        "anomalous": true
+      },
+      "lstm": {
+        "status": "ok",
+        "score": 0.997258,
+        "ticks": 12,
+        "anomalous": true
+      },
+      "known_attack": null,
+      "verdict": "anomalous",
+      "severity": "critical",
+      "taxonomy": "network_behavior_anomaly",
+      "generation_status": "template_fallback",
+      "summary": "patient_monitor traffic assessed as anomalous by fusion policy fusion-policy-0.1 (known_attack=unavailable, anomaly=high).",
+      "enrichment_status": "unavailable",
+      "response_mode": "advisory_only"
+    },
+    "lstm_final_latency_ms": 1332.4,
+    "investigate": {
+      "ok": false,
+      "status_code": null,
+      "latency_ms": 300005.3,
+      "body": null,
+      "error": "timed out"
+    },
+    "investigate_summary": {
+      "error": "timed out"
+    }
+  },
+  "pc_t": {
+    "dataset": {
+      "returncode": 0,
+      "latency_ms": 2137.5,
+      "summary": "OK",
+      "tail": "test_infer_label_strips_pcap_csv (tests.test_dataset_m1.InventoryTests.test_infer_label_strips_pcap_csv) ... ok\ntest_inventory_hashes_csv (tests.test_dataset_m1.InventoryTests.test_inventory_hashes_csv) ... ok\ntest_column_mapping_normalizes_aliases (tests.test_dataset_m1.LeakageAndMappingTests.test_column_mapping_normalizes_aliases) ... ok\ntest_leakage_denylist (tests.test_dataset_m1.LeakageAndMappingTests.test_leakage_denylist) ... ok\ntest_device_holdout_does_not_share_devices (tests.test_dataset_m1.ManifestTests.test_device_holdout_does_not_share_devices) ... ok\ntest_manifest_is_reproducible (tests.test_dataset_m1.ManifestTests.test_manifest_is_reproducible) ... ok\ntest_session_aware_does_not_share_sessions (tests.test_dataset_m1.ManifestTests.test_session_aware_does_not_share_sessions) ... ok\ntest_audit_reports_leakage_and_quality (tests.test_dataset_m1.PreprocessTests.test_audit_reports_leakage_and_quality) ... ok\ntest_preprocessor_fit_only_on_train (tests.test_dataset_m1.PreprocessTests.test_preprocessor_fit_only_on_train) ... ok\ntest_official_test_never_enters_train (tests.test_ciciomt_prepare.OfficialFileManifestTests.test_official_test_never_enters_train) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.097s\n\nOK\n\n"
+    },
+    "full": {
+      "returncode": 1,
+      "latency_ms": 17754.5,
+      "summary": "FAILED (failures=1)",
+      "tail": "s.test_attack_sequence_scores_higher) ... ok\ntest_event_is_advisory_with_evidence_window (test_lstm_baseline.LSTMBaselineTests.test_event_is_advisory_with_evidence_window) ... ok\ntest_sequences_stay_inside_groups (test_lstm_baseline.TickSequenceTests.test_sequences_stay_inside_groups) ... ok\ntest_ticks_do_not_cross_devices (test_lstm_baseline.TickSequenceTests.test_ticks_do_not_cross_devices) ... ok\ntest_allowlist_rejects_unknown_tool (test_rag.RagOrchestratorTests.test_allowlist_rejects_unknown_tool) ... ok\ntest_orchestrator_returns_sourced_claims_only (test_rag.RagOrchestratorTests.test_orchestrator_returns_sourced_claims_only) ... ok\ntest_slm_cannot_force_arbitrary_tool (test_rag.RagOrchestratorTests.test_slm_cannot_force_arbitrary_tool) ... ok\ntest_sft_test_has_enough_negatives (test_slm.SlmGuardrailTests.test_sft_test_has_enough_negatives) ... ok\ntest_template_output_is_valid (test_slm.SlmGuardrailTests.test_template_output_is_valid) ... ok\ntest_unknown_evidence_id_triggers_fallback (test_slm.SlmGuardrailTests.test_unknown_evidence_id_triggers_fallback) ... FAIL\n\n======================================================================\nFAIL: test_unknown_evidence_id_triggers_fallback (test_slm.SlmGuardrailTests.test_unknown_evidence_id_triggers_fallback)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"D:\\實習\\avocdo-edgemed-main\\avocdo-edgemed-main\\tests\\test_slm.py\", line 37, in test_unknown_evidence_id_triggers_fallback\n    self.assertEqual(updated[\"assessment\"][\"generation_status\"], \"template_fallback\")\nAssertionError: 'generated' != 'template_fallback'\n- generated\n+ template_fallback\n\n\n----------------------------------------------------------------------\nRan 38 tests in 12.125s\n\nFAILED (failures=1)\n\n"
+    }
+  }
+}

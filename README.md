@@ -1,5 +1,6 @@
-# SenseL OT Edge Sensor
+# SenseL OT Edge
 
+> GitHub repo：**sensel-ot-edge**（與 **controlplane** 為 SenseL 僅有的兩個產品 repo）  
 > 產品代號：SenseL RelayGuard  
 > 邊緣部署的 OT 資安與遙測閘道器，整合 EdgeX 主動遙測與被動鏡像流量監控。
 
@@ -23,10 +24,24 @@ OT 設備 ──► EdgeX Device Services ──► SenseL Exporter ──► Se
 | `services/sensel-edge-agent/` | 與 SenseL 平台通訊、政策同步、健康回報 |
 | `services/edge-console/` | 本機接入精靈 + 狀態主控台（含引擎/憑證落地狀態） |
 | `services/mqtt-broker/` | 本地 MQTT（特徵摘要 → EdgeX device-mqtt） |
+| `services/sensel-site/` | Tier 2 Site protobuf ingress、dataset lineage 與 trainer boundary（P3-A） |
+| `services/edgemed/` | **本 repo 內**的偵測服務：Baseline + XGB + IF → 一次 fusion（非獨立 GitHub repo） |
 | `config/` | 感測器、擷取、政策與 EdgeX 設定 |
 | `schemas/` | Telemetry / Security Event / Health JSON Schema |
 | `deploy/` | Ubuntu 與 Pi4 部署腳本與網路設定範本 |
 | `docs/` | 架構、部署與 API 文件 |
+
+## 與 Control Plane 的分工
+
+| | **sensel-ot-edge**（本 repo） | **controlplane** |
+|--|-------------------------------|------------------|
+| 部署 | Pi / 現場閘道 | PC / 雲端總部 |
+| 職責 | 封包、特徵、本機偵測、baseline 落地 | 租戶、Console、FL 證據、政策下發 |
+| EdgeMed | `services/edgemed/` 在此 repo 內 | 不拆封包、不跑 IF/XGB |
+
+現場 ML 路徑：`packet-sensor` 抽特徵 → HTTP 至同機 `services/edgemed` → Baseline / XGB / IF 一次 fusion → 一個 security event → MQTT 至 controlplane。
+
+實驗與架構文件見 controlplane repo 的 `docs/experiments/`。
 
 ## 快速開始（Ubuntu）
 
@@ -116,7 +131,7 @@ CTI-origin sighting 細節見 `docker-compose.snort.yml` / `docker-compose.suric
 本 repository 原始碼（`services/`、`config/`、`scripts/`、`docs/` 等）以
 [**Apache License 2.0**](LICENSE) 釋出，Copyright © 2026 Avocado AI Lab。
 
-公開 repo：<https://github.com/AvocadoAI-Lab/sensel-ot-edge-sensor>
+公開 repo：<https://github.com/AvocadoAI-Lab/sensel-ot-edge>（舊名 `sensel-ot-edge-sensor` 已併為此 repo）
 
 **重要**：Docker Compose 部署時拉取的第三方容器（EdgeX、Suricata、Snort、
 Mosquitto 等）各自適用其 upstream 授權，詳見 [NOTICE](NOTICE) 與

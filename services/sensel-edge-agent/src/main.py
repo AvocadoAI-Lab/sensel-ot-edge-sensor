@@ -17,7 +17,9 @@ from pathlib import Path
 from src.api.client import SenseLClient
 from src.config.settings import load_config
 from src.health.collector import collect_health
+from src.edgex.manager import EdgeXDeviceManager
 from src.northbound.mqtt import NorthboundMqttClient
+from src.northbound.wire_mode import WireModeController
 from src.northbound.observe_tick_publisher import ObserveTickPublisher
 from src.northbound.topology_snapshot_publisher import TopologySnapshotPublisher
 from src.policy.sync import PolicySync
@@ -44,6 +46,12 @@ from src.runtime.registration import RegistrationState, attempt_registration
 from src.health.engines import engines_runtime_summary
 from src.sighting.reporter import SightingReporter
 from src.upload.buffer import UploadBuffer
+from src.upload.episode_spool import TrustEpisodeSpool
+from src.upload.episodes import (
+    TrustEpisodeTailer,
+    drain_episode_spool,
+    enqueue_pending_episodes,
+)
 from src.upload.events import SecurityEventTailer
 
 logging.basicConfig(
@@ -237,6 +245,14 @@ def main() -> int:
 
     client = SenseLClient(config)
     mqtt = NorthboundMqttClient(config.northbound_mqtt, config.sensor)
+    edgex_device_manager = None
+    if config.edgex_device_management.enabled:
+        try:
+            edgex_device_manager = EdgeXDeviceManager(config, mqtt)
+        except Exception:
+            logger.exception(
+                "EdgeX device management initialization failed; continuing fail-open"
+            )
     buffer = UploadBuffer(
         config.sensel.buffer.db_path,
         max_events=config.sensel.buffer.max_events,
@@ -244,6 +260,20 @@ def main() -> int:
     tailer = SecurityEventTailer(
         config.sensel.events.watch_path,
         config.sensel.events.offset_path,
+    )
+    episode_tailer = TrustEpisodeTailer(
+        config.sensel.episodes.watch_path,
+        config.sensel.episodes.offset_path,
+    )
+    episode_spool = TrustEpisodeSpool(
+        config.sensel.episodes.spool_db_path,
+        max_episodes=config.sensel.episodes.max_episodes,
+    )
+    wire_mode = WireModeController(
+        config.northbound_mqtt.wire_mode,
+        failure_threshold=config.northbound_mqtt.protobuf_failure_threshold,
+        state_path=config.northbound_mqtt.rollback_state_path,
+        reset_rollback=config.northbound_mqtt.rollback_reset,
     )
     # Extra sources: external engine events (same upload path, separate JSONL +
     # offset to avoid write contention with the packet-sensor pipeline).
@@ -395,6 +425,9 @@ def main() -> int:
             force=True,
         )
 
+        if edgex_device_manager:
+            edgex_device_manager.start()
+
         if policy_mqtt and policy_mqtt.enabled:
             policy_mqtt.start()
         if detection_policy_mqtt and detection_policy_mqtt.enabled:
@@ -461,6 +494,9 @@ def main() -> int:
                 state=registration,
             )
 
+            if edgex_device_manager:
+                edgex_device_manager.refresh_subscription()
+
             if policy_mqtt and policy_mqtt.enabled:
                 policy_mqtt.ensure_connected()
             if detection_policy_mqtt and detection_policy_mqtt.enabled:
@@ -476,10 +512,36 @@ def main() -> int:
             if listfile_mqtt and listfile_mqtt.enabled:
                 listfile_mqtt.ensure_connected()
 
+            if edgex_device_manager:
+                edgex_device_manager.tick(
+                    registration.tenant_id or config.northbound_mqtt.tenant_id
+                )
+
             _flush_buffer(client, buffer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, snort_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
             _upload_pending_events(client, buffer, suricata_tailer, mqtt if mqtt.enabled else None, config, listfile_enforcer)
+            enqueued_episodes = enqueue_pending_episodes(
+                episode_tailer,
+                episode_spool,
+                tenant_id=(
+                    registration.tenant_id or config.northbound_mqtt.tenant_id
+                ),
+                sensor=config.sensor,
+            )
+            delivered_episodes = drain_episode_spool(
+                episode_spool,
+                mqtt,
+                wire_mode,
+            )
+            if enqueued_episodes or delivered_episodes:
+                logger.info(
+                    "Trust Episode spool enqueued=%s delivered=%s pending=%s mode=%s",
+                    enqueued_episodes,
+                    delivered_episodes,
+                    episode_spool.depth(),
+                    wire_mode.effective_mode,
+                )
 
             if sighting_reporter.enabled:
                 sighting_reporter.run_cycle()
@@ -555,6 +617,8 @@ def main() -> int:
                 # Control-Plane MQTT credentials have landed locally.
                 engines=engines_runtime_summary(health.get("engines") or []),
                 mqtt_credentials=credentials_status(),
+                trust_episode_spool_depth=episode_spool.depth(),
+                northbound_wire=wire_mode.to_dict(),
             )
 
             # Northbound MQTT heartbeat: publish_state lazily (re)connects, so a
@@ -609,6 +673,8 @@ def main() -> int:
                     break
                 time.sleep(1)
     finally:
+        if edgex_device_manager:
+            edgex_device_manager.close()
         if operational_mode_mqtt:
             operational_mode_mqtt.stop()
         if baseline_profile_mqtt:
@@ -623,6 +689,7 @@ def main() -> int:
             detection_policy_mqtt.stop()
         if policy_mqtt:
             policy_mqtt.stop()
+        episode_spool.close()
         buffer.close()
         mqtt.close()
         client.close()

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avocdo.ai/schemas/security-event-0.1.json",
+  "title": "Avocdo EdgeMed Security Event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "timestamp",
+    "asset",
+    "detection",
+    "evidence",
+    "assessment",
+    "response"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "event_id": { "type": "string", "minLength": 3 },
+    "timestamp": { "type": "string" },
+    "asset": {
+      "type": "object",
+      "required": ["device_id", "device_type", "operating_state"],
+      "properties": {
+        "device_id": { "type": "string" },
+        "device_type": { "type": "string" },
+        "operating_state": { "type": "string" },
+        "criticality": { "type": "string" },
+        "session_id": { "type": ["string", "null"] }
+      }
+    },
+    "detection": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial_detection", "unavailable"]
+        },
+        "disagreement": { "type": "boolean" },
+        "known_attack": { "type": ["object", "null"] },
+        "anomaly": { "type": ["object", "null"] },
+        "anomalies": { "type": ["object", "null"] }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["evidence_id", "source"],
+        "properties": {
+          "evidence_id": { "type": "string" },
+          "feature": { "type": "string" },
+          "observed": {},
+          "baseline": {},
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "enrichment": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string" },
+        "retrieval_intents": { "type": "array" },
+        "sources": { "type": "array" }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "required": ["verdict", "severity", "severity_source", "summary", "generation_status"],
+      "properties": {
+        "verdict": { "type": "string" },
+        "severity": { "type": "string" },
+        "severity_source": { "type": "string" },
+        "summary": { "type": "string" },
+        "summary_source": { "type": "string" },
+        "evidence_ids": { "type": "array" },
+        "taxonomy": { "type": "string" },
+        "generation_status": {
+          "type": "string",
+          "enum": ["generated", "template_fallback", "enrichment_unavailable"]
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "required": ["mode", "human_approval_required"],
+      "properties": {
+        "mode": { "const": "advisory_only" },
+        "human_approval_required": { "type": "boolean" },
+        "recommended_actions": { "type": "array" }
+      }
+    }
+  }
+}

@@ -1,0 +1,337 @@
+name: sensel-site
+
+services:
+  site-mqtt:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "${SENSEL_SITE_MQTT_BIND_IP:-0.0.0.0}:8883:8883"
+    volumes:
+      - ./services/sensel-site/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${SENSEL_SITE_MQTT_ACL_FILE:-./secrets/site-mqtt/site.acl}:/mosquitto/config/site.acl:ro
+      - ${SENSEL_SITE_MQTT_CERT_DIR:-./secrets/site-mqtt}:/mosquitto/certs:ro
+      - site-mqtt-data:/mosquitto/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+
+  sensel-site:
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      SENSEL_SITE_ENV: ${SENSEL_SITE_ENV:-production}
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_NODE_ID: ${SENSEL_SITE_NODE_ID:?set SENSEL_SITE_NODE_ID}
+      SENSEL_SITE_DATA_DIR: /var/lib/sensel-site
+      SENSEL_SITE_FEATURE_CONTRACT_DIR: /app/contracts
+      SENSEL_SITE_TRAINER_POLICY_PATH: /app/policies/trainer-policy.xgboost-site-v1.json
+      SENSEL_SITE_TRAINER_INBOX_DIR: /var/lib/sensel-trainer-inbox
+      SENSEL_SITE_MQTT_ENABLED: ${SENSEL_SITE_MQTT_ENABLED:-true}
+      SENSEL_SITE_MQTT_HOST: site-mqtt
+      SENSEL_SITE_MQTT_PORT: "8883"
+      SENSEL_SITE_MQTT_TLS: "true"
+      SENSEL_SITE_MQTT_SESSION_EXPIRY_SEC: ${SENSEL_SITE_MQTT_SESSION_EXPIRY_SEC:-86400}
+      SENSEL_SITE_MQTT_CA_PATH: /run/secrets/site-mqtt/ca.crt
+      SENSEL_SITE_MQTT_CERT_PATH: /run/secrets/site-client/client.crt
+      SENSEL_SITE_MQTT_KEY_PATH: /run/secrets/site-client/client.key
+      SENSEL_SITE_SIGNING_KEY_PATH: /run/secrets/site-signing/signing-key.pem
+      SENSEL_SITE_SIGNING_KEY_ID: ${SENSEL_SITE_SIGNING_KEY_ID:?set SENSEL_SITE_SIGNING_KEY_ID}
+      SENSEL_SITE_EPISODE_RETENTION_DAYS: ${SENSEL_SITE_EPISODE_RETENTION_DAYS:-30}
+      SENSEL_SITE_MAX_EPISODE_BYTES: ${SENSEL_SITE_MAX_EPISODE_BYTES:-1048576}
+      SENSEL_SITE_MAX_DATABASE_BYTES: ${SENSEL_SITE_MAX_DATABASE_BYTES:-10737418240}
+      SENSEL_SITE_MAX_WAL_BYTES: ${SENSEL_SITE_MAX_WAL_BYTES:-536870912}
+      SENSEL_DEPLOYMENT_PROFILE_ID: ${SENSEL_DEPLOYMENT_PROFILE_ID:-electric-substation-iec61850}
+      SENSEL_DEPLOYMENT_PROFILE_VERSION: ${SENSEL_DEPLOYMENT_PROFILE_VERSION:-1.0.0}
+    volumes:
+      - site-data:/var/lib/sensel-site
+      - site-trainer-inbox:/var/lib/sensel-trainer-inbox
+      - ${SENSEL_SITE_MQTT_CERT_DIR:-./secrets/site-mqtt}:/run/secrets/site-mqtt:ro
+      - ${SENSEL_SITE_CLIENT_CERT_DIR:-./secrets/site-client}:/run/secrets/site-client:ro
+      - ${SENSEL_SITE_SIGNING_DIR:-./secrets/site-signing}:/run/secrets/site-signing:ro
+    depends_on:
+      - site-mqtt
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -m sensel_site.production --database /var/lib/sensel-site/site.db
+          --maximum-database-bytes $${SENSEL_SITE_MAX_DATABASE_BYTES}
+          --maximum-wal-bytes $${SENSEL_SITE_MAX_WAL_BYTES} --check
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  sensel-site-backup:
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile
+    restart: unless-stopped
+    init: true
+    command:
+      - python
+      - -m
+      - sensel_site.production
+      - --database
+      - /var/lib/sensel-site/site.db
+      - --backup-dir
+      - /backups
+      - --interval-seconds
+      - ${SENSEL_SITE_BACKUP_INTERVAL_SECONDS:-86400}
+      - --retention-days
+      - ${SENSEL_SITE_BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - site-data:/var/lib/sensel-site
+      - site-backups:/backups
+    depends_on:
+      sensel-site:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+
+  sensel-site-soak-evidence:
+    profiles:
+      - qualification
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile
+    restart: "no"
+    init: true
+    command:
+      - python
+      - -m
+      - sensel_site.soak_evidence
+      - --database
+      - /var/lib/sensel-site/site.db
+      - --backup-dir
+      - /backups/soak
+      - --duration-seconds
+      - ${SENSEL_SITE_SOAK_DURATION_SECONDS:-259200}
+      - --interval-seconds
+      - ${SENSEL_SITE_SOAK_INTERVAL_SECONDS:-900}
+      - --maximum-database-bytes
+      - ${SENSEL_SITE_MAX_DATABASE_BYTES:-10737418240}
+      - --maximum-wal-bytes
+      - ${SENSEL_SITE_MAX_WAL_BYTES:-536870912}
+      - --profile-id
+      - ${SENSEL_DEPLOYMENT_PROFILE_ID:-electric-substation-iec61850}
+      - --profile-version
+      - ${SENSEL_DEPLOYMENT_PROFILE_VERSION:-1.0.0}
+      - --environment
+      - ${SENSEL_EVIDENCE_ENVIRONMENT:-lab}
+      - --tenant-id
+      - ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      - --site-id
+      - ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      - --output
+      - /evidence/edge-soak.json
+    volumes:
+      - site-data:/var/lib/sensel-site
+      - site-backups:/backups
+      - site-release-evidence:/evidence
+    depends_on:
+      sensel-site:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - sensel-site
+
+  sensel-site-trainer:
+    profiles:
+      - training
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile.worker
+    init: true
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_TRAINER_JOB_ID: ${SENSEL_SITE_TRAINER_JOB_ID:-}
+      SENSEL_SITE_TRAINER_INBOX_DIR: /input/trainer-inbox
+      SENSEL_SITE_CANDIDATE_OUTBOX_DIR: /output/candidates
+      SENSEL_SITE_FEATURE_CONTRACT_DIR: /app/contracts
+      SENSEL_SITE_TRAINER_POLICY_PATH: /app/policies/trainer-policy.xgboost-site-v1.json
+      SENSEL_SITE_PUBLIC_KEY_PATH: /run/keys/site/site-signing.pub.pem
+      SENSEL_SITE_SIGNING_KEY_ID: ${SENSEL_SITE_SIGNING_KEY_ID:?set SENSEL_SITE_SIGNING_KEY_ID}
+      SENSEL_SITE_TRAINER_SIGNING_KEY_PATH: /run/secrets/trainer-signing/signing-key.pem
+      SENSEL_SITE_TRAINER_SIGNING_KEY_ID: ${SENSEL_SITE_TRAINER_SIGNING_KEY_ID:-}
+    volumes:
+      - site-trainer-inbox:/input/trainer-inbox:ro
+      - site-candidates:/output/candidates
+      - ${SENSEL_SITE_PUBLIC_KEY_DIR:-./secrets/site-public}:/run/keys/site:ro
+      - ${SENSEL_SITE_TRAINER_SIGNING_DIR:-./secrets/trainer-signing}:/run/secrets/trainer-signing:ro
+    network_mode: none
+    read_only: true
+    mem_limit: ${SENSEL_SITE_WORKER_MEMORY_LIMIT:-2g}
+    cpus: ${SENSEL_SITE_WORKER_CPU_LIMIT:-2.0}
+    pids_limit: 256
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  sensel-site-validator:
+    profiles:
+      - training
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile.worker
+    init: true
+    command:
+      - python
+      - -m
+      - sensel_site.candidate_validator
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_VALIDATOR_JOB_ID: ${SENSEL_SITE_VALIDATOR_JOB_ID:-}
+      SENSEL_SITE_TRAINER_INBOX_DIR: /input/trainer-inbox
+      SENSEL_SITE_CANDIDATE_OUTBOX_DIR: /input/candidates
+      SENSEL_SITE_VALIDATION_RESULTS_DIR: /output/validation
+      SENSEL_SITE_FEATURE_CONTRACT_DIR: /app/contracts
+      SENSEL_SITE_TRAINER_POLICY_PATH: /app/policies/trainer-policy.xgboost-site-v1.json
+      SENSEL_SITE_PUBLIC_KEY_PATH: /run/keys/site/site-signing.pub.pem
+      SENSEL_SITE_SIGNING_KEY_ID: ${SENSEL_SITE_SIGNING_KEY_ID:?set SENSEL_SITE_SIGNING_KEY_ID}
+      SENSEL_SITE_TRAINER_PUBLIC_KEY_PATH: /run/keys/trainer/trainer-signing.pub.pem
+      SENSEL_SITE_TRAINER_SIGNING_KEY_ID: ${SENSEL_SITE_TRAINER_SIGNING_KEY_ID:-}
+    volumes:
+      - site-trainer-inbox:/input/trainer-inbox:ro
+      - site-candidates:/input/candidates:ro
+      - site-validation-results:/output/validation
+      - ${SENSEL_SITE_PUBLIC_KEY_DIR:-./secrets/site-public}:/run/keys/site:ro
+      - ${SENSEL_SITE_TRAINER_PUBLIC_KEY_DIR:-./secrets/trainer-public}:/run/keys/trainer:ro
+    network_mode: none
+    read_only: true
+    mem_limit: ${SENSEL_SITE_WORKER_MEMORY_LIMIT:-2g}
+    cpus: ${SENSEL_SITE_WORKER_CPU_LIMIT:-2.0}
+    pids_limit: 256
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  sensel-site-converter:
+    profiles:
+      - model-release
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile.worker
+    init: true
+    command:
+      - python
+      - -m
+      - sensel_site.onnx_converter
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_CONVERTER_JOB_ID: ${SENSEL_SITE_CONVERTER_JOB_ID:-}
+      SENSEL_SITE_TRAINER_INBOX_DIR: /input/trainer-inbox
+      SENSEL_SITE_VALIDATION_RESULTS_DIR: /input/validation
+      SENSEL_SITE_CONVERSION_RESULTS_DIR: /output/conversion
+      SENSEL_SITE_APPROVAL_BUNDLE_DIR: /output/approval-bundles
+      SENSEL_SITE_FEATURE_CONTRACT_DIR: /app/contracts
+      SENSEL_SITE_TRAINER_POLICY_PATH: /app/policies/trainer-policy.xgboost-site-v1.json
+      SENSEL_SITE_PUBLIC_KEY_PATH: /run/keys/site/site-signing.pub.pem
+      SENSEL_SITE_SIGNING_KEY_ID: ${SENSEL_SITE_SIGNING_KEY_ID:?set SENSEL_SITE_SIGNING_KEY_ID}
+      SENSEL_SITE_TRAINER_PUBLIC_KEY_PATH: /run/keys/trainer/trainer-signing.pub.pem
+      SENSEL_SITE_TRAINER_SIGNING_KEY_ID: ${SENSEL_SITE_TRAINER_SIGNING_KEY_ID:-}
+    volumes:
+      - site-trainer-inbox:/input/trainer-inbox:ro
+      - site-validation-results:/input/validation:ro
+      - site-conversion-results:/output/conversion
+      - site-approval-bundles:/output/approval-bundles
+      - ${SENSEL_SITE_PUBLIC_KEY_DIR:-./secrets/site-public}:/run/keys/site:ro
+      - ${SENSEL_SITE_TRAINER_PUBLIC_KEY_DIR:-./secrets/trainer-public}:/run/keys/trainer:ro
+    network_mode: none
+    read_only: true
+    mem_limit: ${SENSEL_SITE_WORKER_MEMORY_LIMIT:-2g}
+    cpus: ${SENSEL_SITE_WORKER_CPU_LIMIT:-2.0}
+    pids_limit: 256
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  sensel-site-release-signer:
+    profiles:
+      - model-release
+    build:
+      context: .
+      dockerfile: services/sensel-site/Dockerfile.release
+    init: true
+    environment:
+      SENSEL_SITE_TENANT_ID: ${SENSEL_SITE_TENANT_ID:?set SENSEL_SITE_TENANT_ID}
+      SENSEL_SITE_ID: ${SENSEL_SITE_ID:?set SENSEL_SITE_ID}
+      SENSEL_SITE_RELEASE_JOB_ID: ${SENSEL_SITE_RELEASE_JOB_ID:-}
+      SENSEL_SITE_APPROVAL_BUNDLE_DIR: /input/approval-bundles
+      SENSEL_SITE_MANUAL_APPROVAL_PATH: /input/manual/approval.json
+      SENSEL_SITE_RELEASE_RESULTS_DIR: /output/releases
+      SENSEL_SITE_RELEASE_SIGNING_KEY_PATH: /run/secrets/release-signing/signing-key.pem
+      SENSEL_SITE_RELEASE_SIGNING_KEY_ID: ${SENSEL_SITE_RELEASE_SIGNING_KEY_ID:-}
+    volumes:
+      - site-approval-bundles:/input/approval-bundles:ro
+      - ${SENSEL_SITE_MANUAL_APPROVAL_FILE:-./secrets/manual-approval/approval.json}:/input/manual/approval.json:ro
+      - site-release-results:/output/releases
+      - ${SENSEL_SITE_RELEASE_SIGNING_DIR:-./secrets/release-signing}:/run/secrets/release-signing:ro
+    network_mode: none
+    read_only: true
+    mem_limit: ${SENSEL_SITE_RELEASE_MEMORY_LIMIT:-256m}
+    cpus: ${SENSEL_SITE_RELEASE_CPU_LIMIT:-0.5}
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  site-mqtt-data:
+  site-data:
+  site-trainer-inbox:
+  site-candidates:
+  site-validation-results:
+  site-conversion-results:
+  site-approval-bundles:
+  site-release-results:
+  site-backups:
+  site-release-evidence:
+
+networks:
+  sensel-site:
+    driver: bridge

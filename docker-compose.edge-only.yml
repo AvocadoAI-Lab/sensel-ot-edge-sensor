@@ -52,11 +52,16 @@ services:
     env_file: .env
     environment:
       - EDGEX_CORE_DATA_URL=http://edgex-core-data:59880
+      - EDGEX_CORE_METADATA_URL=http://edgex-core-metadata:59881
+      - EDGEX_DEVICE_MANAGEMENT_ENABLED=${EDGEX_DEVICE_MANAGEMENT_ENABLED:-true}
+      - EDGEX_INVENTORY_INTERVAL_SEC=${EDGEX_INVENTORY_INTERVAL_SEC:-60}
+      - EDGEX_DESIRED_MQTT_ENABLED=${EDGEX_DESIRED_MQTT_ENABLED:-true}
       - SENSEL_API_URL=http://mock-sensel:8765
       - SENSEL_VERIFY_TLS=false
     volumes:
       - ./config:/app/config:ro
       - ./data/agent:/app/data
+      - ./data/assets:/app/data/assets:ro
     depends_on:
       - local-mqtt
       - mock-sensel
@@ -68,6 +73,8 @@ services:
     build:
       context: ./services/packet-sensor
       dockerfile: Dockerfile
+      args:
+        INSTALL_ML_RUNTIME: ${INSTALL_ML_RUNTIME:-false}
     container_name: sensel-packet-sensor
     restart: unless-stopped
     env_file: .env
@@ -81,6 +88,7 @@ services:
       - ./config:/app/config:ro
       - ./data/pcap:/app/data/pcap
       - ./data/assets:/app/data/assets
+      - ./data/models:/app/data/models:ro
     network_mode: host
     cap_add:
       - NET_ADMIN

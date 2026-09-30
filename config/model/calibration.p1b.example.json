@@ -1,0 +1,20 @@
+{
+  "schema_version": "sensel.calibration.v1",
+  "feature_contract_id": "ot-window-v1",
+  "calibrators": {
+    "isolation-forest": {
+      "version": "replace-with-validated-if-calibration",
+      "kind": "platt",
+      "slope": 1.0,
+      "intercept": 0.0
+    },
+    "xgboost": {
+      "version": "replace-with-validated-xgb-calibration",
+      "kind": "identity"
+    },
+    "tiny-lstm": {
+      "version": "replace-with-validated-lstm-calibration",
+      "kind": "identity"
+    }
+  }
+}

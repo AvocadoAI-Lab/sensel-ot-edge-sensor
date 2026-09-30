@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sensel-edgemed"
+version = "0.1.0"
+description = "Edge-native medical AIoT/OT anomaly detection research MVP"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.115.0",
+  "httpx==0.27.2",
+  "joblib==1.5.3",
+  "numpy==2.0.2",
+  "pandas==2.3.3",
+  "scikit-learn==1.6.1",
+  "torch==2.7.1",
+  "uvicorn==0.30.6",
+  "PyYAML==6.0.2",
+  "xgboost==3.0.2",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

@@ -1,0 +1,133 @@
+{
+  "namespace": "behavior",
+  "documents": [
+    {
+      "source_id": "behavior:patient_monitor:idle",
+      "source_type": "behavior",
+      "device_type": "patient_monitor",
+      "operating_state": "idle",
+      "baseline_summary": "Low sustained packet rate with periodic keepalives.",
+      "expected_features": {"packet_rate": "low", "connection_rate": "low"}
+    },
+    {
+      "source_id": "behavior:patient_monitor:active",
+      "source_type": "behavior",
+      "device_type": "patient_monitor",
+      "operating_state": "active",
+      "baseline_summary": "Moderate telemetry streaming to nurse station.",
+      "expected_features": {"packet_rate": "medium", "byte_rate": "medium"}
+    },
+    {
+      "source_id": "behavior:infusion_pump:active",
+      "source_type": "behavior",
+      "device_type": "infusion_pump",
+      "operating_state": "active",
+      "baseline_summary": "Short MQTT bursts during status publish.",
+      "expected_features": {"connection_rate": "medium"}
+    },
+    {
+      "source_id": "behavior:medical_gateway:active",
+      "source_type": "behavior",
+      "device_type": "medical_gateway",
+      "operating_state": "active",
+      "baseline_summary": "Aggregated multi-device fan-in with stable destinations.",
+      "expected_features": {"connection_rate": "medium-high"}
+    },
+    {
+      "source_id": "behavior:medical_camera:idle",
+      "source_type": "behavior",
+      "device_type": "medical_camera",
+      "operating_state": "idle",
+      "baseline_summary": "Low WiFi keepalive traffic to companion app or cloud vendor.",
+      "expected_features": {"packet_rate": "low", "connection_rate": "low", "rate": "low"}
+    },
+    {
+      "source_id": "behavior:medical_camera:interaction",
+      "source_type": "behavior",
+      "device_type": "medical_camera",
+      "operating_state": "interaction",
+      "baseline_summary": "Short bursts during LAN/WAN watch, mic, photo, or recording.",
+      "expected_features": {"packet_rate": "medium", "byte_rate": "medium", "burst_allowed": true}
+    },
+    {
+      "source_id": "behavior:medical_camera:active",
+      "source_type": "behavior",
+      "device_type": "medical_camera",
+      "operating_state": "active",
+      "baseline_summary": "Sustained moderate streaming while camera is actively monitoring.",
+      "expected_features": {"packet_rate": "medium", "srate": "medium"}
+    },
+    {
+      "source_id": "behavior:medical_pager:idle",
+      "source_type": "behavior",
+      "device_type": "medical_pager",
+      "operating_state": "idle",
+      "baseline_summary": "Very low WiFi traffic while pager is armed and idle.",
+      "expected_features": {"packet_rate": "very_low", "connection_rate": "low"}
+    },
+    {
+      "source_id": "behavior:medical_pager:interaction",
+      "source_type": "behavior",
+      "device_type": "medical_pager",
+      "operating_state": "interaction",
+      "baseline_summary": "Brief burst when SOS button pressed or app profile changes (Home/Armed/Away).",
+      "expected_features": {"packet_rate": "medium", "burst_allowed": true}
+    },
+    {
+      "source_id": "behavior:medical_pager:power",
+      "source_type": "behavior",
+      "device_type": "medical_pager",
+      "operating_state": "power",
+      "baseline_summary": "Minimal traffic during power-on or pairing handshake.",
+      "expected_features": {"packet_rate": "low", "connection_rate": "low"}
+    },
+    {
+      "source_id": "behavior:bp_monitor:idle",
+      "source_type": "behavior",
+      "device_type": "bp_monitor",
+      "operating_state": "idle",
+      "baseline_summary": "Periodic short MQTT publishes to broker; no sustained floods.",
+      "expected_features": {"packet_rate": "very_low", "connection_rate": "low", "rate": "very_low"}
+    },
+    {
+      "source_id": "behavior:bp_monitor:active",
+      "source_type": "behavior",
+      "device_type": "bp_monitor",
+      "operating_state": "active",
+      "baseline_summary": "Short MQTT burst while measurement uploads to broker or phone gateway.",
+      "expected_features": {"packet_rate": "low", "burst_allowed": true}
+    },
+    {
+      "source_id": "behavior:unknown_device:unknown",
+      "source_type": "behavior",
+      "device_type": "unknown_device",
+      "operating_state": "unknown",
+      "baseline_summary": "No learned baseline yet. Judge only against organisation-wide forbidden patterns; do not assert an expected packet rate.",
+      "expected_features": {"packet_rate": "unknown", "assert_rate_thresholds": false}
+    },
+    {
+      "source_id": "behavior:baby_sensor:idle",
+      "source_type": "behavior",
+      "device_type": "baby_sensor",
+      "operating_state": "idle",
+      "baseline_summary": "Very low WiFi keepalive traffic to base station while monitoring quietly.",
+      "expected_features": {"packet_rate": "very_low", "connection_rate": "low"}
+    },
+    {
+      "source_id": "behavior:baby_sensor:interaction",
+      "source_type": "behavior",
+      "device_type": "baby_sensor",
+      "operating_state": "interaction",
+      "baseline_summary": "Brief burst when an emergency orientation/rollover event notifies the companion app (LAN/WAN emergency).",
+      "expected_features": {"packet_rate": "medium", "burst_allowed": true}
+    },
+    {
+      "source_id": "behavior:baby_sensor:power",
+      "source_type": "behavior",
+      "device_type": "baby_sensor",
+      "operating_state": "power",
+      "baseline_summary": "Minimal traffic during power-on or pairing handshake.",
+      "expected_features": {"packet_rate": "low", "connection_rate": "low"}
+    }
+  ]
+}

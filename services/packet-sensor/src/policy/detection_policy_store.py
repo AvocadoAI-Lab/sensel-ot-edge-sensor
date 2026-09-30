@@ -108,3 +108,9 @@ class DetectionPolicyStore:
     def policy(self) -> dict[str, Any]:
         self.maybe_reload()
         return dict(self._baseline)
+
+    def baseline_profile_artifact(self) -> dict[str, Any]:
+        self.maybe_reload()
+        if self._profile_store is None:
+            return {}
+        return self._profile_store.artifact()
